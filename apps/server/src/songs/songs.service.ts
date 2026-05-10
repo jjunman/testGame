@@ -1,5 +1,6 @@
 ﻿import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { BandMember } from '../bands/band-member.entity';
 import { MAX_VOTES_PER_USER } from '../common/constants';
 import { SongRoundStatus } from '../common/enums';
 import { BandsService } from '../bands/bands.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { UsersService } from '../users/users.service';
 import { CreateSongCandidateDto, UpdateSongRoundStatusDto } from './dto';
@@ -33,6 +35,7 @@ export class SongsService {
     @InjectRepository(PracticeAssignment)
     private readonly practiceAssignmentsRepository: Repository<PracticeAssignment>,
     private readonly bandsService: BandsService,
+    private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -136,11 +139,15 @@ export class SongsService {
     await this.bandsService.requireMembership(userId, bandId);
     const candidate = await this.candidatesRepository.findOne({
       where: { id: candidateId },
-      relations: ['round', 'round.band', 'round.finalCandidate'],
+      relations: ['createdByUser', 'round', 'round.band', 'round.finalCandidate'],
     });
 
     if (!candidate || candidate.round.band.id !== bandId) {
       throw new NotFoundException('삭제할 노래를 찾을 수 없습니다.');
+    }
+
+    if (candidate.round.status !== SongRoundStatus.DONE && candidate.createdByUser.id !== userId) {
+      throw new ForbiddenException('직접 올린 후보곡만 삭제할 수 있습니다.');
     }
 
     const linkedAssignments = await this.practiceAssignmentsRepository.find({
@@ -194,10 +201,19 @@ export class SongsService {
     if (existingRound?.status === SongRoundStatus.POSTED) {
       existingRound.status = SongRoundStatus.VOTING;
       existingRound.votingDeadlineAt = new Date(deadlineAt);
-      return this.roundsRepository.save(existingRound);
+      const savedRound = await this.roundsRepository.save(existingRound);
+      await this.notificationsService.notifyBandMembers(
+        bandId,
+        {
+          title: membership.band.name,
+          body: '합주곡 투표가 열렸어요. 후보곡을 골라 주세요.',
+          data: { type: 'song_vote', bandId, roundId: savedRound.id },
+        },
+      );
+      return savedRound;
     }
 
-    return this.roundsRepository.save(
+    const savedRound = await this.roundsRepository.save(
       this.roundsRepository.create({
         band: membership.band,
         status: SongRoundStatus.VOTING,
@@ -205,6 +221,15 @@ export class SongsService {
         votingDeadlineAt: new Date(deadlineAt),
       }),
     );
+    await this.notificationsService.notifyBandMembers(
+      bandId,
+      {
+        title: membership.band.name,
+        body: '합주곡 투표가 열렸어요. 후보곡을 골라 주세요.',
+        data: { type: 'song_vote', bandId, roundId: savedRound.id },
+      },
+    );
+    return savedRound;
   }
 
   async updateRoundStatus(userId: string, bandId: string, dto: UpdateSongRoundStatusDto) {

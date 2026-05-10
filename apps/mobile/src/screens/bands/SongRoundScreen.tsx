@@ -8,6 +8,7 @@ import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
 import { EmptyState, HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
+import { useAuth } from '../../store/AuthContext';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -15,9 +16,11 @@ type Props = NativeStackScreenProps<BandsStackParamList, 'SongRound'>;
 
 export function SongRoundScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
+  const { user } = useAuth();
   const { currentBand } = useCurrentBand();
   const [round, setRound] = useState<SongRoundDto | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null);
   const [endingRound, setEndingRound] = useState(false);
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const { width } = useWindowDimensions();
@@ -38,6 +41,12 @@ export function SongRoundScreen({ route, navigation }: Props) {
 
     return [...round.candidates];
   }, [round]);
+
+  useEffect(() => {
+    if (activeCandidateIndex >= candidates.length) {
+      setActiveCandidateIndex(Math.max(0, candidates.length - 1));
+    }
+  }, [activeCandidateIndex, candidates.length]);
 
   const toggleVote = async (candidateId: string, didVote: boolean) => {
     if (!round) {
@@ -131,7 +140,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   };
 
   const deleteCandidate = (candidate: SongCandidateDto) => {
-    if (!isLeader) {
+    if (!isVoting || candidate.createdByUserId !== user?.id) {
       return;
     }
 
@@ -141,11 +150,14 @@ export function SongRoundScreen({ route, navigation }: Props) {
         text: '삭제하기',
         style: 'destructive',
         onPress: async () => {
+          setDeletingCandidateId(candidate.id);
           try {
             await api.delete(`/bands/${bandId}/song-candidates/${candidate.id}`);
             await load();
           } catch (error) {
             Alert.alert('삭제 실패', error instanceof Error ? error.message : '노래를 삭제하지 못했어요.');
+          } finally {
+            setDeletingCandidateId(null);
           }
         },
       },
@@ -209,6 +221,8 @@ export function SongRoundScreen({ route, navigation }: Props) {
             canEditSelection={canEditSelection}
             isVoting={isVoting}
             submittingId={submittingId}
+            deletingCandidateId={deletingCandidateId}
+            currentUserId={user?.id ?? null}
             onIndexChange={setActiveCandidateIndex}
             onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
             onDelete={deleteCandidate}
@@ -273,6 +287,8 @@ function SongVoteCarousel({
   canEditSelection,
   isVoting,
   submittingId,
+  deletingCandidateId,
+  currentUserId,
   onIndexChange,
   onVote,
   onDelete,
@@ -284,6 +300,8 @@ function SongVoteCarousel({
   canEditSelection: boolean;
   isVoting: boolean;
   submittingId: string | null;
+  deletingCandidateId: string | null;
+  currentUserId: string | null;
   onIndexChange: (index: number) => void;
   onVote: (candidate: SongCandidateDto) => void;
   onDelete: (candidate: SongCandidateDto) => void;
@@ -305,7 +323,8 @@ function SongVoteCarousel({
       >
         {candidates.map((candidate, index) => {
           const active = index === activeIndex;
-          const voteDisabled = !isVoting || !canEditSelection || submittingId !== null;
+          const voteDisabled = !isVoting || !canEditSelection || submittingId !== null || deletingCandidateId !== null;
+          const canDelete = isVoting && currentUserId === candidate.createdByUserId;
           return (
             <Pressable
               key={candidate.id}
@@ -314,8 +333,6 @@ function SongVoteCarousel({
                 { width: cardWidth, marginRight: index === candidates.length - 1 ? 0 : cardGap },
                 candidate.didVote && styles.songVoteCardSelected,
               ]}
-              onLongPress={() => onDelete(candidate)}
-              delayLongPress={450}
             >
               <View style={styles.youtubePanel}>
                 {active && candidate.youtubeVideoId ? (
@@ -335,6 +352,20 @@ function SongVoteCarousel({
                 <Text style={styles.songCardTitle} numberOfLines={2}>{candidate.title}</Text>
                 <Text style={styles.songCardArtist} numberOfLines={1}>{candidate.artist}</Text>
                 {candidate.warningMessage ? <Text style={styles.songCardWarning}>{candidate.warningMessage}</Text> : null}
+                {canDelete ? (
+                  <Pressable
+                    onPress={() => onDelete(candidate)}
+                    disabled={deletingCandidateId === candidate.id || submittingId !== null}
+                    style={[
+                      styles.songDeleteButton,
+                      (deletingCandidateId === candidate.id || submittingId !== null) && styles.songDeleteButtonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.songDeleteButtonText}>
+                      {deletingCandidateId === candidate.id ? '삭제 중...' : '삭제'}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <PrimaryButton
                   label={candidate.didVote ? '이 곡 투표 취소' : '이 곡 투표하기'}
                   onPress={() => onVote(candidate)}
@@ -463,6 +494,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
+  },
+  songDeleteButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+  songDeleteButtonDisabled: {
+    opacity: 0.45,
+  },
+  songDeleteButtonText: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
   },
   songVoteCancelButton: {
     backgroundColor: theme.colors.primaryDark,

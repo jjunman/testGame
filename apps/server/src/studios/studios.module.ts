@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsModule } from '../bands/bands.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { UsersModule } from '../users/users.module';
 import { StudioCandidate } from './studio-candidate.entity';
@@ -14,6 +15,7 @@ import { StudiosService } from './studios.service';
   imports: [
     TypeOrmModule.forFeature([Studio, StudioCandidate, StudioVote, ScheduleProposal, BandMember]),
     BandsModule,
+    NotificationsModule,
     UsersModule,
   ],
   providers: [StudiosService],

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -19,4 +19,13 @@ export class LoginDto {
 
   @IsString()
   password: string;
+}
+
+export class SavePushTokenDto {
+  @IsString()
+  token: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
 }

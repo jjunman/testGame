@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { UserSummary } from '@band/shared-types';
 import { api, tokenStorage } from '../api/client';
+import { registerForPushNotificationsAsync } from '../notifications/pushNotifications';
 
 type AuthContextValue = {
   user: UserSummary | null;
@@ -36,6 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     bootstrap();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    registerForPushNotificationsAsync();
+  }, [user?.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

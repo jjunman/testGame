@@ -21,4 +21,15 @@ export class UsersService {
   findById(id: string) {
     return this.usersRepository.findOne({ where: { id } });
   }
+
+  async savePushToken(userId: string, token: string, platform?: string | null) {
+    const user = await this.findById(userId);
+    if (!user) {
+      return null;
+    }
+
+    user.expoPushToken = token;
+    user.pushPlatform = platform ?? null;
+    return this.usersRepository.save(user);
+  }
 }

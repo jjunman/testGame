@@ -22,6 +22,14 @@ export class User {
   @Column()
   name: string;
 
+  @Column({ name: 'expo_push_token', type: 'varchar', nullable: true })
+  @Exclude()
+  expoPushToken: string | null;
+
+  @Column({ name: 'push_platform', type: 'varchar', nullable: true })
+  @Exclude()
+  pushPlatform: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

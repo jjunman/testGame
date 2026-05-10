@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsModule } from '../bands/bands.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { UsersModule } from '../users/users.module';
 import { SongCandidate } from './song-candidate.entity';
@@ -15,6 +16,7 @@ import { SongsService } from './songs.service';
   imports: [
     TypeOrmModule.forFeature([SongCatalog, SongRound, SongCandidate, SongVote, BandMember, PracticeAssignment]),
     BandsModule,
+    NotificationsModule,
     UsersModule,
   ],
   providers: [SongsService],

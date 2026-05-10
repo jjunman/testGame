@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandsService } from '../bands/bands.service';
 import { ScheduleAvailabilityType } from '../common/enums';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import {
   CreateScheduleProposalDto,
@@ -27,6 +28,7 @@ export class ScheduleService {
     @InjectRepository(ScheduleProposalVote)
     private readonly proposalVotesRepository: Repository<ScheduleProposalVote>,
     private readonly bandsService: BandsService,
+    private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -176,7 +178,7 @@ export class ScheduleService {
       await this.proposalsRepository.save(existingActive);
     }
 
-    return this.proposalsRepository.save(
+    const proposal = await this.proposalsRepository.save(
       this.proposalsRepository.create({
         band: membership.band,
         createdByUser: membership.user,
@@ -188,6 +190,15 @@ export class ScheduleService {
         endedAt: null,
       }),
     );
+    await this.notificationsService.notifyBandMembers(
+      bandId,
+      {
+        title: membership.band.name,
+        body: '합주 시간 투표가 열렸어요. 가능한지 확인해 주세요.',
+        data: { type: 'schedule_vote', bandId, proposalId: proposal.id },
+      },
+    );
+    return proposal;
   }
 
   async voteProposal(userId: string, bandId: string, dto: VoteScheduleProposalDto) {

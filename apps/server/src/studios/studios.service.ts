@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { UsersService } from '../users/users.service';
 import { findAnsanLocation } from './ansan-locations';
@@ -229,6 +230,7 @@ export class StudiosService {
     @InjectRepository(BandMember)
     private readonly membersRepository: Repository<BandMember>,
     private readonly bandsService: BandsService,
+    private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -330,7 +332,7 @@ export class StudiosService {
       throw new BadRequestException('이미 후보로 등록된 합주실입니다.');
     }
 
-    return this.candidatesRepository.save(
+    const candidate = await this.candidatesRepository.save(
       this.candidatesRepository.create({
         band: membership.band,
         studio,
@@ -340,6 +342,15 @@ export class StudiosService {
         voteDeadlineAt: null,
       }),
     );
+    await this.notificationsService.notifyBandMembers(
+      bandId,
+      {
+        title: membership.band.name,
+        body: '합주실 투표가 열렸어요. 후보를 확인해 주세요.',
+        data: { type: 'studio_vote', bandId, candidateId: candidate.id },
+      },
+    );
+    return candidate;
   }
 
   async vote(userId: string, bandId: string, candidateId: string) {

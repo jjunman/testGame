@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BandsModule } from '../bands/bands.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
 import { ScheduleAvailability } from './schedule-availability.entity';
 import { ScheduleProposalVote } from './schedule-proposal-vote.entity';
@@ -13,6 +14,7 @@ import { ScheduleService } from './schedule.service';
   imports: [
     TypeOrmModule.forFeature([ScheduleSlot, ScheduleAvailability, ScheduleProposal, ScheduleProposalVote]),
     BandsModule,
+    NotificationsModule,
     UsersModule,
   ],
   providers: [ScheduleService],
