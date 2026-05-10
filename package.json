@@ -1,0 +1,15 @@
+{
+  "name": "band-management-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace @band/server run start:dev",
+    "dev:mobile": "npm --workspace @band/mobile run start",
+    "build:server": "npm --workspace @band/server run build",
+    "lint:server": "npm --workspace @band/server run lint"
+  }
+}
