@@ -19,7 +19,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
-        label="쏭"
+        label="노래"
         active={active === 'song'}
         icon={
           <MaterialCommunityIcons
@@ -31,13 +31,13 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('SongRound', { bandId })}
       />
       <NavItem
-        label="calendar"
+        label="달력"
         active={active === 'calendar'}
         icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={23} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('Schedule', { bandId })}
       />
       <NavItem
-        label="김태영"
+        label="합주실"
         active={active === 'studio'}
         icon={
           <MaterialCommunityIcons
@@ -49,7 +49,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('Studios', { bandId })}
       />
       <NavItem
-        label="바보"
+        label="유저"
         active={active === 'user'}
         icon={<Ionicons name={active === 'user' ? 'person' : 'person-outline'} size={23} color={active === 'user' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('BandMembers', { bandId })}
