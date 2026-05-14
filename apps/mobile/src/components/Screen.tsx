@@ -16,8 +16,6 @@ export function Screen({ children, contentContainerStyle, fixedFooter, scrollEna
 
   const body = (
     <View style={styles.backdrop}>
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
       {scrollEnabled ? (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: bottomSpacing }, contentContainerStyle]}
@@ -45,38 +43,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 28,
-    gap: 16,
+    gap: 14,
   },
   fill: {
     flex: 1,
   },
   fixedFooter: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
-  },
-  glowTop: {
-    position: 'absolute',
-    top: -80,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#ddd1ff',
-    opacity: 0.55,
-  },
-  glowBottom: {
-    position: 'absolute',
-    bottom: -120,
-    left: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: '#ffe3ea',
-    opacity: 0.5,
+    left: 12,
+    right: 12,
+    bottom: 12,
   },
 });

@@ -15,7 +15,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="홈"
         active={active === 'home'}
-        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={23} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={22} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
@@ -24,7 +24,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         icon={
           <MaterialCommunityIcons
             name={active === 'song' ? 'music-note' : 'music-note-outline'}
-            size={23}
+            size={22}
             color={active === 'song' ? theme.colors.primary : inactiveColor}
           />
         }
@@ -33,7 +33,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="달력"
         active={active === 'calendar'}
-        icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={23} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={22} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('Schedule', { bandId })}
       />
       <NavItem
@@ -42,23 +42,23 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         icon={
           <MaterialCommunityIcons
             name={active === 'studio' ? 'map-marker' : 'map-marker-outline'}
-            size={23}
+            size={22}
             color={active === 'studio' ? theme.colors.primary : inactiveColor}
           />
         }
         onPress={() => navigation.navigate('Studios', { bandId })}
       />
       <NavItem
-        label="유저"
+        label="멤버"
         active={active === 'user'}
-        icon={<Ionicons name={active === 'user' ? 'person' : 'person-outline'} size={23} color={active === 'user' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'user' ? 'person' : 'person-outline'} size={22} color={active === 'user' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('BandMembers', { bandId })}
       />
     </View>
   );
 }
 
-const inactiveColor = '#9e96c8';
+const inactiveColor = '#7c8491';
 
 function NavItem({
   label,
@@ -72,7 +72,7 @@ function NavItem({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.item}>
+    <Pressable onPress={onPress} style={[styles.item, active && styles.itemActive]}>
       {icon}
       <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{label}</Text>
     </Pressable>
@@ -82,22 +82,32 @@ function NavItem({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    height: 72,
-    backgroundColor: '#e7ddff',
-    borderRadius: 22,
-    paddingTop: 10,
-    paddingBottom: 10,
+    height: 68,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 6,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 5,
   },
   item: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
+    borderRadius: theme.radius.md,
+  },
+  itemActive: {
+    backgroundColor: theme.colors.primarySoft,
   },
   label: {
     color: inactiveColor,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   labelActive: {
     color: theme.colors.primary,

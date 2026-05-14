@@ -107,15 +107,15 @@ function InputRow({
 
 const styles = StyleSheet.create({
   formCard: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    backgroundColor: '#f4f0ff',
-    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
     padding: 14,
     gap: 12,
   },
   title: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '800',
   },

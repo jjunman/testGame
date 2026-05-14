@@ -7,7 +7,7 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LEADER_START_POINTS, MEMBER_START_POINTS } from '../common/constants';
-import { MemberRole, PositionType, SongRoundStatus } from '../common/enums';
+import { MemberRole, PositionType, PracticeAssignmentStatus, SongRoundStatus } from '../common/enums';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { ScheduleAvailability } from '../schedule/schedule-availability.entity';
 import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
@@ -275,6 +275,7 @@ export class BandsService {
       role: member.role,
       positionLabel: this.positionLabel(member.positionType, member.customPosition),
       volumePoints: member.volumePoints,
+      joinedAt: member.joinedAt.toISOString(),
     }));
   }
 
@@ -283,7 +284,7 @@ export class BandsService {
   }
 
   async getTodos(userId: string, bandId: string) {
-    await this.requireMembership(userId, bandId);
+    const membership = await this.requireMembership(userId, bandId);
     const todos = [];
 
     const votingRound = await this.roundsRepository.findOne({
@@ -335,10 +336,13 @@ export class BandsService {
       });
     }
 
-      const openPracticeCount = await this.practiceRepository
+    const openPracticeCount = await this.practiceRepository
       .createQueryBuilder('assignment')
       .leftJoin('assignment.submissions', 'submission', 'submission.userId = :userId', { userId })
       .where('assignment.bandId = :bandId', { bandId })
+      .andWhere('assignment.status = :status', { status: PracticeAssignmentStatus.OPEN })
+      .andWhere('assignment.dueAt >= :now', { now: new Date() })
+      .andWhere('assignment.dueAt >= :joinedAt', { joinedAt: membership.joinedAt })
       .andWhere('submission.id IS NULL')
       .getCount();
 

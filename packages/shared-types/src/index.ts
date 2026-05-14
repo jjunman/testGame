@@ -38,6 +38,7 @@ export type BandMemberSummary = {
   role: MemberRole;
   positionLabel: string;
   volumePoints: number;
+  joinedAt: string;
 };
 
 export type SongCandidateDto = {

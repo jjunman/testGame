@@ -16,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
@@ -28,6 +29,7 @@ export class BandsController {
   constructor(
     private readonly bandsService: BandsService,
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get()
@@ -57,7 +59,7 @@ export class BandsController {
   ) {
     const user = await this.usersService.findById(currentUser.userId);
     res.locals.message = '밴드를 만들었습니다.';
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = this.configService.get<string>('uploadBaseUrl') ?? `${req.protocol}://${req.get('host')}`;
     const thumbnailUrl = file ? `${baseUrl}/uploads/${file.filename}` : dto.thumbnailUrl;
     return this.bandsService.createBand(user!, dto, thumbnailUrl);
   }

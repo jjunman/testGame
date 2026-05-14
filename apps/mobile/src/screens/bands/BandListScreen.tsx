@@ -3,7 +3,7 @@ import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BandSummary } from '@band/shared-types';
-import { api } from '../../api/client';
+import { api, toApiAssetUrl } from '../../api/client';
 import { Screen } from '../../components/Screen';
 import { EmptyState, PrimaryButton, StatusBadge } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
@@ -18,9 +18,13 @@ export function BandListScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     const result = await api.get<BandSummary[]>('/bands');
-    setBands(result);
-    if (!currentBand || !result.some((band) => band.id === currentBand.id)) {
-      setCurrentBand(result[0] ?? null);
+    const normalized = result.map((band) => ({
+      ...band,
+      thumbnailUrl: toApiAssetUrl(band.thumbnailUrl),
+    }));
+    setBands(normalized);
+    if (!currentBand || !normalized.some((band) => band.id === currentBand.id)) {
+      setCurrentBand(normalized[0] ?? null);
     }
   }, [currentBand, setCurrentBand]);
 
@@ -92,9 +96,11 @@ export function BandListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   headerCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 18,
+    borderRadius: theme.radius.md,
     padding: 16,
     gap: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   userButton: {
     width: 38,
@@ -120,9 +126,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardWrap: {
-    borderRadius: 22,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: 'transparent',
   },
   cardWrapSelected: {
@@ -132,7 +138,7 @@ const styles = StyleSheet.create({
     minHeight: 126,
     justifyContent: 'space-between',
     padding: 16,
-    borderRadius: 22,
+    borderRadius: theme.radius.md,
   },
   cardTop: {
     flexDirection: 'row',
@@ -145,10 +151,10 @@ const styles = StyleSheet.create({
   },
   cardDim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(18, 12, 44, 0.44)',
+    backgroundColor: 'rgba(15, 20, 30, 0.46)',
   },
   cardImage: {
-    borderRadius: 22,
+    borderRadius: theme.radius.md,
   },
   bandTitle: {
     color: '#fff',

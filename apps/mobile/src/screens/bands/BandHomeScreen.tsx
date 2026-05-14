@@ -3,10 +3,10 @@ import { Alert, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, TodoItemDto, VoteSummaryDto, VoteStepStatus } from '@band/shared-types';
-import { api } from '../../api/client';
+import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, HeroBanner, StatusBadge } from '../../components/UI';
+import { EmptyState, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -26,10 +26,11 @@ export function BandHomeScreen({ route, navigation }: Props) {
     setLoadError(null);
     try {
       const result = await api.get<BandHomeDto>(`/bands/${bandId}`);
+      const thumbnailUrl = toApiAssetUrl(result.thumbnailUrl);
       setCurrentBand({
         id: result.id,
         name: result.name,
-        thumbnailUrl: result.thumbnailUrl,
+        thumbnailUrl,
         inviteCode: result.inviteCode,
         myRole: result.myMembership?.role ?? 'member',
         myPosition: result.myMembership?.positionLabel ?? '',
@@ -37,6 +38,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       });
       setDetail({
         ...result,
+        thumbnailUrl,
         myMembership: result.myMembership ?? {
           role: 'member',
           positionLabel: '',
@@ -84,6 +86,10 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
   const hasActiveSongVote = detail.activeSongRound?.status === 'voting';
+  const primaryTodo = todos[0] ?? null;
+  const secondaryTodos = todos.slice(1);
+  const pickingCards = detail.songCards.filter((card) => card.kind === 'picking');
+  const songCards = detail.songCards.filter((card) => card.kind === 'song');
 
   const startSongVote = async () => {
     setStartingVote(true);
@@ -122,6 +128,22 @@ export function BandHomeScreen({ route, navigation }: Props) {
     navigation.navigate('PracticeAssignments', { bandId });
   };
 
+  const openTodo = (todo: TodoItemDto) => {
+    if (todo.shortcut === 'song_round') {
+      navigation.navigate('SongRound', { bandId });
+      return;
+    }
+    if (todo.shortcut === 'schedule') {
+      navigation.navigate('Schedule', { bandId });
+      return;
+    }
+    if (todo.shortcut === 'studio') {
+      navigation.navigate('Studios', { bandId });
+      return;
+    }
+    navigation.navigate('PracticeAssignments', { bandId });
+  };
+
   const deleteSongCard = (card: BandHomeDto['songCards'][number]) => {
     const isPicking = card.kind === 'picking';
     const title = isPicking ? '곡 투표 삭제하기' : '노래 삭제하기';
@@ -152,84 +174,90 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
-      <HeroBanner title={detail.name} subtitle="밴드 메인" imageUrl={detail.thumbnailUrl} />
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>내가 해야 할 것</Text>
-        <View style={styles.todoList}>
-          <VoteTimeline
-            summary={detail.voteSummary}
-            onPress={(target) => {
-              if (target === 'song') {
-                navigation.navigate('SongRound', { bandId });
-                return;
-              }
-              if (target === 'schedule') {
-                navigation.navigate('Schedule', { bandId });
-                return;
-              }
-              navigation.navigate('Studios', { bandId });
-            }}
-          />
-          {todos.length === 0 ? (
-            <EmptyState title="지금은 할 일이 없어요" description="투표나 연습 과제가 생기면 여기에서 바로 확인할 수 있어요." />
-          ) : (
-            <>
-            {todos.map((todo) => (
-              <TodoCard
-                key={todo.type}
-                todo={todo}
-                onPress={() => {
-                  if (todo.shortcut === 'song_round') {
-                    navigation.navigate('SongRound', { bandId });
-                    return;
-                  }
-                  if (todo.shortcut === 'schedule') {
-                    navigation.navigate('Schedule', { bandId });
-                    return;
-                  }
-                  if (todo.shortcut === 'studio') {
-                    navigation.navigate('Studios', { bandId });
-                    return;
-                  }
-                  navigation.navigate('PracticeAssignments', { bandId });
-                }}
-              />
-            ))}
-            </>
-          )}
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryTop}>
+          <View style={styles.summaryText}>
+            <Text style={styles.bandName} numberOfLines={1}>{detail.name}</Text>
+            <Text style={styles.bandMeta} numberOfLines={1}>
+              {detail.myMembership.positionLabel || '파트 미정'} · {detail.myMembership.role === 'leader' ? '리더' : '멤버'}
+            </Text>
+          </View>
+          <StatusBadge label={todos.length > 0 ? `${todos.length}개 필요` : '정리됨'} tone={todos.length > 0 ? 'warning' : 'success'} />
+        </View>
+        <View style={styles.summaryStats}>
+          <SummaryStat label="연습 과제" value={detail.openPracticeCount} />
+          <SummaryStat label="등록 일정" value={detail.openScheduleSlotCount} />
+          <SummaryStat label="초대코드" value={detail.inviteCode} />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>노래 목록</Text>
-        <View style={styles.songGrid}>
-            {detail.songCards.map((card) => (
-              <Pressable
-                key={card.id}
-                style={styles.songTile}
-                onPress={() => openSongCard(card)}
-                onLongPress={() => deleteSongCard(card)}
-                delayLongPress={450}
-              >
-                <ImageBackground source={{ uri: card.thumbnailUrl ?? undefined }} imageStyle={styles.songCoverImage} style={styles.songCover}>
-                  <View style={styles.songCoverOverlay} />
-                  <Text style={styles.songCoverText}>{card.kind === 'picking' ? '진행중' : card.title.slice(0, 2)}</Text>
-                </ImageBackground>
-                <Text style={styles.songTitle} numberOfLines={1}>{card.title}</Text>
-                <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
-                {card.practiceDueAt ? <Text style={styles.songDueText} numberOfLines={1}>{formatDueLabel(card.practiceDueAt)}</Text> : null}
-              </Pressable>
+        <Text style={styles.sectionTitle}>지금 할 일</Text>
+        {primaryTodo ? (
+          <PrimaryTodoCard todo={primaryTodo} onPress={() => openTodo(primaryTodo)} />
+        ) : (
+          <EmptyState title="지금은 할 일이 없어요" description="투표나 연습 과제가 생기면 여기에서 바로 확인할 수 있어요." />
+        )}
+        {secondaryTodos.length > 0 ? (
+          <View style={styles.compactTodoList}>
+            {secondaryTodos.map((todo) => (
+              <CompactTodoItem key={todo.type} todo={todo} onPress={() => openTodo(todo)} />
             ))}
-              <Pressable
-                style={[styles.songTile, styles.addSongTile, (startingVote || hasActiveSongVote) && styles.addSongTileDisabled]}
-                onPress={() => setDeadlineModalOpen(true)}
-                disabled={startingVote || hasActiveSongVote}
-              >
-                <Text style={styles.addPlus}>{startingVote ? '...' : '+'}</Text>
-                <Text style={styles.addText}>{hasActiveSongVote ? '투표 진행중' : startingVote ? '시작 중' : '곡 추가하기'}</Text>
-              </Pressable>
           </View>
+        ) : null}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>진행 상황</Text>
+        <VoteTimeline
+          summary={detail.voteSummary}
+          onPress={(target) => {
+            if (target === 'song') {
+              navigation.navigate('SongRound', { bandId });
+              return;
+            }
+            if (target === 'schedule') {
+              navigation.navigate('Schedule', { bandId });
+              return;
+            }
+            navigation.navigate('Studios', { bandId });
+          }}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>곡과 연습</Text>
+          <Pressable
+            style={[styles.startVoteButton, (startingVote || hasActiveSongVote) && styles.startVoteButtonDisabled]}
+            onPress={() => setDeadlineModalOpen(true)}
+            disabled={startingVote || hasActiveSongVote}
+          >
+            <Text style={styles.startVoteText}>{hasActiveSongVote ? '투표 진행 중' : startingVote ? '시작 중...' : '투표 시작'}</Text>
+          </Pressable>
+        </View>
+
+        {pickingCards.length > 0 ? (
+          <View style={styles.listGroup}>
+            <Text style={styles.groupLabel}>진행 중인 투표</Text>
+            {pickingCards.map((card) => (
+              <SongListItem key={card.id} card={card} onPress={() => openSongCard(card)} onLongPress={() => deleteSongCard(card)} />
+            ))}
+          </View>
+        ) : null}
+
+        {songCards.length > 0 ? (
+          <View style={styles.listGroup}>
+            <Text style={styles.groupLabel}>곡 / 연습</Text>
+            {songCards.map((card) => (
+              <SongListItem key={card.id} card={card} onPress={() => openSongCard(card)} onLongPress={() => deleteSongCard(card)} />
+            ))}
+          </View>
+        ) : null}
+
+        {detail.songCards.length === 0 ? (
+          <EmptyState title="아직 곡이 없어요" description="투표를 시작하면 후보곡과 연습 흐름이 여기에 정리돼요." />
+        ) : null}
       </View>
 
       <Modal visible={deadlineModalOpen} transparent animationType="fade" onRequestClose={() => setDeadlineModalOpen(false)}>
@@ -270,17 +298,66 @@ export function BandHomeScreen({ route, navigation }: Props) {
   );
 }
 
-function TodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
-  const tone = todo.shortcut === 'song_round' ? 'pink' : 'purple';
-
+function SummaryStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <Pressable style={[styles.todoCard, tone === 'pink' ? styles.todoPink : styles.todoPurple]} onPress={onPress}>
+    <View style={styles.summaryStat}>
+      <Text style={styles.summaryStatLabel}>{label}</Text>
+      <Text style={styles.summaryStatValue} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
+function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
+  return (
+    <Pressable style={styles.primaryTodoCard} onPress={onPress}>
       <View style={styles.todoTop}>
         <Text style={styles.todoTitle}>{todo.title}</Text>
-        <StatusBadge label={todo.dueLabel ?? '바로가기'} tone={tone === 'pink' ? 'danger' : 'default'} />
+        <StatusBadge label={todo.dueLabel ?? '바로가기'} tone="warning" />
       </View>
       <Text style={styles.todoDescription}>{todo.description}</Text>
       <Text style={styles.todoAction}>바로가기</Text>
+    </Pressable>
+  );
+}
+
+function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
+  return (
+    <Pressable style={styles.compactTodoItem} onPress={onPress}>
+      <View style={styles.compactTodoText}>
+        <Text style={styles.compactTodoTitle} numberOfLines={1}>{todo.title}</Text>
+        <Text style={styles.compactTodoDescription} numberOfLines={1}>{todo.description}</Text>
+      </View>
+      <Text style={styles.compactTodoAction}>열기</Text>
+    </Pressable>
+  );
+}
+
+function SongListItem({
+  card,
+  onPress,
+  onLongPress,
+}: {
+  card: BandHomeDto['songCards'][number];
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const isPicking = card.kind === 'picking';
+  return (
+    <Pressable style={styles.songListItem} onPress={onPress} onLongPress={onLongPress} delayLongPress={450}>
+      <ImageBackground source={{ uri: card.thumbnailUrl ?? undefined }} imageStyle={styles.songCoverImage} style={styles.songCover}>
+        <View style={styles.songCoverOverlay} />
+        <Text style={styles.songCoverText}>{isPicking ? '투표' : card.title.slice(0, 2)}</Text>
+      </ImageBackground>
+      <View style={styles.songListBody}>
+        <View style={styles.songListTop}>
+          <Text style={styles.songTitle} numberOfLines={1}>{card.title}</Text>
+          <StatusBadge label={isPicking ? '투표 중' : card.practiceAssignmentId ? '연습' : '곡'} tone={isPicking ? 'warning' : 'default'} />
+        </View>
+        <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
+        <Text style={styles.songHint} numberOfLines={1}>
+          {card.practiceDueAt ? formatDueLabel(card.practiceDueAt) : isPicking ? '눌러서 투표 화면으로 이동' : '길게 누르면 삭제'}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -344,9 +421,11 @@ function formatDueLabel(value: string) {
 const styles = StyleSheet.create({
   loadingCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 18,
+    borderRadius: theme.radius.md,
     padding: 18,
     gap: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   loadingTitle: {
     color: theme.colors.text,
@@ -372,24 +451,119 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
+  summaryCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 14,
+    gap: 12,
+  },
+  summaryTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  summaryText: {
+    flex: 1,
+    gap: 4,
+  },
+  bandName: {
+    color: theme.colors.text,
+    fontSize: 23,
+    fontWeight: '900',
+  },
+  bandMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  summaryStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  summaryStat: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 3,
+  },
+  summaryStatLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  summaryStatValue: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 17,
     fontWeight: '800',
   },
-  todoList: {
+  primaryTodoCard: {
+    borderRadius: theme.radius.md,
+    padding: 16,
+    gap: 9,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: '#f8f8ff',
+  },
+  compactTodoList: {
     gap: 10,
   },
+  compactTodoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  compactTodoText: {
+    flex: 1,
+    gap: 2,
+  },
+  compactTodoTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  compactTodoDescription: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  compactTodoAction: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   voteTimelineCard: {
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 14,
     gap: 12,
   },
   voteTimelineTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -407,21 +581,21 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.border,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   voteStepDone: {
-    backgroundColor: '#23a66f',
-    borderColor: '#23a66f',
+    backgroundColor: theme.colors.success,
+    borderColor: theme.colors.success,
   },
   voteStepNeeded: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
   voteStepNumber: {
-    color: theme.colors.primary,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -437,7 +611,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   voteStepLabelNeeded: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
   },
   voteStepStatus: {
     color: theme.colors.textMuted,
@@ -452,18 +626,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   voteStepLineDone: {
-    backgroundColor: '#23a66f',
-  },
-  todoCard: {
-    borderRadius: 14,
-    padding: 14,
-    gap: 8,
-  },
-  todoPink: {
-    backgroundColor: '#ffcad7',
-  },
-  todoPurple: {
-    backgroundColor: '#c9b8ff',
+    backgroundColor: theme.colors.success,
   },
   todoTop: {
     flexDirection: 'row',
@@ -472,7 +635,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   todoTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '800',
     flex: 1,
@@ -482,30 +645,65 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   todoAction: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.textMuted,
     fontWeight: '800',
     fontSize: 12,
   },
-  songGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  startVoteButton: {
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  songTile: {
-    width: '30%',
-    minWidth: 84,
-    gap: 5,
+  startVoteButtonDisabled: {
+    opacity: 0.55,
+  },
+  startVoteText: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  listGroup: {
+    gap: 8,
+  },
+  groupLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  songListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 10,
+  },
+  songListBody: {
+    flex: 1,
+    gap: 4,
+  },
+  songListTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   songCover: {
+    width: 70,
     height: 70,
-    borderRadius: 4,
-    backgroundColor: '#282432',
+    borderRadius: theme.radius.sm,
+    backgroundColor: '#20242c',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   songCoverImage: {
-    borderRadius: 4,
+    borderRadius: theme.radius.sm,
   },
   songCoverOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -517,37 +715,19 @@ const styles = StyleSheet.create({
   },
   songTitle: {
     color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '900',
+    flex: 1,
   },
   songArtist: {
     color: theme.colors.textMuted,
-    fontSize: 11,
-  },
-  songDueText: {
-    color: theme.colors.primary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
-  addSongTile: {
-    height: 94,
-    borderRadius: 4,
-    backgroundColor: theme.colors.primaryDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addSongTileDisabled: {
-    opacity: 0.7,
-  },
-  addPlus: {
-    color: '#fff',
-    fontSize: 28,
+  songHint: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
     fontWeight: '800',
-  },
-  addText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
   },
   modalBackdrop: {
     flex: 1,
@@ -557,7 +737,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#fff',
-    borderRadius: 22,
+    borderRadius: theme.radius.lg,
     padding: 20,
     gap: 14,
   },
@@ -577,8 +757,8 @@ const styles = StyleSheet.create({
   deadlineChip: {
     flex: 1,
     borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     paddingVertical: 12,
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -588,14 +768,14 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   deadlineChipText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '800',
   },
   deadlineChipTextActive: {
     color: '#fff',
   },
   deadlineSummary: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   modalActions: {
@@ -604,20 +784,20 @@ const styles = StyleSheet.create({
   },
   modalCancel: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 13,
   },
   modalCancelText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '800',
   },
   modalConfirm: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',

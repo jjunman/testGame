@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryAction: {
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   candidateSection: {
     gap: 8,
@@ -456,15 +456,15 @@ const styles = StyleSheet.create({
   },
   carouselDotActive: {
     width: 18,
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   carouselDotVoted: {
     backgroundColor: theme.colors.primary,
   },
   locationCard: {
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 14,
     gap: 10,
@@ -479,20 +479,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 17,
     fontWeight: '900',
   },
   map: {
     height: 220,
-    borderRadius: 14,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
   },
   addressSearch: {
     gap: 8,
   },
   addressButton: {
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   mapActions: {
     flexDirection: 'row',
@@ -516,10 +516,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   confirmedCard: {
-    borderRadius: 16,
-    backgroundColor: '#edf9f0',
+    borderRadius: theme.radius.md,
+    backgroundColor: '#ecfdf5',
     borderWidth: 1,
-    borderColor: '#b9e7c4',
+    borderColor: '#bbf7d0',
     padding: 14,
     gap: 6,
   },
@@ -533,9 +533,9 @@ const styles = StyleSheet.create({
   },
   card: {
     height: '100%',
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 10,
     gap: 10,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: '#f7f1ff',
+    backgroundColor: '#f8f8ff',
   },
   cardConfirmed: {
     borderColor: '#5fc47b',
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '900',
   },
@@ -581,8 +581,8 @@ const styles = StyleSheet.create({
   },
   infoCell: {
     flex: 1,
-    borderRadius: 10,
-    backgroundColor: '#f4f0ff',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
     padding: 8,
     gap: 3,
   },
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   voteText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 13,
     fontWeight: '900',
   },
@@ -624,16 +624,16 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     borderRadius: 999,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: theme.colors.surfaceMuted,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   linkButtonText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: '900',
   },
   votedButton: {
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
 });

@@ -27,18 +27,22 @@ export function HeroBanner({
   align?: 'left' | 'center';
 }) {
   return (
-    <ImageBackground source={{ uri: imageUrl || fallbackBandImage }} imageStyle={styles.heroImage} style={styles.hero}>
-      <View style={styles.heroOverlay} />
-      {badge ? (
-        <View style={styles.heroBadge}>
-          <Text style={styles.heroBadgeText}>{badge}</Text>
-        </View>
+    <View style={[styles.hero, align === 'center' && styles.heroCentered]}>
+      {imageUrl ? (
+        <ImageBackground source={{ uri: imageUrl || fallbackBandImage }} imageStyle={styles.heroThumbImage} style={styles.heroThumb}>
+          <View style={styles.heroThumbOverlay} />
+        </ImageBackground>
       ) : null}
-      <View style={[styles.heroContent, align === 'center' && styles.center]}>
-        <Text style={[styles.heroTitle, align === 'center' && styles.centerText]}>{title}</Text>
-        {subtitle ? <Text style={[styles.heroSubtitle, align === 'center' && styles.centerText]}>{subtitle}</Text> : null}
+      <View style={styles.heroTextBlock}>
+        <View style={[styles.heroTitleRow, align === 'center' && styles.center]}>
+          <Text style={[styles.heroTitle, align === 'center' && styles.centerText]} numberOfLines={2}>{title}</Text>
+          {badge ? (
+            <Text style={styles.heroBadgeText}>{badge}</Text>
+          ) : null}
+        </View>
+        {subtitle ? <Text style={[styles.heroSubtitle, align === 'center' && styles.centerText]} numberOfLines={2}>{subtitle}</Text> : null}
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -56,6 +60,26 @@ export function SectionCard({
       <Text style={styles.title}>{title}</Text>
       {children}
     </View>
+  );
+}
+
+export function TextButton({
+  label,
+  onPress,
+  tone = 'default',
+  disabled,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  tone?: 'default' | 'danger';
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.textButton, disabled && styles.textButtonDisabled, style]}>
+      <Text style={[styles.textButtonText, tone === 'danger' && styles.textButtonDanger]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -192,45 +216,58 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   hero: {
-    minHeight: 164,
-    borderRadius: theme.radius.lg,
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  heroCentered: {
+    justifyContent: 'center',
+  },
+  heroThumb: {
+    width: 54,
+    height: 54,
     overflow: 'hidden',
-    justifyContent: 'flex-end',
-    padding: 20,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  heroImage: {
-    borderRadius: theme.radius.lg,
+  heroThumbImage: {
+    borderRadius: theme.radius.md,
   },
-  heroOverlay: {
+  heroThumbOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(17, 13, 41, 0.48)',
+    backgroundColor: 'rgba(0,0,0,0.08)',
   },
-  heroBadge: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  heroBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  heroContent: {
+  heroTextBlock: {
+    flex: 1,
     gap: 4,
   },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 28,
+  heroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroBadgeText: {
+    overflow: 'hidden',
+    color: theme.colors.textMuted,
+    backgroundColor: theme.colors.surfaceMuted,
+    fontSize: 12,
     fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.pill,
+  },
+  heroTitle: {
+    flexShrink: 1,
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '900',
   },
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 14,
-    lineHeight: 20,
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   center: {
     alignItems: 'center',
@@ -241,13 +278,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    padding: 16,
+    padding: 14,
     gap: 12,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   cardPurple: {
     backgroundColor: theme.colors.surfaceMuted,
@@ -256,8 +290,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff0f3',
   },
   title: {
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
     color: theme.colors.text,
   },
   label: {
@@ -269,7 +303,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: theme.colors.border,
-    borderRadius: 14,
+    borderRadius: theme.radius.md,
     backgroundColor: '#fff',
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -284,8 +318,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    paddingVertical: 13,
     paddingHorizontal: 18,
     minHeight: 52,
   },
@@ -302,8 +336,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     paddingVertical: 13,
     paddingHorizontal: 18,
   },
@@ -316,7 +350,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 96,
     backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: 16,
+    borderRadius: theme.radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 4,
@@ -337,7 +371,7 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     overflow: 'hidden',
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: theme.colors.surfaceMuted,
     color: theme.colors.primaryDark,
     fontSize: 12,
     fontWeight: '700',
@@ -363,8 +397,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
@@ -410,8 +444,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.82)',
   },
   empty: {
-    borderRadius: 16,
-    paddingVertical: 28,
+    borderRadius: theme.radius.md,
+    paddingVertical: 24,
     paddingHorizontal: 16,
     backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'center',
@@ -430,5 +464,21 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.danger,
     fontWeight: '600',
+  },
+  textButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  textButtonDisabled: {
+    opacity: 0.45,
+  },
+  textButtonText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  textButtonDanger: {
+    color: theme.colors.danger,
   },
 });

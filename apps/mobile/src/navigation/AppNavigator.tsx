@@ -83,22 +83,23 @@ function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: '#9e96c8',
+        tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle:
           route.name === 'UserTab' ||
           (route.name === 'BandsTab' && !['JoinBand', 'CreateBand'].includes(getFocusedRouteNameFromRoute(route) ?? 'BandList'))
             ? { display: 'none' }
             : {
-                height: 72,
-                backgroundColor: '#e7ddff',
-                borderTopWidth: 0,
-                paddingTop: 10,
-                paddingBottom: 10,
+                height: 68,
+                backgroundColor: theme.colors.surface,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                paddingTop: 8,
+                paddingBottom: 8,
                 position: 'absolute',
-                left: 16,
-                right: 16,
-                bottom: 16,
-                borderRadius: 22,
+                left: 12,
+                right: 12,
+                bottom: 12,
+                borderRadius: theme.radius.lg,
               },
         tabBarLabelStyle: {
           fontSize: 11,

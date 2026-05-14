@@ -140,16 +140,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 16,
     gap: 10,
   },
   cardNeed: {
     borderColor: theme.colors.primary,
-    backgroundColor: '#f7f1ff',
+    backgroundColor: '#f8f8ff',
   },
   cardTop: {
     flexDirection: 'row',
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     flex: 1,
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '900',
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   cardAction: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '900',
   },

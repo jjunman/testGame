@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   previewHint: {
-    color: theme.colors.primary,
+    color: theme.colors.textMuted,
     fontSize: 11,
     fontWeight: '900',
     textAlign: 'center',
@@ -308,13 +308,15 @@ const styles = StyleSheet.create({
   tableCard: {
     flex: 1,
     backgroundColor: theme.colors.surface,
-    borderRadius: 16,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     paddingHorizontal: 10,
     paddingVertical: 9,
     gap: 4,
   },
   tableTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 11,
     fontWeight: '900',
     textAlign: 'center',
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   },
   legendDotBordered: {
     borderWidth: 1,
-    borderColor: theme.colors.primarySoft,
+    borderColor: theme.colors.border,
   },
   legendText: {
     color: theme.colors.textMuted,
@@ -389,7 +391,9 @@ const styles = StyleSheet.create({
   },
   voteCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 18,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     padding: 16,
     gap: 10,
   },
@@ -399,7 +403,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   voteMessage: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   voteMeta: {
@@ -414,19 +418,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   voteJumpButton: {
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   disabledActionButton: {
     backgroundColor: theme.colors.primarySoft,
   },
   confirmedCard: {
-    backgroundColor: '#e6f8f0',
-    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
     padding: 16,
     gap: 10,
   },
   noButton: {
-    backgroundColor: '#f36f7d',
+    backgroundColor: theme.colors.danger,
   },
   subtleEndButton: {
     alignSelf: 'center',

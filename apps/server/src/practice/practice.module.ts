@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BandMember } from '../bands/band-member.entity';
 import { BandsModule } from '../bands/bands.module';
 import { PointsModule } from '../points/points.module';
 import { SongCandidate } from '../songs/song-candidate.entity';
@@ -11,7 +12,7 @@ import { PracticeService } from './practice.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PracticeAssignment, PracticeSubmission, SongCandidate]),
+    TypeOrmModule.forFeature([PracticeAssignment, PracticeSubmission, SongCandidate, BandMember]),
     BandsModule,
     UsersModule,
     PointsModule,

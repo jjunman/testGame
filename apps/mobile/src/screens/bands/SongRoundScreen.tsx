@@ -407,12 +407,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   sectionTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   sectionCaption: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     marginTop: 4,
@@ -424,9 +424,9 @@ const styles = StyleSheet.create({
     paddingRight: 18,
   },
   songVoteCard: {
-    borderRadius: 8,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: 'hidden',
   },
@@ -435,13 +435,13 @@ const styles = StyleSheet.create({
   },
   youtubePanel: {
     backgroundColor: '#111',
-    minHeight: 160,
+    minHeight: 150,
   },
   youtubeFallback: {
     aspectRatio: 16 / 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: '#20242c',
   },
   youtubeFallbackImage: {
     resizeMode: 'cover',
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   songCardVoteCount: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   songVoteCancelButton: {
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   carouselDots: {
     flexDirection: 'row',
@@ -524,15 +524,15 @@ const styles = StyleSheet.create({
   },
   carouselDotActive: {
     width: 18,
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.text,
   },
   carouselDotVoted: {
     backgroundColor: theme.colors.primary,
   },
   voteList: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    backgroundColor: '#eee8ff',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   actionStack: {
     gap: 8,
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#d7cbff',
+    borderBottomColor: theme.colors.border,
   },
   voteRowSelected: {
     backgroundColor: theme.colors.primary,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   previewButtonText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '900',
     fontSize: 16,
   },
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   voteTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '800',
     fontSize: 14,
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
   },
   voteCount: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
   songCover: {
     width: 116,
     height: 116,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.text,
     padding: 14,
   },
   playIcon: {
@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#fff',
-    borderRadius: 22,
+    borderRadius: theme.radius.lg,
     padding: 20,
     gap: 12,
   },
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   modalSubtitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   modalBody: {
@@ -717,20 +717,20 @@ const styles = StyleSheet.create({
   },
   modalCancel: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 13,
   },
   modalCancelText: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontWeight: '800',
   },
   modalConfirm: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
