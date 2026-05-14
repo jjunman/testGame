@@ -199,6 +199,7 @@ export class BandsService {
       id: string;
       title: string;
       artist: string;
+      youtubeUrl?: string | null;
       thumbnailUrl: string | null;
       practiceAssignmentId?: string | null;
       practiceDueAt?: string | null;
@@ -212,6 +213,9 @@ export class BandsService {
         id: round.finalCandidate!.id,
         title: round.finalCandidate!.songCatalog.title,
         artist: round.finalCandidate!.songCatalog.artist,
+        youtubeUrl: round.finalCandidate!.songCatalog.youtubeVideoId
+          ? `https://www.youtube.com/watch?v=${round.finalCandidate!.songCatalog.youtubeVideoId}`
+          : null,
         thumbnailUrl: round.finalCandidate!.songCatalog.youtubeVideoId
           ? `https://img.youtube.com/vi/${round.finalCandidate!.songCatalog.youtubeVideoId}/hqdefault.jpg`
           : null,

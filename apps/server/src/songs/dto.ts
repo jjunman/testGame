@@ -51,3 +51,17 @@ export class CreateSongVoteDto {
   @IsString()
   candidateId: string;
 }
+
+export class UpdateSongCandidateDto {
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  artist: string;
+
+  @IsString()
+  @IsNotEmpty()
+  youtubeUrl: string;
+}

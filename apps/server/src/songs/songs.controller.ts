@@ -16,6 +16,7 @@ import {
   CreateSongCandidateDto,
   CreateSongVoteDto,
   StartSongRoundDto,
+  UpdateSongCandidateDto,
   UpdateSongRoundStatusDto,
 } from './dto';
 import { SongsService } from './songs.service';
@@ -55,6 +56,18 @@ export class SongsController {
   ) {
     res.locals.message = '노래를 삭제했습니다.';
     return this.songsService.deleteCandidate(user.userId, bandId, candidateId);
+  }
+
+  @Patch('song-candidates/:candidateId')
+  updateCandidate(
+    @CurrentUser() user: { userId: string },
+    @Param('bandId') bandId: string,
+    @Param('candidateId') candidateId: string,
+    @Body() dto: UpdateSongCandidateDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '노래 정보를 수정했습니다.';
+    return this.songsService.updateCandidate(user.userId, bandId, candidateId, dto);
   }
 
   @Post('song-round/start')

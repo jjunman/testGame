@@ -13,7 +13,7 @@ import { BandsService } from '../bands/bands.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { UsersService } from '../users/users.service';
-import { CreateSongCandidateDto, UpdateSongRoundStatusDto } from './dto';
+import { CreateSongCandidateDto, UpdateSongCandidateDto, UpdateSongRoundStatusDto } from './dto';
 import { SongCandidate } from './song-candidate.entity';
 import { SongCatalog } from './song-catalog.entity';
 import { SongRound } from './song-round.entity';
@@ -169,6 +169,52 @@ export class SongsService {
 
     await this.candidatesRepository.remove(candidate);
     return { deleted: true, roundDeleted: false };
+  }
+
+  async updateCandidate(userId: string, bandId: string, candidateId: string, dto: UpdateSongCandidateDto) {
+    await this.bandsService.requireMembership(userId, bandId);
+    const candidate = await this.candidatesRepository.findOne({
+      where: { id: candidateId },
+      relations: ['round', 'round.band', 'songCatalog'],
+    });
+
+    if (!candidate || candidate.round.band.id !== bandId) {
+      throw new NotFoundException('수정할 노래를 찾을 수 없습니다.');
+    }
+
+    const youtubeVideoId = this.extractYouTubeVideoId(dto.youtubeUrl);
+    if (!youtubeVideoId) {
+      throw new BadRequestException('유효한 유튜브 링크를 입력해 주세요.');
+    }
+
+    const normalizedTitle = dto.title.trim().toLowerCase();
+    const normalizedArtist = dto.artist.trim().toLowerCase();
+    const candidates = await this.candidatesRepository.find({
+      where: { round: { id: candidate.round.id } },
+      relations: ['songCatalog'],
+    });
+    const duplicated = candidates.some(
+      (item) =>
+        item.id !== candidate.id &&
+        item.songCatalog.title.trim().toLowerCase() === normalizedTitle &&
+        item.songCatalog.artist.trim().toLowerCase() === normalizedArtist,
+    );
+
+    if (duplicated) {
+      throw new BadRequestException('이미 추가된 곡입니다.');
+    }
+
+    candidate.songCatalog.title = dto.title.trim();
+    candidate.songCatalog.artist = dto.artist.trim();
+    candidate.songCatalog.youtubeVideoId = youtubeVideoId;
+    await this.catalogRepository.save(candidate.songCatalog);
+
+    return {
+      id: candidate.id,
+      title: candidate.songCatalog.title,
+      artist: candidate.songCatalog.artist,
+      youtubeVideoId,
+    };
   }
 
   async deleteActiveRound(userId: string, bandId: string) {

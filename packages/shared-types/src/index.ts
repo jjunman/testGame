@@ -193,6 +193,7 @@ export type BandSongCardDto = {
   id: string;
   title: string;
   artist: string;
+  youtubeUrl?: string | null;
   thumbnailUrl: string | null;
   practiceAssignmentId?: string | null;
   practiceDueAt?: string | null;
