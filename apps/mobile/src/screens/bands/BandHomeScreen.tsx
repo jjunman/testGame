@@ -208,7 +208,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>진행 상황</Text>
+        <Text style={styles.sectionTitle}>투표</Text>
         <VoteTimeline
           summary={detail.voteSummary}
           onPress={(target) => {
@@ -377,7 +377,7 @@ function VoteTimeline({
 
   return (
     <View style={styles.voteTimelineCard}>
-      <Text style={styles.voteTimelineTitle}>투표 진행</Text>
+      <Text style={styles.voteTimelineTitle}>투표 목록</Text>
       <View style={styles.voteSteps}>
         {steps.map((step, index) => {
           const done = step.status === 'done';
