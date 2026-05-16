@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BandHomeDto, TodoItemDto, VoteSummaryDto, VoteStepStatus } from '@band/shared-types';
+import { BandHomeDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, StatusBadge } from '../../components/UI';
+import { EmptyState, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -17,21 +17,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const { setCurrentBand } = useCurrentBand();
   const [detail, setDetail] = useState<BandHomeDto | null>(null);
-  const [startingVote, setStartingVote] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
-  const [deadlineOffsetDays, setDeadlineOffsetDays] = useState<1 | 3 | 7>(3);
-  const [expandedSongCardId, setExpandedSongCardId] = useState<string | null>(null);
-  const [editingSongCardId, setEditingSongCardId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editArtist, setEditArtist] = useState('');
-  const [editYoutubeUrl, setEditYoutubeUrl] = useState('');
-  const [editingSong, setEditingSong] = useState(false);
-
-  const closeSongCardMenu = () => {
-    setExpandedSongCardId(null);
-    setEditingSongCardId(null);
-  };
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -69,16 +55,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
     return unsubscribe;
   }, [load, navigation]);
 
-  const deadlineLabel = useMemo(() => {
-    if (deadlineOffsetDays === 1) {
-      return '내일까지';
-    }
-    if (deadlineOffsetDays === 7) {
-      return '일주일 뒤까지';
-    }
-    return '3일 뒤까지';
-  }, [deadlineOffsetDays]);
-
   if (!detail) {
     return (
       <Screen>
@@ -96,48 +72,8 @@ export function BandHomeScreen({ route, navigation }: Props) {
   }
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
-  const hasActiveSongVote = detail.activeSongRound?.status === 'voting';
   const primaryTodo = todos[0] ?? null;
   const secondaryTodos = todos.slice(1);
-  const pickingCards = detail.songCards.filter((card) => card.kind === 'picking');
-  const songCards = detail.songCards.filter((card) => card.kind === 'song');
-
-  const startSongVote = async () => {
-    setStartingVote(true);
-    try {
-      const deadline = new Date();
-      deadline.setDate(deadline.getDate() + deadlineOffsetDays);
-      deadline.setHours(23, 59, 0, 0);
-
-      await api.post(`/bands/${bandId}/song-round/start`, {
-        deadlineAt: deadline.toISOString(),
-      });
-      setDeadlineModalOpen(false);
-      await load();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '합주곡 투표를 시작하지 못했어요.';
-      setLoadError(message);
-    } finally {
-      setStartingVote(false);
-    }
-  };
-
-  const openSongCard = (card: BandHomeDto['songCards'][number]) => {
-    if (card.kind === 'picking') {
-      navigation.navigate('SongRound', { bandId });
-      return;
-    }
-
-    if (card.practiceAssignmentId) {
-      navigation.navigate('PracticeAssignmentDetail', {
-        bandId,
-        assignmentId: card.practiceAssignmentId,
-      });
-      return;
-    }
-
-    navigation.navigate('PracticeAssignments', { bandId });
-  };
 
   const openTodo = (todo: TodoItemDto) => {
     if (todo.shortcut === 'song_round') {
@@ -153,69 +89,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
       return;
     }
     navigation.navigate('PracticeAssignments', { bandId });
-  };
-
-  const deleteSongCard = (card: BandHomeDto['songCards'][number]) => {
-    const isPicking = card.kind === 'picking';
-    const title = isPicking ? '곡 투표 삭제하기' : '노래 삭제하기';
-    const message = isPicking
-      ? '진행 중인 곡 투표를 취소하고 홈에서 없앨까요?'
-      : `${card.title}을(를) 노래 목록에서 삭제할까요?${card.practiceAssignmentId ? '\n연습중인 곡 연결도 함께 목록에서 사라져요.' : ''}`;
-
-    Alert.alert(title, message, [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제하기',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (isPicking) {
-              await api.delete(`/bands/${bandId}/song-round`);
-            } else {
-              await api.delete(`/bands/${bandId}/song-candidates/${card.id}`);
-            }
-            await load();
-          } catch (error) {
-            Alert.alert('삭제 실패', error instanceof Error ? error.message : '노래 항목을 삭제하지 못했어요.');
-          }
-        },
-      },
-    ]);
-  };
-
-  const beginEditSongCard = (card: BandHomeDto['songCards'][number]) => {
-    if (card.kind === 'picking') {
-      navigation.navigate('SongRound', { bandId });
-      return;
-    }
-
-    setExpandedSongCardId(card.id);
-    setEditingSongCardId(card.id);
-    setEditTitle(card.title);
-    setEditArtist(card.artist);
-    setEditYoutubeUrl(card.youtubeUrl ?? '');
-  };
-
-  const submitSongEdit = async (card: BandHomeDto['songCards'][number]) => {
-    if (!editTitle.trim() || !editArtist.trim() || !editYoutubeUrl.trim()) {
-      Alert.alert('입력 필요', '곡 제목, 가수, 유튜브 링크를 모두 입력해 주세요.');
-      return;
-    }
-
-    setEditingSong(true);
-    try {
-      await api.patch(`/bands/${bandId}/song-candidates/${card.id}`, {
-        title: editTitle.trim(),
-        artist: editArtist.trim(),
-        youtubeUrl: editYoutubeUrl.trim(),
-      });
-      closeSongCardMenu();
-      await load();
-    } catch (error) {
-      Alert.alert('수정 실패', error instanceof Error ? error.message : '노래 정보를 수정하지 못했어요.');
-    } finally {
-      setEditingSong(false);
-    }
   };
 
   return (
@@ -254,136 +127,22 @@ export function BandHomeScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>투표</Text>
-        <VoteTimeline
-          summary={detail.voteSummary}
+        <Text style={styles.sectionTitle}>밴드 진행</Text>
+        <BandFlowTimeline
+          detail={detail}
           onPress={(target) => {
             if (target === 'song') {
               navigation.navigate('SongRound', { bandId });
               return;
             }
-            if (target === 'schedule') {
-              navigation.navigate('Schedule', { bandId });
+            if (target === 'practice') {
+              navigation.navigate('SongRound', { bandId });
               return;
             }
             navigation.navigate('Studios', { bandId });
           }}
         />
       </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>곡과 연습</Text>
-          <Pressable
-            style={[styles.startVoteButton, (startingVote || hasActiveSongVote) && styles.startVoteButtonDisabled]}
-            onPress={() => setDeadlineModalOpen(true)}
-            disabled={startingVote || hasActiveSongVote}
-          >
-            <Text style={styles.startVoteText}>{hasActiveSongVote ? '투표 진행 중' : startingVote ? '시작 중...' : '투표 시작'}</Text>
-          </Pressable>
-        </View>
-
-        {pickingCards.length > 0 ? (
-          <View style={styles.listGroup}>
-            <Text style={styles.groupLabel}>진행 중인 투표</Text>
-            {pickingCards.map((card) => (
-              <SongListItem
-                key={card.id}
-                card={card}
-                expanded={expandedSongCardId === card.id}
-                editing={editingSongCardId === card.id}
-                editTitle={editTitle}
-                editArtist={editArtist}
-                editYoutubeUrl={editYoutubeUrl}
-                editingSong={editingSong}
-                onPress={() => openSongCard(card)}
-                onToggleMore={() => {
-                  setExpandedSongCardId((current) => (current === card.id ? null : card.id));
-                  setEditingSongCardId(null);
-                }}
-                onEdit={() => beginEditSongCard(card)}
-                onDelete={() => deleteSongCard(card)}
-                onClose={closeSongCardMenu}
-                onChangeTitle={setEditTitle}
-                onChangeArtist={setEditArtist}
-                onChangeYoutubeUrl={setEditYoutubeUrl}
-                onSubmitEdit={() => void submitSongEdit(card)}
-                onCancelEdit={() => setEditingSongCardId(null)}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {songCards.length > 0 ? (
-          <View style={styles.listGroup}>
-            <Text style={styles.groupLabel}>곡 / 연습</Text>
-            {songCards.map((card) => (
-              <SongListItem
-                key={card.id}
-                card={card}
-                expanded={expandedSongCardId === card.id}
-                editing={editingSongCardId === card.id}
-                editTitle={editTitle}
-                editArtist={editArtist}
-                editYoutubeUrl={editYoutubeUrl}
-                editingSong={editingSong}
-                onPress={() => openSongCard(card)}
-                onToggleMore={() => {
-                  setExpandedSongCardId((current) => (current === card.id ? null : card.id));
-                  setEditingSongCardId(null);
-                }}
-                onEdit={() => beginEditSongCard(card)}
-                onDelete={() => deleteSongCard(card)}
-                onClose={closeSongCardMenu}
-                onChangeTitle={setEditTitle}
-                onChangeArtist={setEditArtist}
-                onChangeYoutubeUrl={setEditYoutubeUrl}
-                onSubmitEdit={() => void submitSongEdit(card)}
-                onCancelEdit={() => setEditingSongCardId(null)}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {detail.songCards.length === 0 ? (
-          <EmptyState title="아직 곡이 없어요" description="투표를 시작하면 후보곡과 연습 흐름이 여기에 정리돼요." />
-        ) : null}
-      </View>
-
-      <Modal visible={deadlineModalOpen} transparent animationType="fade" onRequestClose={() => setDeadlineModalOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>합주곡 투표 시작</Text>
-            <Text style={styles.modalBody}>투표 마감일을 먼저 정해 주세요. 시작하면 멤버들이 후보곡을 올리고 바로 투표할 수 있어요.</Text>
-            <View style={styles.deadlineOptions}>
-              {([
-                { label: '내일', value: 1 },
-                { label: '3일 뒤', value: 3 },
-                { label: '7일 뒤', value: 7 },
-              ] as const).map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={[styles.deadlineChip, deadlineOffsetDays === option.value && styles.deadlineChipActive]}
-                  onPress={() => setDeadlineOffsetDays(option.value)}
-                >
-                  <Text style={[styles.deadlineChipText, deadlineOffsetDays === option.value && styles.deadlineChipTextActive]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.deadlineSummary}>선택됨: {deadlineLabel}</Text>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancel} onPress={() => setDeadlineModalOpen(false)}>
-                <Text style={styles.modalCancelText}>취소</Text>
-              </Pressable>
-              <Pressable style={styles.modalConfirm} onPress={() => void startSongVote()}>
-                <Text style={styles.modalConfirmText}>시작하기</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -400,6 +159,7 @@ function SummaryStat({ label, value }: { label: string; value: string | number }
 function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
   return (
     <Pressable style={styles.primaryTodoCard} onPress={onPress}>
+      <Text style={styles.priorityLabel}>{todoPriorityLabel(todo)}</Text>
       <View style={styles.todoTop}>
         <Text style={styles.todoTitle}>{todo.title}</Text>
         <StatusBadge label={todo.dueLabel ?? '바로가기'} tone="warning" />
@@ -408,6 +168,16 @@ function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
       <Text style={styles.todoAction}>바로가기</Text>
     </Pressable>
   );
+}
+
+function todoPriorityLabel(todo: TodoItemDto) {
+  if (todo.type === 'submit_practice') {
+    return '중요';
+  }
+  if (todo.type === 'submit_schedule') {
+    return '먼저 필요';
+  }
+  return '응답 필요';
 }
 
 function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
@@ -422,124 +192,39 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
   );
 }
 
-function SongListItem({
-  card,
-  expanded,
-  editing,
-  editTitle,
-  editArtist,
-  editYoutubeUrl,
-  editingSong,
-  onPress,
-  onToggleMore,
-  onEdit,
-  onDelete,
-  onClose,
-  onChangeTitle,
-  onChangeArtist,
-  onChangeYoutubeUrl,
-  onSubmitEdit,
-  onCancelEdit,
-}: {
-  card: BandHomeDto['songCards'][number];
-  expanded: boolean;
-  editing: boolean;
-  editTitle: string;
-  editArtist: string;
-  editYoutubeUrl: string;
-  editingSong: boolean;
-  onPress: () => void;
-  onToggleMore: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onClose: () => void;
-  onChangeTitle: (value: string) => void;
-  onChangeArtist: (value: string) => void;
-  onChangeYoutubeUrl: (value: string) => void;
-  onSubmitEdit: () => void;
-  onCancelEdit: () => void;
-}) {
-  const isPicking = card.kind === 'picking';
-  return (
-    <View style={styles.songCardShell}>
-      <Pressable style={styles.songListItem} onPress={onPress}>
-        <ImageBackground source={{ uri: card.thumbnailUrl ?? undefined }} imageStyle={styles.songCoverImage} style={styles.songCover}>
-          <View style={styles.songCoverOverlay} />
-          <Text style={styles.songCoverText}>{isPicking ? '투표' : card.title.slice(0, 2)}</Text>
-        </ImageBackground>
-        <View style={styles.songListBody}>
-          <View style={styles.songListTop}>
-            <Text style={styles.songTitle} numberOfLines={1}>{card.title}</Text>
-            <View style={styles.songActions}>
-              <StatusBadge label={isPicking ? '투표 중' : card.practiceAssignmentId ? '연습' : '곡'} tone={isPicking ? 'warning' : 'default'} />
-              <Pressable
-                style={[styles.songMenuButton, expanded && styles.songMenuButtonActive]}
-                hitSlop={10}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  onToggleMore();
-                }}
-              >
-                <Ionicons name="ellipsis-vertical" size={17} color={expanded ? theme.colors.primaryDark : theme.colors.textMuted} />
-              </Pressable>
-              {expanded && !editing ? (
-                <View style={styles.inlineMenu}>
-                  <Pressable style={styles.inlineMenuItem} onPress={onEdit}>
-                    <Text style={styles.inlineMenuText}>{isPicking ? '관리' : '수정'}</Text>
-                  </Pressable>
-                  <Pressable style={styles.inlineMenuItem} onPress={onDelete}>
-                    <Text style={[styles.inlineMenuText, styles.inlineMenuDanger]}>{isPicking ? '삭제' : '삭제'}</Text>
-                  </Pressable>
-                  <Pressable style={[styles.inlineMenuItem, styles.inlineMenuLastItem]} onPress={onClose}>
-                    <Text style={styles.inlineMenuText}>닫기</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          </View>
-          <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
-          <Text style={styles.songHint} numberOfLines={1}>
-            {card.practiceDueAt ? formatDueLabel(card.practiceDueAt) : isPicking ? '눌러서 투표 화면으로 이동' : '눌러서 연습 관리'}
-          </Text>
-        </View>
-      </Pressable>
-      {editing ? (
-        <View style={styles.songFoldout}>
-          <View style={styles.songEditForm}>
-            <Field value={editTitle} onChangeText={onChangeTitle} placeholder="곡 제목" />
-            <Field value={editArtist} onChangeText={onChangeArtist} placeholder="가수" />
-            <Field value={editYoutubeUrl} onChangeText={onChangeYoutubeUrl} placeholder="유튜브 링크" autoCapitalize="none" />
-            <View style={styles.songEditActions}>
-              <Pressable style={styles.foldoutButton} onPress={onCancelEdit} disabled={editingSong}>
-                <Text style={styles.foldoutButtonText}>취소</Text>
-              </Pressable>
-              <Pressable style={[styles.foldoutButton, styles.foldoutPrimary]} onPress={onSubmitEdit} disabled={editingSong}>
-                <Text style={[styles.foldoutButtonText, styles.foldoutPrimaryText]}>{editingSong ? '저장 중...' : '저장'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function VoteTimeline({
-  summary,
+function BandFlowTimeline({
+  detail,
   onPress,
 }: {
-  summary: VoteSummaryDto;
-  onPress: (target: 'song' | 'schedule' | 'studio') => void;
+  detail: BandHomeDto;
+  onPress: (target: 'song' | 'practice' | 'studio') => void;
 }) {
-  const steps: Array<{ key: 'song' | 'schedule' | 'studio'; label: string; status: VoteStepStatus }> = [
-    { key: 'song', label: '노래 투표', status: summary.song },
-    { key: 'schedule', label: '합주 시간 투표', status: summary.schedule },
-    { key: 'studio', label: '합주실 투표', status: summary.studio },
+  const hasConfirmedSong = detail.songCards.some((card) => card.kind === 'song');
+  const practiceStatus: VoteStepStatus = detail.openPracticeCount > 0 ? 'needed' : hasConfirmedSong ? 'done' : 'none';
+  const steps: Array<{ key: 'song' | 'practice' | 'studio'; label: string; status: VoteStepStatus; description: string }> = [
+    {
+      key: 'song',
+      label: '곡 정하기',
+      status: detail.voteSummary.song,
+      description: detail.voteSummary.song === 'done' ? '합주곡 확정' : detail.voteSummary.song === 'needed' ? '투표 진행 중' : '대기 중',
+    },
+    {
+      key: 'practice',
+      label: '연습하기',
+      status: practiceStatus,
+      description: practiceStatus === 'done' ? '연습 정리됨' : practiceStatus === 'needed' ? '제출 필요' : '곡 확정 후 시작',
+    },
+    {
+      key: 'studio',
+      label: '합주실 잡기',
+      status: detail.voteSummary.studio,
+      description: detail.voteSummary.studio === 'done' ? '합주실 확정' : detail.voteSummary.studio === 'needed' ? '후보 투표 중' : '대기 중',
+    },
   ];
 
   return (
     <View style={styles.voteTimelineCard}>
-      <Text style={styles.voteTimelineTitle}>투표 목록</Text>
+      <Text style={styles.voteTimelineTitle}>곡부터 합주실까지</Text>
       <View style={styles.voteSteps}>
         {steps.map((step, index) => {
           const done = step.status === 'done';
@@ -555,7 +240,7 @@ function VoteTimeline({
                   )}
                 </View>
                 <Text style={[styles.voteStepLabel, needed && styles.voteStepLabelNeeded]} numberOfLines={2}>{step.label}</Text>
-                <Text style={styles.voteStepStatus}>{statusLabel(step.status)}</Text>
+                <Text style={styles.voteStepStatus} numberOfLines={2}>{step.description}</Text>
               </Pressable>
               {index < steps.length - 1 ? <View style={[styles.voteStepLine, done && styles.voteStepLineDone]} /> : null}
             </React.Fragment>
@@ -564,20 +249,6 @@ function VoteTimeline({
       </View>
     </View>
   );
-}
-
-function statusLabel(status: VoteStepStatus) {
-  if (status === 'done') {
-    return '완료';
-  }
-  if (status === 'needed') {
-    return '필요';
-  }
-  return '대기';
-}
-
-function formatDueLabel(value: string) {
-  return `마감 ${new Date(value).toLocaleDateString('ko-KR')}`;
 }
 
 const styles = StyleSheet.create({
@@ -614,10 +285,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   summaryCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.primarySoft,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#ddd6ff',
     padding: 14,
     gap: 12,
   },
@@ -664,12 +335,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 17,
@@ -678,10 +343,21 @@ const styles = StyleSheet.create({
   primaryTodoCard: {
     borderRadius: theme.radius.md,
     padding: 16,
-    gap: 9,
+    gap: 8,
     borderWidth: 1,
     borderColor: theme.colors.primary,
-    backgroundColor: '#f8f8ff',
+    backgroundColor: '#fbfaff',
+  },
+  priorityLabel: {
+    alignSelf: 'flex-start',
+    color: theme.colors.primaryDark,
+    backgroundColor: theme.colors.primarySoft,
+    borderRadius: theme.radius.pill,
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    fontSize: 11,
+    fontWeight: '900',
   },
   compactTodoList: {
     gap: 10,
@@ -718,9 +394,9 @@ const styles = StyleSheet.create({
   },
   voteTimelineCard: {
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: '#fbfaff',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: '#ddd6ff',
     padding: 14,
     gap: 12,
   },
@@ -788,7 +464,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   voteStepLineDone: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: theme.colors.primary,
   },
   todoTop: {
     flexDirection: 'row',
@@ -810,262 +486,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontWeight: '800',
     fontSize: 12,
-  },
-  startVoteButton: {
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  startVoteButtonDisabled: {
-    opacity: 0.55,
-  },
-  startVoteText: {
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  listGroup: {
-    gap: 8,
-  },
-  groupLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  songCardShell: {
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: 'visible',
-    zIndex: 1,
-  },
-  songListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-  },
-  songListBody: {
-    flex: 1,
-    gap: 4,
-  },
-  songListTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  songActions: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 5,
-    minHeight: 54,
-    width: 54,
-    position: 'relative',
-  },
-  songMenuButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  songMenuButtonActive: {
-    backgroundColor: theme.colors.primarySoft,
-  },
-  inlineMenu: {
-    position: 'absolute',
-    top: 34,
-    right: 3,
-    zIndex: 20,
-    elevation: 8,
-    width: 48,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: 'hidden',
-  },
-  inlineMenuItem: {
-    minHeight: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  inlineMenuLastItem: {
-    borderBottomWidth: 0,
-  },
-  inlineMenuText: {
-    color: theme.colors.text,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  inlineMenuDanger: {
-    color: theme.colors.danger,
-  },
-  songFoldout: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: '#fbfcfe',
-    padding: 10,
-    gap: 10,
-  },
-  foldoutButton: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  foldoutButtonText: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  foldoutPrimary: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  foldoutPrimaryText: {
-    color: '#fff',
-  },
-  foldoutDanger: {
-    borderColor: '#ffd5d5',
-    backgroundColor: '#fff7f7',
-  },
-  foldoutDangerText: {
-    color: theme.colors.danger,
-  },
-  songEditForm: {
-    gap: 8,
-  },
-  songEditActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  songCover: {
-    width: 70,
-    height: 70,
-    borderRadius: theme.radius.sm,
-    backgroundColor: '#20242c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  songCoverImage: {
-    borderRadius: theme.radius.sm,
-  },
-  songCoverOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13, 10, 30, 0.45)',
-  },
-  songCoverText: {
-    color: '#fff',
-    fontWeight: '800',
-  },
-  songTitle: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '900',
-    flex: 1,
-  },
-  songArtist: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  songHint: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(8, 8, 18, 0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: theme.radius.lg,
-    padding: 20,
-    gap: 14,
-  },
-  modalTitle: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  modalBody: {
-    color: theme.colors.textMuted,
-    lineHeight: 20,
-  },
-  deadlineOptions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  deadlineChip: {
-    flex: 1,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  deadlineChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  deadlineChipText: {
-    color: theme.colors.text,
-    fontWeight: '800',
-  },
-  deadlineChipTextActive: {
-    color: '#fff',
-  },
-  deadlineSummary: {
-    color: theme.colors.text,
-    fontWeight: '700',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modalCancel: {
-    flex: 1,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 13,
-  },
-  modalCancelText: {
-    color: theme.colors.text,
-    fontWeight: '800',
-  },
-  modalConfirm: {
-    flex: 1,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 13,
-  },
-  modalConfirmText: {
-    color: '#fff',
-    fontWeight: '800',
   },
 });

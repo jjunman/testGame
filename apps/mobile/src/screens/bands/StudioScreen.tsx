@@ -44,9 +44,9 @@ export function StudioScreen({ route, navigation }: Props) {
   const savedLocationCoordinate = hasSavedLocation && location
     ? { latitude: location.latitude!, longitude: location.longitude! }
     : null;
-  const cardWidth = Math.min(360, Math.max(280, width - 72));
-  const cardHeight = Math.min(316, Math.max(286, Math.round(height * 0.37)));
-  const cardGap = 12;
+  const cardWidth = Math.min(360, Math.max(286, width - 56));
+  const cardHeight = Math.min(330, Math.max(304, Math.round(height * 0.38)));
+  const cardGap = 14;
 
   const load = useCallback(async () => {
     const [nextCandidates, nextLocation] = await Promise.all([
@@ -426,19 +426,19 @@ function formatCoordinate(coordinate: Coordinate) {
 
 const styles = StyleSheet.create({
   actions: {
-    gap: 8,
-  },
-  secondaryAction: {
-    backgroundColor: theme.colors.text,
-  },
-  candidateSection: {
-    gap: 8,
-  },
-  carouselShell: {
     gap: 10,
   },
+  secondaryAction: {
+    backgroundColor: theme.colors.textMuted,
+  },
+  candidateSection: {
+    gap: 12,
+  },
+  carouselShell: {
+    gap: 12,
+  },
   carouselContent: {
-    paddingRight: 18,
+    paddingRight: 20,
   },
   carouselItem: {
     flexShrink: 0,
@@ -466,11 +466,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 14,
-    gap: 10,
+    padding: 16,
+    gap: 14,
   },
   locationCardCompact: {
-    gap: 8,
+    gap: 10,
   },
   locationHeader: {
     flexDirection: 'row',
@@ -480,23 +480,23 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
   },
   map: {
-    height: 220,
-    borderRadius: theme.radius.md,
+    height: 210,
+    borderRadius: theme.radius.sm,
     overflow: 'hidden',
   },
   addressSearch: {
-    gap: 8,
+    gap: 10,
   },
   addressButton: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.textMuted,
   },
   mapActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   mapButton: {
     flex: 1,
@@ -517,11 +517,11 @@ const styles = StyleSheet.create({
   },
   confirmedCard: {
     borderRadius: theme.radius.md,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    padding: 14,
-    gap: 6,
+    padding: 16,
+    gap: 8,
   },
   confirmedTitle: {
     color: theme.colors.text,
@@ -537,13 +537,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 10,
-    gap: 10,
+    padding: 14,
+    gap: 12,
     overflow: 'hidden',
   },
   cardSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: '#f8f8ff',
+    backgroundColor: '#fbfaff',
   },
   cardConfirmed: {
     borderColor: '#5fc47b',
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   cardTitleWrap: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   titleRow: {
     flexDirection: 'row',
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
   },
   metaText: {
@@ -583,8 +583,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surfaceMuted,
-    padding: 8,
-    gap: 3,
+    padding: 9,
+    gap: 4,
   },
   infoLabel: {
     color: theme.colors.textMuted,
@@ -600,11 +600,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 11,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 16,
   },
   noteArea: {
-    minHeight: 18,
-    gap: 1,
+    minHeight: 22,
+    gap: 3,
   },
   cardFooter: {
     marginTop: 'auto',
@@ -620,13 +620,13 @@ const styles = StyleSheet.create({
   },
   linkActions: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   linkButton: {
     borderRadius: 999,
     backgroundColor: theme.colors.surfaceMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   linkButtonText: {
     color: theme.colors.text,
@@ -634,6 +634,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   votedButton: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.textMuted,
   },
 });

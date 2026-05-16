@@ -14,6 +14,7 @@ import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { ScheduleSlot } from '../schedule/schedule-slot.entity';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { SongRound } from '../songs/song-round.entity';
+import { SongVote } from '../songs/song-vote.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { User } from '../users/user.entity';
 import { BandMember } from './band-member.entity';
@@ -31,6 +32,8 @@ export class BandsService {
     private readonly roundsRepository: Repository<SongRound>,
     @InjectRepository(SongCandidate)
     private readonly candidatesRepository: Repository<SongCandidate>,
+    @InjectRepository(SongVote)
+    private readonly songVotesRepository: Repository<SongVote>,
     @InjectRepository(PracticeAssignment)
     private readonly practiceRepository: Repository<PracticeAssignment>,
     @InjectRepository(ScheduleSlot)
@@ -289,14 +292,29 @@ export class BandsService {
 
   async getTodos(userId: string, bandId: string) {
     const membership = await this.requireMembership(userId, bandId);
-    const todos = [];
+    const todos: Array<{
+      type: string;
+      title: string;
+      description: string;
+      dueLabel: string;
+      shortcut: 'song_round' | 'practice' | 'schedule' | 'studio';
+    }> = [];
 
     const votingRound = await this.roundsRepository.findOne({
       where: { band: { id: bandId }, status: SongRoundStatus.VOTING },
       order: { createdAt: 'DESC' },
     });
 
-    if (votingRound) {
+    const hasSongVote = votingRound
+      ? (await this.songVotesRepository.count({
+          where: {
+            user: { id: userId },
+            candidate: { round: { id: votingRound.id } },
+          },
+        })) > 0
+      : false;
+
+    if (votingRound && !hasSongVote) {
       todos.push({
         type: 'vote_song',
         title: '합주곡 투표하기',
@@ -340,7 +358,7 @@ export class BandsService {
       });
     }
 
-    const openPracticeCount = await this.practiceRepository
+    const urgentPractice = await this.practiceRepository
       .createQueryBuilder('assignment')
       .leftJoin('assignment.submissions', 'submission', 'submission.userId = :userId', { userId })
       .where('assignment.bandId = :bandId', { bandId })
@@ -348,14 +366,15 @@ export class BandsService {
       .andWhere('assignment.dueAt >= :now', { now: new Date() })
       .andWhere('assignment.dueAt >= :joinedAt', { joinedAt: membership.joinedAt })
       .andWhere('submission.id IS NULL')
-      .getCount();
+      .orderBy('assignment.dueAt', 'ASC')
+      .getOne();
 
-    if (openPracticeCount > 0) {
+    if (urgentPractice) {
       todos.push({
         type: 'submit_practice',
-        title: '연습 제출하기',
-        description: '마감 전까지 녹음본을 제출해 주세요.',
-        dueLabel: '가능한 빨리',
+        title: `${urgentPractice.title} 제출하기`,
+        description: '가장 가까운 마감 과제예요. 녹음본을 제출해 주세요.',
+        dueLabel: this.formatTodoDueLabel(urgentPractice.dueAt),
         shortcut: 'practice',
       });
     }
@@ -374,7 +393,34 @@ export class BandsService {
       });
     }
 
-    return todos;
+    return todos.sort((a, b) => this.todoPriority(a.type) - this.todoPriority(b.type));
+  }
+
+  private todoPriority(type: string) {
+    const priorities: Record<string, number> = {
+      submit_practice: 10,
+      submit_schedule: 20,
+      vote_schedule_proposal: 30,
+      vote_song: 40,
+      vote_studio: 50,
+    };
+
+    return priorities[type] ?? 999;
+  }
+
+  private formatTodoDueLabel(dueAt: Date) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDate = new Date(dueAt.getFullYear(), dueAt.getMonth(), dueAt.getDate());
+    const dayDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff <= 0) {
+      return '오늘 마감';
+    }
+    if (dayDiff === 1) {
+      return '내일 마감';
+    }
+    return `D-${dayDiff}`;
   }
 
   private async getVoteSummary(userId: string, bandId: string) {

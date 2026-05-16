@@ -273,7 +273,7 @@ function slotKey(date: string, hour: number) {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 12,
+    gap: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -282,8 +282,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
   },
   caption: {
     color: theme.colors.textMuted,
@@ -311,8 +311,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     gap: 4,
   },
   tableTitle: {
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '800',
-    textAlign: 'center',
+    textAlign: 'left',
     paddingVertical: 10,
   },
   voteCard: {
@@ -394,13 +394,13 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 16,
+    padding: 14,
     gap: 10,
   },
   voteTitle: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
   },
   voteMessage: {
     color: theme.colors.text,
@@ -412,27 +412,27 @@ const styles = StyleSheet.create({
   },
   voteActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   quickActions: {
-    gap: 10,
+    gap: 8,
   },
   voteJumpButton: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.textMuted,
   },
   disabledActionButton: {
     backgroundColor: theme.colors.primarySoft,
   },
   confirmedCard: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    padding: 16,
+    padding: 14,
     gap: 10,
   },
   noButton: {
-    backgroundColor: theme.colors.danger,
+    backgroundColor: theme.colors.textMuted,
   },
   subtleEndButton: {
     alignSelf: 'center',

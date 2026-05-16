@@ -6,6 +6,7 @@ import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { ScheduleSlot } from '../schedule/schedule-slot.entity';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { SongRound } from '../songs/song-round.entity';
+import { SongVote } from '../songs/song-vote.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { UsersModule } from '../users/users.module';
 import { BandMember } from './band-member.entity';
@@ -20,6 +21,7 @@ import { BandsService } from './bands.service';
       BandMember,
       SongRound,
       SongCandidate,
+      SongVote,
       PracticeAssignment,
       ScheduleSlot,
       ScheduleAvailability,

@@ -82,17 +82,17 @@ function NavItem({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    height: 68,
+    height: 64,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 6,
+    padding: 5,
     shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 3,
   },
   item: {
     flex: 1,
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   itemActive: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: theme.colors.surfaceMuted,
   },
   label: {
     color: inactiveColor,
@@ -110,6 +110,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   labelActive: {
-    color: theme.colors.primary,
+    color: theme.colors.text,
   },
 });

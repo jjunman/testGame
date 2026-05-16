@@ -44,17 +44,17 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 28,
-    gap: 14,
+    gap: 12,
   },
   fill: {
     flex: 1,
   },
   fixedFooter: {
     position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
+    left: 10,
+    right: 10,
+    bottom: 10,
   },
 });
