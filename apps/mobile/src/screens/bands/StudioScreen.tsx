@@ -14,6 +14,7 @@ import { BandsStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<BandsStackParamList, 'Studios'>;
 type Coordinate = { latitude: number; longitude: number };
+type StudioTab = 'location' | 'vote';
 
 const ANSAN_CENTER: Coordinate = { latitude: 37.3219, longitude: 126.8309 };
 const DEFAULT_REGION: Region = {
@@ -37,6 +38,7 @@ export function StudioScreen({ route, navigation }: Props) {
   const [finalizing, setFinalizing] = useState(false);
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [editingLocation, setEditingLocation] = useState(false);
+  const [activeTab, setActiveTab] = useState<StudioTab>('location');
   const { width, height } = useWindowDimensions();
   const isLeader = currentBand?.myRole === 'leader';
   const confirmed = candidates.find((candidate) => candidate.status === 'confirmed') ?? null;
@@ -181,13 +183,22 @@ export function StudioScreen({ route, navigation }: Props) {
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="studio" navigation={navigation} />}>
       <HeroBanner title="합주실 정하기" subtitle="지도에서 집 위치를 찍고 모두에게 가까운 합주실을 골라요." badge="안산" align="center" />
 
+      <View style={styles.segment}>
+        <SegmentButton label="내 집 위치" active={activeTab === 'location'} onPress={() => setActiveTab('location')} />
+        <SegmentButton label="후보 / 투표" active={activeTab === 'vote'} onPress={() => setActiveTab('vote')} />
+      </View>
+
+      {activeTab === 'vote' ? (
       <View style={styles.actions}>
         <PrimaryButton label="합주실 후보 추가" onPress={() => navigation.navigate('CreateStudioCandidate', { bandId })} />
       </View>
 
+      ) : null}
+
+      {activeTab === 'location' ? (
       <View style={[styles.locationCard, hasSavedLocation && !editingLocation && styles.locationCardCompact]}>
         <View style={styles.locationHeader}>
-          <Text style={styles.sectionTitle}>내 집 위치</Text>
+          <Text style={styles.sectionTitle}>내 집 위치 정하기</Text>
           <StatusBadge label={location?.latitude !== null && location?.longitude !== null ? '저장됨' : '미입력'} tone={location?.latitude !== null && location?.longitude !== null ? 'success' : 'warning'} />
         </View>
         {hasSavedLocation && !editingLocation ? (
@@ -227,7 +238,10 @@ export function StudioScreen({ route, navigation }: Props) {
           </>
         )}
       </View>
+      ) : null}
 
+      {activeTab === 'vote' ? (
+      <>
       {confirmed ? (
         <View style={styles.confirmedCard}>
           <StatusBadge label="확정된 합주실" tone="success" />
@@ -262,7 +276,17 @@ export function StudioScreen({ route, navigation }: Props) {
           ) : null}
         </View>
       )}
+      </>
+      ) : null}
     </Screen>
+  );
+}
+
+function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -425,6 +449,32 @@ function formatCoordinate(coordinate: Coordinate) {
 }
 
 const styles = StyleSheet.create({
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.sm,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonActive: {
+    backgroundColor: theme.colors.surface,
+  },
+  segmentText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  segmentTextActive: {
+    color: theme.colors.text,
+  },
   actions: {
     gap: 10,
   },

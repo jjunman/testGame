@@ -178,7 +178,9 @@ export type TodoItemDto = {
   title: string;
   description: string;
   dueLabel?: string | null;
+  dueAt?: string | null;
   shortcut?: 'song_round' | 'practice' | 'schedule' | 'studio';
+  targetId?: string | null;
 };
 
 export type VoteStepStatus = 'none' | 'needed' | 'done';
@@ -197,6 +199,7 @@ export type BandSongCardDto = {
   thumbnailUrl: string | null;
   practiceAssignmentId?: string | null;
   practiceDueAt?: string | null;
+  practiceStatus?: 'open' | 'closed' | null;
   kind: 'song' | 'picking';
 };
 
@@ -205,6 +208,7 @@ export type BandHomeDto = {
   name: string;
   thumbnailUrl: string | null;
   inviteCode: string;
+  memberCount: number;
   myMembership: {
     role: MemberRole;
     positionLabel: string;

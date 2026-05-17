@@ -1,14 +1,14 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
 import { HeroBanner, MetricPill, PrimaryButton, SectionCard } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
-import { MainTabParamList } from '../../types/navigation';
+import { BandsStackParamList } from '../../types/navigation';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'UserTab'>;
+type Props = NativeStackScreenProps<BandsStackParamList, 'Profile'>;
 
 export function ProfileScreen({ navigation }: Props) {
   const { user, logout } = useAuth();
@@ -17,7 +17,7 @@ export function ProfileScreen({ navigation }: Props) {
     <Screen>
       <Pressable
         style={styles.backButton}
-        onPress={() => navigation.navigate('BandsTab', { screen: 'BandList' })}
+        onPress={() => navigation.goBack()}
       >
         <Ionicons name="chevron-back" size={18} color={theme.colors.primaryDark} />
         <Text style={styles.backButtonText}>돌아가기</Text>

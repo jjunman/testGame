@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   songOptionSelected: {
     borderColor: theme.colors.primary,
@@ -227,6 +228,7 @@ const styles = StyleSheet.create({
   songOptionBody: {
     flex: 1,
     gap: 3,
+    justifyContent: 'center',
   },
   songTitle: {
     color: theme.colors.text,

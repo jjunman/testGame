@@ -104,19 +104,8 @@ export function ScheduleScreen({ route, navigation }: Props) {
       <HeroBanner title="우리 모임표" subtitle="이번 합주가 가능한 시간을 한눈에 맞춰봐요." badge="calendar" align="center" />
 
       <View style={styles.section}>
-        <View style={styles.quickActions}>
-          <PrimaryButton label="내 일정 등록하기" onPress={() => navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' })} />
-          <PrimaryButton
-            label="일정 투표하기"
-            onPress={() => Alert.alert('일정 투표', '아래 찬반투표 카드에서 찬성 또는 반대를 선택해 주세요.')}
-            disabled={!activeProposal}
-            style={activeProposal ? styles.voteJumpButton : styles.disabledActionButton}
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>찬반투표</Text>
+        <PrimaryButton label="합주 시간 제안하기" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} />
         {confirmedProposal ? (
           <View style={styles.confirmedCard}>
             <StatusBadge label="합주 시간 확정" tone="success" />
@@ -178,9 +167,6 @@ export function ScheduleScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <PrimaryButton label="합주 시간 제안하기" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} />
-      </View>
     </Screen>
   );
 }
@@ -413,15 +399,6 @@ const styles = StyleSheet.create({
   voteActions: {
     flexDirection: 'row',
     gap: 8,
-  },
-  quickActions: {
-    gap: 8,
-  },
-  voteJumpButton: {
-    backgroundColor: theme.colors.textMuted,
-  },
-  disabledActionButton: {
-    backgroundColor: theme.colors.primarySoft,
   },
   confirmedCard: {
     backgroundColor: theme.colors.surface,

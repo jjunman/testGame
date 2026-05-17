@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BandHomeDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
+import { BandHomeDto, PracticeAssignmentDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, StatusBadge } from '../../components/UI';
+import { EmptyState } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -75,7 +75,18 @@ export function BandHomeScreen({ route, navigation }: Props) {
   const primaryTodo = todos[0] ?? null;
   const secondaryTodos = todos.slice(1);
 
-  const openTodo = (todo: TodoItemDto) => {
+  const openTodo = async (todo: TodoItemDto) => {
+    if (todo.type === 'submit_practice') {
+      const assignmentId = todo.targetId ?? await findFirstPendingPracticeId(bandId);
+      if (assignmentId) {
+        navigation.navigate('PracticeAssignmentDetail', { bandId, assignmentId });
+      }
+      return;
+    }
+    if (todo.type === 'submit_schedule') {
+      navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' });
+      return;
+    }
     if (todo.shortcut === 'song_round') {
       navigation.navigate('SongRound', { bandId });
       return;
@@ -88,7 +99,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       navigation.navigate('Studios', { bandId });
       return;
     }
-    navigation.navigate('PracticeAssignments', { bandId });
+    navigation.navigate('BandHome', { bandId });
   };
 
   return (
@@ -101,11 +112,10 @@ export function BandHomeScreen({ route, navigation }: Props) {
               {detail.myMembership.positionLabel || '파트 미정'} · {detail.myMembership.role === 'leader' ? '리더' : '멤버'}
             </Text>
           </View>
-          <StatusBadge label={todos.length > 0 ? `${todos.length}개 필요` : '정리됨'} tone={todos.length > 0 ? 'warning' : 'success'} />
         </View>
         <View style={styles.summaryStats}>
-          <SummaryStat label="연습 과제" value={detail.openPracticeCount} />
-          <SummaryStat label="등록 일정" value={detail.openScheduleSlotCount} />
+          <SummaryStat label="멤버 수" value={formatCount(detail.memberCount, '명', 1)} />
+          <SummaryStat label="해야할 일" value={formatCount(todos.length, '개')} />
           <SummaryStat label="초대코드" value={detail.inviteCode} />
         </View>
       </View>
@@ -113,14 +123,14 @@ export function BandHomeScreen({ route, navigation }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>지금 할 일</Text>
         {primaryTodo ? (
-          <PrimaryTodoCard todo={primaryTodo} onPress={() => openTodo(primaryTodo)} />
+          <PrimaryTodoCard todo={primaryTodo} onPress={() => void openTodo(primaryTodo)} />
         ) : (
           <EmptyState title="지금은 할 일이 없어요" description="투표나 연습 과제가 생기면 여기에서 바로 확인할 수 있어요." />
         )}
         {secondaryTodos.length > 0 ? (
           <View style={styles.compactTodoList}>
             {secondaryTodos.map((todo) => (
-              <CompactTodoItem key={todo.type} todo={todo} onPress={() => openTodo(todo)} />
+              <CompactTodoItem key={todo.type} todo={todo} onPress={() => void openTodo(todo)} />
             ))}
           </View>
         ) : null}
@@ -156,40 +166,80 @@ function SummaryStat({ label, value }: { label: string; value: string | number }
   );
 }
 
-function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
-  return (
-    <Pressable style={styles.primaryTodoCard} onPress={onPress}>
-      <Text style={styles.priorityLabel}>{todoPriorityLabel(todo)}</Text>
-      <View style={styles.todoTop}>
-        <Text style={styles.todoTitle}>{todo.title}</Text>
-        <StatusBadge label={todo.dueLabel ?? '바로가기'} tone="warning" />
-      </View>
-      <Text style={styles.todoDescription}>{todo.description}</Text>
-      <Text style={styles.todoAction}>바로가기</Text>
-    </Pressable>
-  );
+function formatCount(value: number | null | undefined, unit: string, fallback = 0) {
+  const count = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return `${count}${unit}`;
 }
 
-function todoPriorityLabel(todo: TodoItemDto) {
-  if (todo.type === 'submit_practice') {
-    return '중요';
-  }
-  if (todo.type === 'submit_schedule') {
-    return '먼저 필요';
-  }
-  return '응답 필요';
+function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
+  const iconName = todoIconName(todo);
+
+  return (
+    <Pressable style={styles.primaryTodoCard} onPress={onPress}>
+      <View style={styles.todoIcon}>
+        <Ionicons name={iconName} size={22} color={theme.colors.textMuted} />
+      </View>
+      <View style={styles.todoBody}>
+        <Text style={styles.todoTitle}>{todo.title}</Text>
+      </View>
+      <Text style={styles.todoDeadline}>{todoDeadlineLabel(todo)}</Text>
+    </Pressable>
+  );
 }
 
 function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
+  const iconName = todoIconName(todo);
+
   return (
     <Pressable style={styles.compactTodoItem} onPress={onPress}>
+      <View style={styles.compactTodoIcon}>
+        <Ionicons name={iconName} size={18} color={theme.colors.textMuted} />
+      </View>
       <View style={styles.compactTodoText}>
         <Text style={styles.compactTodoTitle} numberOfLines={1}>{todo.title}</Text>
-        <Text style={styles.compactTodoDescription} numberOfLines={1}>{todo.description}</Text>
       </View>
-      <Text style={styles.compactTodoAction}>열기</Text>
+      <Text style={styles.compactTodoDeadline}>{todoDeadlineLabel(todo)}</Text>
     </Pressable>
   );
+}
+
+function todoDeadlineLabel(todo: TodoItemDto) {
+  if (todo.dueAt) {
+    const diff = new Date(todo.dueAt).getTime() - Date.now();
+    const day = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    return `D-${day}`;
+  }
+  if (todo.dueLabel?.startsWith('D-')) {
+    return todo.dueLabel;
+  }
+  if (todo.dueLabel === '오늘 마감') {
+    return 'D-0';
+  }
+  if (todo.dueLabel === '내일 마감') {
+    return 'D-1';
+  }
+  return 'D-0';
+}
+
+function todoIconName(todo: TodoItemDto): keyof typeof Ionicons.glyphMap {
+  if (todo.type === 'submit_practice' || todo.shortcut === 'practice') {
+    return 'mic-outline';
+  }
+  if (todo.type === 'submit_schedule' || todo.type === 'vote_schedule_proposal' || todo.shortcut === 'schedule') {
+    return 'calendar-outline';
+  }
+  if (todo.type === 'vote_studio' || todo.shortcut === 'studio') {
+    return 'location-outline';
+  }
+  return 'musical-notes-outline';
+}
+
+async function findFirstPendingPracticeId(bandId: string) {
+  const assignments = await api.get<PracticeAssignmentDto[]>(`/bands/${bandId}/practice-assignments`);
+  const pending = assignments
+    .filter((assignment) => assignment.status === 'open' && !assignment.hasSubmitted)
+    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+  return pending[0]?.id ?? null;
 }
 
 function BandFlowTimeline({
@@ -341,23 +391,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   primaryTodoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: theme.radius.md,
-    padding: 16,
-    gap: 8,
+    padding: 14,
+    gap: 12,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     backgroundColor: '#fbfaff',
   },
-  priorityLabel: {
-    alignSelf: 'flex-start',
-    color: theme.colors.primaryDark,
-    backgroundColor: theme.colors.primarySoft,
-    borderRadius: theme.radius.pill,
-    overflow: 'hidden',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    fontSize: 11,
-    fontWeight: '900',
+  todoIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todoBody: {
+    flex: 1,
+    minWidth: 0,
   },
   compactTodoList: {
     gap: 10,
@@ -373,24 +424,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
+  compactTodoIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   compactTodoText: {
     flex: 1,
-    gap: 2,
+    minWidth: 0,
   },
   compactTodoTitle: {
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: '900',
   },
-  compactTodoDescription: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  compactTodoAction: {
+  compactTodoDeadline: {
     color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '900',
+    minWidth: 34,
+    textAlign: 'right',
   },
   voteTimelineCard: {
     borderRadius: theme.radius.md,
@@ -466,25 +520,17 @@ const styles = StyleSheet.create({
   voteStepLineDone: {
     backgroundColor: theme.colors.primary,
   },
-  todoTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
   todoTitle: {
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: '800',
     flex: 1,
   },
-  todoDescription: {
-    color: theme.colors.text,
-    lineHeight: 19,
-  },
-  todoAction: {
+  todoDeadline: {
     color: theme.colors.textMuted,
     fontWeight: '800',
     fontSize: 12,
+    minWidth: 36,
+    textAlign: 'right',
   },
 });

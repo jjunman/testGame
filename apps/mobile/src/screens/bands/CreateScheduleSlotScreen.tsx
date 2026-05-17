@@ -10,6 +10,7 @@ import { BandsStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<BandsStackParamList, 'CreateScheduleSlot'>;
 type DurationHour = 1 | 2 | 3 | 4;
+type ScheduleSlotTab = 'recommended' | 'manual';
 type Recommendation = {
   key: string;
   date: string;
@@ -31,6 +32,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<ScheduleSlotTab>('recommended');
 
   useEffect(() => {
     void (async () => {
@@ -45,6 +47,10 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   const recommendedItems = useMemo(
     () => buildRecommendations(summary, durationHours).slice(0, 3),
     [durationHours, summary],
+  );
+  const allAvailableRecommendedItems = useMemo(
+    () => recommendedItems.filter((item) => item.allAvailable),
+    [recommendedItems],
   );
   const recommended = recommendedItems[0] ?? null;
 
@@ -85,7 +91,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   };
 
   return (
-    <Screen>
+    <Screen scrollEnabled={false}>
       <HeroBanner title="합주 시간 제안하기" subtitle="몇 시간 합주할지 고르면, 가능한 연속 시간대를 추천해요." badge="일정" />
 
       <SectionCard title="합주 길이">
@@ -106,54 +112,72 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
         </View>
       </SectionCard>
 
-      <SectionCard title="추천 시간">
-        {recommendedItems.length > 0 ? (
-          <View style={styles.recommendList}>
-            {recommendedItems.map((item) => {
-              const itemWeekdayIndex = dateToWeekdayIndex(item.date);
-              const selected = weekdayIndex === itemWeekdayIndex && startTime === item.startTime && endTime === item.endTime;
+      <View style={styles.segment}>
+        <SegmentButton label="추천 시간" active={activeTab === 'recommended'} onPress={() => setActiveTab('recommended')} />
+        <SegmentButton label="직접 정하기" active={activeTab === 'manual'} onPress={() => setActiveTab('manual')} />
+      </View>
+
+      {activeTab === 'recommended' ? (
+        <SectionCard title="추천 시간">
+          {allAvailableRecommendedItems.length > 0 ? (
+            <View style={styles.recommendList}>
+              {allAvailableRecommendedItems.map((item) => {
+                const itemWeekdayIndex = dateToWeekdayIndex(item.date);
+                const selected = weekdayIndex === itemWeekdayIndex && startTime === item.startTime && endTime === item.endTime;
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.recommendItem, selected && styles.recommendItemSelected]}
+                    onPress={() => {
+                      setWeekdayIndex(itemWeekdayIndex);
+                      setStartTime(item.startTime);
+                      setEndTime(item.endTime);
+                    }}
+                  >
+                    <Text style={[styles.recommendTitle, selected && styles.recommendTitleSelected]}>
+                      {WEEK_LABELS[itemWeekdayIndex]}요일 {item.startTime} - {item.endTime}
+                    </Text>
+                    <Text style={[styles.recommendMessage, selected && styles.recommendMessageSelected]}>{item.message}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>모두가 {durationHours}시간 연속으로 가능한 시간이 아직 없어요. 직접 정하기 탭에서 시간을 제안해 주세요.</Text>
+          )}
+          <PrimaryButton label="제안하기" onPress={submit} loading={submitting} disabled={allAvailableRecommendedItems.length === 0} />
+        </SectionCard>
+      ) : null}
+
+      {activeTab === 'manual' ? (
+        <SectionCard title="직접 정하기">
+          <Label>요일</Label>
+          <View style={styles.weekdayGrid}>
+            {WEEK_LABELS.map((label, index) => {
+              const selected = weekdayIndex === index;
               return (
-                <Pressable
-                  key={item.key}
-                  style={[styles.recommendItem, selected && styles.recommendItemSelected]}
-                  onPress={() => {
-                    setWeekdayIndex(itemWeekdayIndex);
-                    setStartTime(item.startTime);
-                    setEndTime(item.endTime);
-                  }}
-                >
-                  <Text style={[styles.recommendTitle, selected && styles.recommendTitleSelected]}>
-                    {WEEK_LABELS[itemWeekdayIndex]}요일 {item.startTime} - {item.endTime}
-                  </Text>
-                  <Text style={[styles.recommendMessage, selected && styles.recommendMessageSelected]}>{item.message}</Text>
+                <Pressable key={label} style={[styles.weekdayButton, selected && styles.weekdayButtonSelected]} onPress={() => setWeekdayIndex(index)}>
+                  <Text style={[styles.weekdayText, selected && styles.weekdayTextSelected]}>{label}</Text>
                 </Pressable>
               );
             })}
           </View>
-        ) : (
-          <Text style={styles.emptyText}>선택한 길이에 맞는 연속 시간이 아직 없어요. 직접 요일과 시간을 입력해 주세요.</Text>
-        )}
-      </SectionCard>
-
-      <SectionCard title="직접 정하기">
-        <Label>요일</Label>
-        <View style={styles.weekdayGrid}>
-          {WEEK_LABELS.map((label, index) => {
-            const selected = weekdayIndex === index;
-            return (
-              <Pressable key={label} style={[styles.weekdayButton, selected && styles.weekdayButtonSelected]} onPress={() => setWeekdayIndex(index)}>
-                <Text style={[styles.weekdayText, selected && styles.weekdayTextSelected]}>{label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Label>시작 시간</Label>
-        <Field value={startTime} onChangeText={setStartTime} placeholder="예: 19:00" />
-        <Label>종료 시간</Label>
-        <Field value={endTime} onChangeText={setEndTime} placeholder="예: 21:00" />
-        <PrimaryButton label="제안하기" onPress={submit} loading={submitting} />
-      </SectionCard>
+          <Label>시작 시간</Label>
+          <Field value={startTime} onChangeText={setStartTime} placeholder="예: 19:00" />
+          <Label>종료 시간</Label>
+          <Field value={endTime} onChangeText={setEndTime} placeholder="예: 21:00" />
+          <PrimaryButton label="제안하기" onPress={submit} loading={submitting} />
+        </SectionCard>
+      ) : null}
     </Screen>
+  );
+}
+
+function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -251,6 +275,32 @@ function toDateValue(date: Date) {
 }
 
 const styles = StyleSheet.create({
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.sm,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonActive: {
+    backgroundColor: theme.colors.surface,
+  },
+  segmentText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  segmentTextActive: {
+    color: theme.colors.text,
+  },
   durationRow: {
     flexDirection: 'row',
     gap: 8,
@@ -314,14 +364,15 @@ const styles = StyleSheet.create({
   },
   weekdayGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: 4,
     marginBottom: 8,
   },
   weekdayButton: {
-    width: 44,
+    flex: 1,
     height: 44,
-    borderRadius: 12,
+    minWidth: 0,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
     backgroundColor: '#fff',

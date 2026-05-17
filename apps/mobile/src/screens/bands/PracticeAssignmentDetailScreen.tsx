@@ -460,7 +460,8 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           detail={detail}
           recording={recording}
           countdown={countdown}
-          onRecord={() => void (recording ? stopRecording() : startRecording())}
+          onStartRecording={() => void startRecording()}
+          onStopRecording={() => void stopRecording()}
           onCancel={() => void cancelRecording()}
           onImport={() => void importAudioFile()}
           onSubmit={() => setMode('submit')}
@@ -610,7 +611,8 @@ function PracticePanel({
   detail,
   recording,
   countdown,
-  onRecord,
+  onStartRecording,
+  onStopRecording,
   onCancel,
   onImport,
   onSubmit,
@@ -619,19 +621,24 @@ function PracticePanel({
   detail: PracticeDetailDto;
   recording: boolean;
   countdown: number | null;
-  onRecord: () => void;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
   onCancel: () => void;
   onImport: () => void;
   onSubmit: () => void;
 }) {
   const playerRef = useRef<any>(null);
   const sourceStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sourcePlaying, setSourcePlaying] = useState(false);
 
   useEffect(() => {
     return () => {
       if (sourceStartTimerRef.current) {
         clearTimeout(sourceStartTimerRef.current);
+      }
+      if (sourceStopTimerRef.current) {
+        clearTimeout(sourceStopTimerRef.current);
       }
     };
   }, []);
@@ -643,32 +650,43 @@ function PracticePanel({
     }
   };
 
+  const clearSourceStopTimer = () => {
+    if (sourceStopTimerRef.current) {
+      clearTimeout(sourceStopTimerRef.current);
+      sourceStopTimerRef.current = null;
+    }
+  };
+
   const stopSourcePlayback = () => {
     clearSourceStartTimer();
+    clearSourceStopTimer();
     setSourcePlaying(false);
     playerRef.current?.pauseVideo?.();
     playerRef.current?.getInternalPlayer?.()?.pauseVideo?.();
   };
 
   useEffect(() => {
-    if (!recording) {
+    if (!recording && countdown === null) {
       stopSourcePlayback();
     }
-  }, [recording]);
+  }, [countdown, recording]);
 
   const handleRecordPress = () => {
     if (recording) {
       stopSourcePlayback();
-      onRecord();
+      onStopRecording();
       return;
     }
 
     if (youtubeVideoId) {
       clearSourceStartTimer();
+      clearSourceStopTimer();
       const segmentStartSec = Math.max(0, detail.startSec ?? 0);
+      const segmentEndSec = detail.endSec !== null && detail.endSec > segmentStartSec ? detail.endSec : null;
       const preRollSec = Math.min(RECORDING_COUNTDOWN_SECONDS, segmentStartSec);
       const sourceStartDelayMs = (RECORDING_COUNTDOWN_SECONDS - preRollSec) * 1000;
-      playerRef.current?.seekTo?.(segmentStartSec - preRollSec, true);
+      const sourceStartSec = segmentStartSec - preRollSec;
+      playerRef.current?.seekTo?.(sourceStartSec, true);
 
       if (sourceStartDelayMs === 0) {
         setSourcePlaying(true);
@@ -679,8 +697,17 @@ function PracticePanel({
           setSourcePlaying(true);
         }, sourceStartDelayMs);
       }
+
+      if (segmentEndSec !== null) {
+        const stopDelayMs = RECORDING_COUNTDOWN_SECONDS * 1000 + (segmentEndSec - segmentStartSec) * 1000 + 250;
+        sourceStopTimerRef.current = setTimeout(() => {
+          sourceStopTimerRef.current = null;
+          stopSourcePlayback();
+          onStopRecording();
+        }, stopDelayMs);
+      }
     }
-    onRecord();
+    onStartRecording();
   };
 
   const handleCancelPress = () => {

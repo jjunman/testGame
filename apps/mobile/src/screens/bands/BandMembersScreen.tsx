@@ -6,7 +6,7 @@ import { BandMemberSummary } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { PrimaryButton, StatusBadge, TextButton } from '../../components/UI';
+import { PrimaryButton, TextButton } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -138,33 +138,15 @@ export function BandMembersScreen({ route, navigation }: Props) {
                 {myMembership.positionLabel} · {myMembership.role === 'leader' ? '리더' : '멤버'}
               </Text>
             </View>
-            <StatusBadge label={getVolumeTier(myMembership.volumePoints).badge} tone={getVolumeTier(myMembership.volumePoints).tone} />
           </View>
           <View style={styles.myStats}>
             <MiniStat icon="musical-notes-outline" label="내 포인트" value={`${myMembership.volumePoints}점`} />
             <MiniStat icon="stats-chart-outline" label="밴드 평균" value={`${averagePoints}점`} />
             <MiniStat icon="calendar-outline" label="가입" value={formatJoinDate(myMembership.joinedAt)} />
           </View>
-          <PointsBar value={myMembership.volumePoints} />
+          <PointsGauge value={myMembership.volumePoints} />
         </View>
       ) : null}
-
-      <View style={styles.syncCard}>
-        <View style={styles.syncHeader}>
-          <View style={styles.syncIcon}>
-            <Ionicons name="checkmark-done-outline" size={18} color={theme.colors.accent} />
-          </View>
-          <View style={styles.syncHeaderText}>
-            <Text style={styles.sectionTitle}>밴드 동기화</Text>
-            <Text style={styles.syncHeaderSubtitle}>가입 즉시 현재 밴드 흐름에 맞춰져요.</Text>
-          </View>
-        </View>
-        <View style={styles.syncRows}>
-          <SyncRow icon="archive-outline" title="과거 활동" description="지난 투표, 확정곡, 연습 기록을 볼 수 있어요." />
-          <SyncRow icon="flag-outline" title="현재 할 일" description="가입 후 마감되는 활동만 내 할 일로 잡혀요." />
-          <SyncRow icon="shield-checkmark-outline" title="포인트" description="가입 전에 끝난 연습으로 감점되지 않아요." />
-        </View>
-      </View>
 
       <View style={styles.rosterSection}>
         <View style={styles.sectionHeader}>
@@ -221,28 +203,6 @@ function MiniStat({
   );
 }
 
-function SyncRow({
-  icon,
-  title,
-  description,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
-}) {
-  return (
-    <View style={styles.syncRow}>
-      <View style={styles.syncRowIcon}>
-        <Ionicons name={icon} size={17} color={theme.colors.primaryDark} />
-      </View>
-      <View style={styles.syncText}>
-        <Text style={styles.syncTitle}>{title}</Text>
-        <Text style={styles.syncDescription}>{description}</Text>
-      </View>
-    </View>
-  );
-}
-
 function MemberRow({
   member,
   canTransfer,
@@ -262,10 +222,6 @@ function MemberRow({
       <View style={styles.memberBody}>
         <View style={styles.memberNameRow}>
           <Text style={styles.memberName} numberOfLines={1}>{member.name}</Text>
-          <View style={styles.memberBadges}>
-            <Text style={styles.memberPointPill}>{member.volumePoints}점</Text>
-            <StatusBadge label={member.role === 'leader' ? '리더' : '멤버'} tone={member.role === 'leader' ? 'warning' : 'default'} />
-          </View>
         </View>
         <Text style={styles.memberMeta} numberOfLines={1}>
           {member.positionLabel} · 가입 {formatJoinDate(member.joinedAt)}
@@ -278,9 +234,8 @@ function MemberRow({
   );
 }
 
-function PointsBar({ value }: { value: number }) {
+function PointsGauge({ value }: { value: number }) {
   const safeValue = Math.max(0, Math.min(100, value));
-  const tier = getVolumeTier(value);
 
   return (
     <View style={styles.pointsWrap}>
@@ -288,45 +243,16 @@ function PointsBar({ value }: { value: number }) {
         <Text style={styles.pointsLabel}>볼륨 포인트</Text>
         <Text style={styles.pointsValue}>{safeValue}점</Text>
       </View>
+      <View style={styles.pointsScale}>
+        <Text style={styles.pointsScaleText}>0</Text>
+        <Text style={styles.pointsScaleText}>50</Text>
+        <Text style={styles.pointsScaleText}>100</Text>
+      </View>
       <View style={styles.pointsTrack}>
         <View style={[styles.pointsFill, { width: `${safeValue}%` }]} />
       </View>
-      <Text style={styles.pointsDescription}>{tier.description}</Text>
     </View>
   );
-}
-
-function getVolumeTier(value: number): {
-  badge: string;
-  tone: 'default' | 'success' | 'warning' | 'danger';
-  description: string;
-} {
-  if (value >= 35) {
-    return {
-      badge: '최상',
-      tone: 'success',
-      description: '연습 제출이 꾸준해서 투표 영향력이 가장 강한 상태예요.',
-    };
-  }
-  if (value >= 25) {
-    return {
-      badge: '좋음',
-      tone: 'success',
-      description: '연습 흐름이 안정적이에요.',
-    };
-  }
-  if (value >= 15) {
-    return {
-      badge: '보통',
-      tone: 'warning',
-      description: '마감 전 제출을 챙기면 금방 회복할 수 있어요.',
-    };
-  }
-  return {
-    badge: '주의',
-    tone: 'danger',
-    description: '다음 연습 제출부터 포인트를 회복해봐요.',
-  };
 }
 
 function formatJoinDate(value: string) {
@@ -341,7 +267,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 14,
+    marginBottom: 2,
   },
   headerText: {
     flex: 1,
@@ -377,8 +304,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 14,
-    gap: 14,
+    padding: 18,
+    gap: 18,
     overflow: 'hidden',
   },
   myCardAccent: {
@@ -423,16 +350,16 @@ const styles = StyleSheet.create({
   },
   myStats: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   miniStat: {
     flex: 1,
     minWidth: 0,
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: 9,
-    paddingVertical: 9,
-    gap: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 12,
+    gap: 5,
   },
   miniStatLabel: {
     color: theme.colors.textMuted,
@@ -449,6 +376,7 @@ const styles = StyleSheet.create({
   },
   pointsHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
@@ -459,11 +387,20 @@ const styles = StyleSheet.create({
   },
   pointsValue: {
     color: theme.colors.text,
-    fontSize: 13,
+    fontSize: 22,
     fontWeight: '900',
   },
+  pointsScale: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  pointsScaleText: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   pointsTrack: {
-    height: 9,
+    height: 12,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.surfaceMuted,
     overflow: 'hidden',
@@ -473,77 +410,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.primary,
   },
-  pointsDescription: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
-  },
-  syncCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 14,
-    gap: 12,
-  },
-  syncHeader: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  syncIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  syncHeaderText: {
-    flex: 1,
-    gap: 2,
-  },
-  syncHeaderSubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  syncRows: {
-    gap: 8,
-  },
-  syncRow: {
-    flexDirection: 'row',
-    gap: 10,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.surfaceMuted,
-    padding: 10,
-  },
-  syncRowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  syncText: {
-    flex: 1,
-    gap: 2,
-  },
-  syncTitle: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  syncDescription: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '700',
-  },
   rosterSection: {
-    gap: 10,
+    gap: 14,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -570,8 +438,9 @@ const styles = StyleSheet.create({
   },
   memberRow: {
     flexDirection: 'row',
-    gap: 11,
-    padding: 13,
+    gap: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
@@ -597,21 +466,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-  },
-  memberBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  memberPointPill: {
-    overflow: 'hidden',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surfaceMuted,
-    color: theme.colors.text,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    fontSize: 12,
-    fontWeight: '900',
   },
   memberName: {
     flex: 1,

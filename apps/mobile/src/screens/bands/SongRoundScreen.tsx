@@ -299,28 +299,26 @@ export function SongRoundScreen({ route, navigation }: Props) {
             {isVoting ? <StatusBadge label={`D-${daysLeft(round?.votingDeadlineAt)}`} tone="warning" /> : null}
           </View>
 
-          {!isDone ? (
-            <View style={styles.actionRow}>
-              {hasActiveSongVote ? (
-                <View style={styles.readonlyAction}>
-                  <Text style={styles.readonlyActionText}>투표 진행 중</Text>
-                </View>
-              ) : (
-                <Pressable
-                  style={[styles.secondaryAction, startingVote && styles.secondaryActionDisabled]}
-                  onPress={() => setDeadlineModalOpen(true)}
-                  disabled={startingVote}
-                >
-                  <Text style={styles.secondaryActionText}>{startingVote ? '시작 중...' : '투표 시작'}</Text>
-                </Pressable>
-              )}
-              {canAddCandidate ? (
-                <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('AddSongCandidate', { bandId })}>
-                  <Text style={styles.secondaryActionText}>후보곡 추가</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
+          <View style={styles.actionRow}>
+            {hasActiveSongVote ? (
+              <View style={styles.readonlyAction}>
+                <Text style={styles.readonlyActionText}>투표 진행 중</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.secondaryAction, startingVote && styles.secondaryActionDisabled]}
+                onPress={() => setDeadlineModalOpen(true)}
+                disabled={startingVote}
+              >
+                <Text style={styles.secondaryActionText}>{startingVote ? '시작 중...' : '투표 시작'}</Text>
+              </Pressable>
+            )}
+            {canAddCandidate ? (
+              <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('AddSongCandidate', { bandId })}>
+                <Text style={styles.secondaryActionText}>후보곡 추가</Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           {isDone ? (
             <EmptyState title="진행 중인 투표가 없어요" description="합주곡 투표가 완료되었어요. 곡과 연습 탭에서 확정곡을 확인할 수 있어요." />
@@ -492,8 +490,10 @@ function SongLibraryCard({
   onSubmitEdit: () => void;
   onCancelEdit: () => void;
 }) {
+  const practiceClosed = card.practiceStatus === 'closed';
+
   return (
-    <View style={styles.songCardShell}>
+    <View style={[styles.songCardShell, practiceClosed && styles.songCardShellClosed]}>
       <Pressable style={styles.songListItem} onPress={onPress}>
         <ImageBackground source={{ uri: card.thumbnailUrl ?? undefined }} imageStyle={styles.songCoverImage} style={styles.songCoverSmall}>
           <View style={styles.songCoverOverlay} />
@@ -503,7 +503,7 @@ function SongLibraryCard({
           <View style={styles.songListTop}>
             <Text style={styles.songTitle} numberOfLines={1}>{card.title}</Text>
             <View style={styles.songActions}>
-              <StatusBadge label={card.practiceAssignmentId ? '연습' : '곡'} />
+              <StatusBadge label={practiceClosed ? '완료' : card.practiceAssignmentId ? '연습' : '곡'} tone={practiceClosed ? 'default' : 'default'} />
               <Pressable
                 style={[styles.songMenuButton, expanded && styles.songMenuButtonActive]}
                 hitSlop={10}
@@ -531,7 +531,7 @@ function SongLibraryCard({
           </View>
           <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
           <Text style={styles.songHint} numberOfLines={1}>
-            {card.practiceDueAt ? formatDueLabel(card.practiceDueAt) : '눌러서 연습 과제 만들기'}
+            {practiceClosed ? '연습 완료' : card.practiceDueAt ? formatDueLabel(card.practiceDueAt) : '눌러서 연습 과제 만들기'}
           </Text>
         </View>
       </Pressable>
@@ -895,6 +895,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     overflow: 'visible',
     zIndex: 1,
+  },
+  songCardShellClosed: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    opacity: 0.82,
   },
   songListItem: {
     flexDirection: 'row',

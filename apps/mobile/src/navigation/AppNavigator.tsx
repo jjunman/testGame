@@ -1,9 +1,7 @@
 ﻿import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { getFocusedRouteNameFromRoute, NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { SignupScreen } from '../screens/auth/SignupScreen';
@@ -24,12 +22,11 @@ import { CreateScheduleSlotScreen } from '../screens/bands/CreateScheduleSlotScr
 import { StudioScreen } from '../screens/bands/StudioScreen';
 import { CreateStudioCandidateScreen } from '../screens/bands/CreateStudioCandidateScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { AuthStackParamList, BandsStackParamList, MainTabParamList } from '../types/navigation';
+import { AuthStackParamList, BandsStackParamList } from '../types/navigation';
 import { theme } from '../constants/theme';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const BandsStack = createNativeStackNavigator<BandsStackParamList>();
-const Tabs = createBottomTabNavigator<MainTabParamList>();
 
 const stackOptions = {
   headerStyle: {
@@ -49,6 +46,7 @@ function BandsNavigator() {
   return (
     <BandsStack.Navigator screenOptions={stackOptions}>
       <BandsStack.Screen name="BandList" component={BandListScreen} options={{ title: '내 밴드' }} />
+      <BandsStack.Screen name="Profile" component={ProfileScreen} options={{ title: '유저' }} />
       <BandsStack.Screen name="JoinBand" component={JoinBandScreen} options={{ title: '밴드 추가하기' }} />
       <BandsStack.Screen name="CreateBand" component={CreateBandScreen} options={{ title: '밴드 만들기' }} />
       <BandsStack.Screen name="BandHome" component={BandHomeScreen} options={{ title: '밴드 홈', animation: 'none' }} />
@@ -62,7 +60,7 @@ function BandsNavigator() {
       <BandsStack.Screen name="Schedule" component={ScheduleScreen} options={{ title: '합주 스케줄러', animation: 'none' }} />
       <BandsStack.Screen name="ScheduleEdit" component={ScheduleEditScreen} options={{ title: '시간 맞추기' }} />
       <BandsStack.Screen name="CreateScheduleSlot" component={CreateScheduleSlotScreen} options={{ title: '합주 시간 제안' }} />
-      <BandsStack.Screen name="Studios" component={StudioScreen} options={{ title: '합주실 정하기' }} />
+      <BandsStack.Screen name="Studios" component={StudioScreen} options={{ title: '합주실 정하기', animation: 'none' }} />
       <BandsStack.Screen name="CreateStudioCandidate" component={CreateStudioCandidateScreen} options={{ title: '합주실 후보 추가' }} />
     </BandsStack.Navigator>
   );
@@ -77,49 +75,6 @@ function AuthNavigator() {
   );
 }
 
-function MainTabs() {
-  return (
-    <Tabs.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle:
-          route.name === 'UserTab' ||
-          (route.name === 'BandsTab' && !['JoinBand', 'CreateBand'].includes(getFocusedRouteNameFromRoute(route) ?? 'BandList'))
-            ? { display: 'none' }
-            : {
-                height: 68,
-                backgroundColor: theme.colors.surface,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.border,
-                paddingTop: 8,
-                paddingBottom: 8,
-                position: 'absolute',
-                left: 12,
-                right: 12,
-                bottom: 12,
-                borderRadius: theme.radius.lg,
-              },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
-        },
-        tabBarIcon: ({ color, size, focused }) => {
-          if (route.name === 'BandsTab') {
-            return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />;
-          }
-
-          return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
-        },
-      })}
-    >
-      <Tabs.Screen name="BandsTab" component={BandsNavigator} options={{ title: '홈' }} />
-      <Tabs.Screen name="UserTab" component={ProfileScreen} options={{ title: '유저' }} />
-    </Tabs.Navigator>
-  );
-}
-
 export function AppNavigator() {
   const { user, loading } = useAuth();
 
@@ -131,5 +86,5 @@ export function AppNavigator() {
     );
   }
 
-  return <NavigationContainer>{user ? <MainTabs /> : <AuthNavigator />}</NavigationContainer>;
+  return <NavigationContainer>{user ? <BandsNavigator /> : <AuthNavigator />}</NavigationContainer>;
 }

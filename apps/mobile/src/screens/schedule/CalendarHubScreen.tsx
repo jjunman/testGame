@@ -39,7 +39,7 @@ export function CalendarHubScreen() {
       <Screen>
         <HeroBanner title="달력" subtitle="밴드를 선택하면 합주 시간 흐름을 볼 수 있어요." badge="선택 필요" />
         <EmptyState title="선택된 밴드가 없어요" description="내 밴드에서 사용할 밴드를 먼저 선택해 주세요." />
-        <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandsTab', { screen: 'BandList' })} />
+        <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandList')} />
       </Screen>
     );
   }
@@ -57,10 +57,10 @@ export function CalendarHubScreen() {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>바로가기</Text>
-        <PrimaryButton label="합주 일정 보기" onPress={() => navigation.navigate('BandsTab', { screen: 'Schedule', params: { bandId: currentBand.id } })} />
+        <PrimaryButton label="합주 일정 보기" onPress={() => navigation.navigate('Schedule', { bandId: currentBand.id })} />
         <Pressable
           style={styles.secondaryRow}
-          onPress={() => navigation.navigate('BandsTab', { screen: 'CreateScheduleSlot', params: { bandId: currentBand.id } })}
+          onPress={() => navigation.navigate('CreateScheduleSlot', { bandId: currentBand.id })}
         >
           <Text style={styles.secondaryTitle}>합주 시간 제안하기</Text>
           <Text style={styles.secondaryMeta}>가능한 시간을 골라 찬반 투표를 열어요</Text>
@@ -81,7 +81,7 @@ export function CalendarHubScreen() {
             <Pressable
               key={slot.id}
               style={styles.slotRow}
-              onPress={() => navigation.navigate('BandsTab', { screen: 'Schedule', params: { bandId: currentBand.id } })}
+              onPress={() => navigation.navigate('Schedule', { bandId: currentBand.id })}
             >
               <View style={styles.slotBody}>
                 <Text style={styles.slotTitle}>{slot.date} {slot.startTime} - {slot.endTime}</Text>

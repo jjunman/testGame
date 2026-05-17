@@ -36,7 +36,7 @@ export function BandListScreen({ navigation }: Props) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable style={styles.userButton} onPress={() => navigation.getParent()?.navigate('UserTab')}>
+        <Pressable style={styles.userButton} onPress={() => navigation.navigate('Profile')}>
           <Ionicons name="person-outline" size={20} color={theme.colors.primaryDark} />
         </Pressable>
       ),

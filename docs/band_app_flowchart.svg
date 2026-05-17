@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2300" viewBox="0 0 1800 2300">
+  <defs>
+    <style>
+      .bg { fill: #f7f6fb; }
+      .title { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 46px; font-weight: 900; fill: #29243d; }
+      .subtitle { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 22px; font-weight: 700; fill: #726b86; }
+      .section-title { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 26px; font-weight: 900; fill: #5b4bc4; }
+      .node-title { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 22px; font-weight: 900; fill: #262236; }
+      .node-text { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 17px; font-weight: 700; fill: #6d667e; }
+      .small { font-size: 15px; }
+      .card { fill: #ffffff; stroke: #ded9ee; stroke-width: 2; }
+      .primary { fill: #f0edff; stroke: #8b7cf6; stroke-width: 3; }
+      .success { fill: #ebf8ef; stroke: #50b06a; stroke-width: 2; }
+      .warning { fill: #fff7df; stroke: #e3aa35; stroke-width: 2; }
+      .muted { fill: #f0eff4; stroke: #d4cfdf; stroke-width: 2; }
+      .section { fill: #ffffff; stroke: #d9d3eb; stroke-width: 2; }
+      .line { fill: none; stroke: #8f86a8; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .soft-line { fill: none; stroke: #beb7d2; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .label { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 15px; font-weight: 800; fill: #71688a; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M 2 2 L 12 7 L 2 12 Z" fill="#8f86a8"/>
+    </marker>
+    <marker id="softArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 2 2 L 10 6 L 2 10 Z" fill="#beb7d2"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="2300"/>
+  <text class="title" x="90" y="88">밴드 합주 관리 앱 흐름도</text>
+  <text class="subtitle" x="92" y="126">계정 생성부터 밴드 입장, 합주곡 투표, 개인 연습, 일정, 합주실 확정까지의 전체 사용 흐름</text>
+
+  <!-- Account and band entry -->
+  <rect class="section" x="80" y="170" width="1640" height="430" rx="28"/>
+  <text class="section-title" x="120" y="218">1. 앱 시작과 밴드 입장</text>
+
+  <rect class="primary" x="120" y="260" width="240" height="100" rx="20"/>
+  <text class="node-title" x="155" y="304">앱 시작</text>
+  <text class="node-text" x="155" y="334">로그인 상태 확인</text>
+
+  <rect class="card" x="430" y="260" width="270" height="100" rx="20"/>
+  <text class="node-title" x="470" y="304">로그인 / 회원가입</text>
+  <text class="node-text" x="470" y="334">계정 생성 후 자동 진입</text>
+
+  <rect class="primary" x="770" y="260" width="250" height="100" rx="20"/>
+  <text class="node-title" x="830" y="304">내 밴드</text>
+  <text class="node-text" x="812" y="334">밴드 카드와 유저 버튼</text>
+
+  <rect class="card" x="1090" y="250" width="250" height="118" rx="20"/>
+  <text class="node-title" x="1137" y="294">밴드 추가</text>
+  <text class="node-text" x="1124" y="324">초대코드 입력</text>
+  <text class="node-text" x="1124" y="350">포지션 선택 후 가입</text>
+
+  <rect class="card" x="1410" y="250" width="250" height="118" rx="20"/>
+  <text class="node-title" x="1456" y="294">밴드 만들기</text>
+  <text class="node-text" x="1440" y="324">썸네일, 이름 설정</text>
+  <text class="node-text" x="1440" y="350">내 포지션 선택</text>
+
+  <rect class="muted" x="770" y="420" width="250" height="92" rx="20"/>
+  <text class="node-title" x="842" y="458">유저 화면</text>
+  <text class="node-text" x="818" y="488">계정 정보 / 로그아웃</text>
+
+  <rect class="primary" x="1090" y="420" width="570" height="92" rx="20"/>
+  <text class="node-title" x="1310" y="458">밴드 홈</text>
+  <text class="node-text" x="1196" y="488">밴드 내부 네비게이션이 여기서부터 표시됨</text>
+
+  <path class="line" d="M360 310 H430" marker-end="url(#arrow)"/>
+  <path class="line" d="M700 310 H770" marker-end="url(#arrow)"/>
+  <path class="line" d="M1020 310 H1090" marker-end="url(#arrow)"/>
+  <path class="line" d="M1340 310 H1410" marker-end="url(#arrow)"/>
+  <path class="soft-line" d="M895 360 V420" marker-end="url(#softArrow)"/>
+  <path class="line" d="M1215 368 V420" marker-end="url(#arrow)"/>
+  <path class="line" d="M1535 368 V420" marker-end="url(#arrow)"/>
+
+  <!-- Home -->
+  <rect class="section" x="80" y="650" width="1640" height="270" rx="28"/>
+  <text class="section-title" x="120" y="698">2. 밴드 홈</text>
+
+  <rect class="primary" x="120" y="740" width="360" height="112" rx="20"/>
+  <text class="node-title" x="178" y="782">지금 해야 할 일</text>
+  <text class="node-text" x="158" y="812">가장 급한 1개를 크게 표시</text>
+  <text class="node-text" x="158" y="838">버튼은 해당 화면으로 바로 이동</text>
+
+  <rect class="card" x="560" y="740" width="360" height="112" rx="20"/>
+  <text class="node-title" x="642" y="782">진행 타임라인</text>
+  <text class="node-text" x="610" y="812">곡 정하기 → 연습하기</text>
+  <text class="node-text" x="610" y="838">→ 합주실 잡기</text>
+
+  <rect class="card" x="1000" y="740" width="300" height="112" rx="20"/>
+  <text class="node-title" x="1082" y="782">밴드 정보</text>
+  <text class="node-text" x="1040" y="812">밴드명, 썸네일</text>
+  <text class="node-text" x="1040" y="838">내 포지션 표시</text>
+
+  <rect class="muted" x="1380" y="740" width="260" height="112" rx="20"/>
+  <text class="node-title" x="1430" y="782">내부 네비</text>
+  <text class="node-text" x="1414" y="812">홈 / 노래 / 달력</text>
+  <text class="node-text" x="1414" y="838">합주실 / 유저</text>
+
+  <path class="line" d="M1375 512 V635 C1375 642 1375 646 1375 650" marker-end="url(#arrow)"/>
+  <path class="soft-line" d="M480 796 H560" marker-end="url(#softArrow)"/>
+  <path class="soft-line" d="M920 796 H1000" marker-end="url(#softArrow)"/>
+  <path class="soft-line" d="M1300 796 H1380" marker-end="url(#softArrow)"/>
+
+  <!-- Main function columns -->
+  <rect class="section" x="80" y="970" width="1640" height="1110" rx="28"/>
+  <text class="section-title" x="120" y="1018">3. 밴드 내부 핵심 기능</text>
+
+  <!-- Song and practice column -->
+  <rect class="primary" x="120" y="1070" width="360" height="80" rx="20"/>
+  <text class="node-title" x="248" y="1105">노래 탭</text>
+  <text class="node-text" x="174" y="1132">투표 / 곡과 연습 세그먼트</text>
+
+  <rect class="card" x="120" y="1190" width="360" height="108" rx="20"/>
+  <text class="node-title" x="208" y="1228">합주곡 투표</text>
+  <text class="node-text" x="152" y="1258">투표 시작, 후보 추가</text>
+  <text class="node-text" x="152" y="1284">내가 올린 후보 삭제</text>
+
+  <rect class="card" x="120" y="1338" width="360" height="108" rx="20"/>
+  <text class="node-title" x="208" y="1376">후보 카드 확인</text>
+  <text class="node-text" x="152" y="1406">유튜브 플레이어</text>
+  <text class="node-text" x="152" y="1432">제목, 가수, 투표 버튼</text>
+
+  <rect class="warning" x="120" y="1486" width="360" height="108" rx="20"/>
+  <text class="node-title" x="206" y="1524">최대 2곡 투표</text>
+  <text class="node-text" x="152" y="1554">제출 전까지 선택 변경 가능</text>
+  <text class="node-text" x="152" y="1580">완료 시 최다 득표 곡 확정</text>
+
+  <rect class="success" x="120" y="1634" width="360" height="108" rx="20"/>
+  <text class="node-title" x="218" y="1672">곡과 연습</text>
+  <text class="node-text" x="152" y="1702">확정곡 / 연습 카드</text>
+  <text class="node-text" x="152" y="1728">완료된 연습은 회색 표시</text>
+
+  <rect class="card" x="120" y="1782" width="360" height="108" rx="20"/>
+  <text class="node-title" x="220" y="1820">연습 상세</text>
+  <text class="node-text" x="152" y="1850">과제 정보, 구간 설정</text>
+  <text class="node-text" x="152" y="1876">녹음, 제출, 결과 확인</text>
+
+  <rect class="card" x="120" y="1930" width="360" height="108" rx="20"/>
+  <text class="node-title" x="206" y="1968">녹음과 제출</text>
+  <text class="node-text" x="152" y="1998">5초 전부터 유튜브 재생</text>
+  <text class="node-text" x="152" y="2024">끝까지 녹음해야 저장</text>
+
+  <!-- Schedule column -->
+  <rect class="primary" x="540" y="1070" width="360" height="80" rx="20"/>
+  <text class="node-title" x="676" y="1105">달력 탭</text>
+  <text class="node-text" x="596" y="1132">일정 등록과 합주 시간 확정</text>
+
+  <rect class="card" x="540" y="1190" width="360" height="108" rx="20"/>
+  <text class="node-title" x="640" y="1228">내 일정 등록</text>
+  <text class="node-text" x="574" y="1258">가능한 시간을 드래그</text>
+  <text class="node-text" x="574" y="1284">멤버별 가능 시간 합산</text>
+
+  <rect class="card" x="540" y="1338" width="360" height="108" rx="20"/>
+  <text class="node-title" x="626" y="1376">합주 시간 제안</text>
+  <text class="node-text" x="574" y="1406">몇 시간 합주할지 선택</text>
+  <text class="node-text" x="574" y="1432">추천 시간 또는 직접 선택</text>
+
+  <rect class="warning" x="540" y="1486" width="360" height="108" rx="20"/>
+  <text class="node-title" x="632" y="1524">찬반 투표</text>
+  <text class="node-text" x="574" y="1554">찬성 / 반대 제출</text>
+  <text class="node-text" x="574" y="1580">가능 멤버 안내 표시</text>
+
+  <rect class="success" x="540" y="1634" width="360" height="108" rx="20"/>
+  <text class="node-title" x="628" y="1672">합주 시간 확정</text>
+  <text class="node-text" x="574" y="1702">모두 응답 후 결과 확인</text>
+  <text class="node-text" x="574" y="1728">진행 타임라인에 반영</text>
+
+  <!-- Studio column -->
+  <rect class="primary" x="960" y="1070" width="360" height="80" rx="20"/>
+  <text class="node-title" x="1094" y="1105">합주실 탭</text>
+  <text class="node-text" x="1016" y="1132">위치, 후보, 투표, 확정</text>
+
+  <rect class="card" x="960" y="1190" width="360" height="108" rx="20"/>
+  <text class="node-title" x="1054" y="1228">내 위치 저장</text>
+  <text class="node-text" x="994" y="1258">처음 저장 후 접힘</text>
+  <text class="node-text" x="994" y="1284">주소 변경하기로 수정</text>
+
+  <rect class="card" x="960" y="1338" width="360" height="108" rx="20"/>
+  <text class="node-title" x="1042" y="1376">합주실 후보 추가</text>
+  <text class="node-text" x="994" y="1406">지도에서 위치 확인</text>
+  <text class="node-text" x="994" y="1432">평균 거리순 후보 확인</text>
+
+  <rect class="warning" x="960" y="1486" width="360" height="108" rx="20"/>
+  <text class="node-title" x="1048" y="1524">후보 카드 투표</text>
+  <text class="node-text" x="994" y="1554">가격, 평균 거리, 전화</text>
+  <text class="node-text" x="994" y="1580">링크, 득표수 표시</text>
+
+  <rect class="success" x="960" y="1634" width="360" height="108" rx="20"/>
+  <text class="node-title" x="1052" y="1672">합주실 확정</text>
+  <text class="node-text" x="994" y="1702">확정 버튼으로 결정</text>
+  <text class="node-text" x="994" y="1728">후보 목록 정리</text>
+
+  <!-- Members column -->
+  <rect class="primary" x="1380" y="1070" width="260" height="80" rx="20"/>
+  <text class="node-title" x="1438" y="1105">유저 탭</text>
+  <text class="node-text" x="1410" y="1132">멤버 / 포인트</text>
+
+  <rect class="card" x="1380" y="1190" width="260" height="108" rx="20"/>
+  <text class="node-title" x="1420" y="1228">내 정보</text>
+  <text class="node-text" x="1410" y="1258">포지션</text>
+  <text class="node-text" x="1410" y="1284">볼륨 포인트</text>
+
+  <rect class="card" x="1380" y="1338" width="260" height="108" rx="20"/>
+  <text class="node-title" x="1410" y="1376">멤버 목록</text>
+  <text class="node-text" x="1410" y="1406">이름, 포지션</text>
+  <text class="node-text" x="1410" y="1432">포인트 확인</text>
+
+  <rect class="muted" x="1380" y="1486" width="260" height="108" rx="20"/>
+  <text class="node-title" x="1412" y="1524">관리 행동</text>
+  <text class="node-text" x="1410" y="1554">리더 위임</text>
+  <text class="node-text" x="1410" y="1580">밴드 나가기</text>
+
+  <path class="line" d="M300 1150 V1190" marker-end="url(#arrow)"/>
+  <path class="line" d="M300 1298 V1338" marker-end="url(#arrow)"/>
+  <path class="line" d="M300 1446 V1486" marker-end="url(#arrow)"/>
+  <path class="line" d="M300 1594 V1634" marker-end="url(#arrow)"/>
+  <path class="line" d="M300 1742 V1782" marker-end="url(#arrow)"/>
+  <path class="line" d="M300 1890 V1930" marker-end="url(#arrow)"/>
+
+  <path class="line" d="M720 1150 V1190" marker-end="url(#arrow)"/>
+  <path class="line" d="M720 1298 V1338" marker-end="url(#arrow)"/>
+  <path class="line" d="M720 1446 V1486" marker-end="url(#arrow)"/>
+  <path class="line" d="M720 1594 V1634" marker-end="url(#arrow)"/>
+
+  <path class="line" d="M1140 1150 V1190" marker-end="url(#arrow)"/>
+  <path class="line" d="M1140 1298 V1338" marker-end="url(#arrow)"/>
+  <path class="line" d="M1140 1446 V1486" marker-end="url(#arrow)"/>
+  <path class="line" d="M1140 1594 V1634" marker-end="url(#arrow)"/>
+
+  <path class="line" d="M1510 1150 V1190" marker-end="url(#arrow)"/>
+  <path class="line" d="M1510 1298 V1338" marker-end="url(#arrow)"/>
+  <path class="line" d="M1510 1446 V1486" marker-end="url(#arrow)"/>
+
+  <path class="soft-line" d="M300 852 V940 C300 955 300 958 300 970" marker-end="url(#softArrow)"/>
+  <path class="soft-line" d="M1510 852 V940 C1510 955 1510 958 1510 970" marker-end="url(#softArrow)"/>
+
+  <!-- Points and system rules -->
+  <rect class="section" x="80" y="2130" width="1640" height="120" rx="28"/>
+  <text class="section-title" x="120" y="2180">4. 볼륨 포인트 규칙</text>
+  <text class="node-text" x="120" y="2218">모든 부원은 기본 20점, 리더는 25점으로 시작합니다. 연습을 제시간에 제출하면 상승하고, 미제출하면 하락합니다.</text>
+  <text class="node-text" x="980" y="2218">동점 상황에서는 볼륨 포인트가 높은 멤버의 선택이 우선됩니다.</text>
+</svg>

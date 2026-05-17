@@ -206,6 +206,7 @@ export class BandsService {
       thumbnailUrl: string | null;
       practiceAssignmentId?: string | null;
       practiceDueAt?: string | null;
+      practiceStatus?: PracticeAssignmentStatus | null;
       kind: 'song' | 'picking';
     }> = completedRounds
       .filter((round) => round.finalCandidate?.songCatalog)
@@ -224,6 +225,7 @@ export class BandsService {
           : null,
         practiceAssignmentId: practiceAssignment?.id ?? null,
         practiceDueAt: practiceAssignment?.dueAt?.toISOString() ?? null,
+        practiceStatus: practiceAssignment?.status ?? null,
         kind: 'song' as const,
       };
       });
@@ -245,6 +247,9 @@ export class BandsService {
       name: membership.band.name,
       thumbnailUrl: membership.band.thumbnailUrl,
       inviteCode: membership.band.inviteCode,
+      memberCount: await this.membersRepository.count({
+        where: { band: { id: bandId } },
+      }),
       myMembership: {
         role: membership.role,
         positionLabel: this.positionLabel(membership.positionType, membership.customPosition),
@@ -297,7 +302,9 @@ export class BandsService {
       title: string;
       description: string;
       dueLabel: string;
+      dueAt?: string | null;
       shortcut: 'song_round' | 'practice' | 'schedule' | 'studio';
+      targetId?: string | null;
     }> = [];
 
     const votingRound = await this.roundsRepository.findOne({
@@ -315,11 +322,13 @@ export class BandsService {
       : false;
 
     if (votingRound && !hasSongVote) {
+      const dueAt = votingRound.votingDeadlineAt ?? this.daysFromNow(3);
       todos.push({
         type: 'vote_song',
         title: '합주곡 투표하기',
         description: '후보 곡 중 최대 2곡을 골라 제출해 주세요.',
-        dueLabel: '투표 진행중',
+        dueLabel: this.formatTodoDueLabel(dueAt),
+        dueAt: dueAt.toISOString(),
         shortcut: 'song_round',
       });
     }
@@ -330,11 +339,13 @@ export class BandsService {
       order: { createdAt: 'DESC' },
     });
     if (activeProposal && !activeProposal.votes?.some((vote) => vote.user.id === userId)) {
+      const dueAt = this.toDateTime(activeProposal.date, activeProposal.startTime);
       todos.push({
         type: 'vote_schedule_proposal',
         title: '합주 시간 투표하기',
         description: '제안된 합주 시간이 괜찮은지 찬성 또는 반대로 응답해 주세요.',
-        dueLabel: '찬반투표 진행중',
+        dueLabel: this.formatTodoDueLabel(dueAt),
+        dueAt: dueAt.toISOString(),
         shortcut: 'schedule',
       });
     }
@@ -349,11 +360,13 @@ export class BandsService {
       activeStudioCandidates.length > 0 &&
       !activeStudioCandidates.some((candidate) => candidate.votes?.some((vote) => vote.user.id === userId))
     ) {
+      const dueAt = this.earliestStudioVoteDueAt(activeStudioCandidates);
       todos.push({
         type: 'vote_studio',
         title: '합주실 투표하기',
         description: '부원들이 올린 합주실 후보 중 하나를 선택해 주세요.',
-        dueLabel: '투표 진행중',
+        dueLabel: this.formatTodoDueLabel(dueAt),
+        dueAt: dueAt.toISOString(),
         shortcut: 'studio',
       });
     }
@@ -375,7 +388,9 @@ export class BandsService {
         title: `${urgentPractice.title} 제출하기`,
         description: '가장 가까운 마감 과제예요. 녹음본을 제출해 주세요.',
         dueLabel: this.formatTodoDueLabel(urgentPractice.dueAt),
+        dueAt: urgentPractice.dueAt.toISOString(),
         shortcut: 'practice',
+        targetId: urgentPractice.id,
       });
     }
 
@@ -384,11 +399,13 @@ export class BandsService {
     })) > 0;
 
     if (!hasSubmittedSchedule) {
+      const dueAt = this.daysFromNow(7);
       todos.push({
         type: 'submit_schedule',
         title: '일정 등록하기',
         description: '가능한 합주 시간대를 입력해 주세요.',
-        dueLabel: '지금 가능',
+        dueLabel: this.formatTodoDueLabel(dueAt),
+        dueAt: dueAt.toISOString(),
         shortcut: 'schedule',
       });
     }
@@ -421,6 +438,31 @@ export class BandsService {
       return '내일 마감';
     }
     return `D-${dayDiff}`;
+  }
+
+  private toDateTime(date: string, time: string) {
+    return new Date(`${date}T${time}:00`);
+  }
+
+  private daysFromNow(days: number) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setHours(23, 59, 0, 0);
+    return date;
+  }
+
+  private earliestStudioVoteDueAt(candidates: StudioCandidate[]) {
+    const dueTimes = candidates.map((candidate) => {
+      if (candidate.voteDeadlineAt) {
+        return candidate.voteDeadlineAt.getTime();
+      }
+      const fallback = new Date(candidate.createdAt);
+      fallback.setDate(fallback.getDate() + 3);
+      fallback.setHours(23, 59, 0, 0);
+      return fallback.getTime();
+    });
+
+    return new Date(Math.min(...dueTimes));
   }
 
   private async getVoteSummary(userId: string, bandId: string) {

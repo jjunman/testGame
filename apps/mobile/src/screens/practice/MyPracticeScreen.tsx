@@ -39,7 +39,7 @@ export function MyPracticeScreen() {
       <Screen>
         <HeroBanner title="노래" subtitle="밴드를 선택하면 합주곡과 연습 과제를 볼 수 있어요." badge="선택 필요" />
         <EmptyState title="선택된 밴드가 없어요" description="내 밴드에서 사용할 밴드를 먼저 선택해 주세요." />
-        <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandsTab', { screen: 'BandList' })} />
+        <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandList')} />
       </Screen>
     );
   }
@@ -58,10 +58,10 @@ export function MyPracticeScreen() {
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>바로가기</Text>
         <View style={styles.quickGrid}>
-          <PrimaryButton label="합주곡" onPress={() => navigation.navigate('BandsTab', { screen: 'SongRound', params: { bandId: currentBand.id } })} />
+          <PrimaryButton label="합주곡" onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id })} />
           <Pressable
             style={styles.secondaryRow}
-            onPress={() => navigation.navigate('BandsTab', { screen: 'PracticeAssignments', params: { bandId: currentBand.id } })}
+            onPress={() => navigation.navigate('PracticeAssignments', { bandId: currentBand.id })}
           >
             <Text style={styles.secondaryTitle}>연습 과제 전체 보기</Text>
             <Text style={styles.secondaryMeta}>{items.length}개 과제</Text>
@@ -77,7 +77,7 @@ export function MyPracticeScreen() {
         <Text style={styles.bodyText}>
           {round?.status === 'voting' ? '후보곡을 보고 최대 2곡까지 투표할 수 있어요.' : round ? '완료된 투표는 노래 탭에서 확인할 수 있어요.' : '아직 시작된 합주곡 투표가 없어요.'}
         </Text>
-        <Pressable style={styles.linkRow} onPress={() => navigation.navigate('BandsTab', { screen: 'SongRound', params: { bandId: currentBand.id } })}>
+        <Pressable style={styles.linkRow} onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id })}>
           <Text style={styles.linkText}>노래 탭 열기</Text>
         </Pressable>
       </View>
@@ -92,10 +92,7 @@ export function MyPracticeScreen() {
             key={item.id}
             style={styles.assignmentRow}
             onPress={() =>
-              navigation.navigate('BandsTab', {
-                screen: 'PracticeAssignmentDetail',
-                params: { bandId: currentBand.id, assignmentId: item.id },
-              })
+              navigation.navigate('PracticeAssignmentDetail', { bandId: currentBand.id, assignmentId: item.id })
             }
           >
             <View style={styles.assignmentBody}>

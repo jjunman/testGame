@@ -1,5 +1,3 @@
-import { NavigatorScreenParams } from '@react-navigation/native';
-
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
@@ -7,6 +5,7 @@ export type AuthStackParamList = {
 
 export type BandsStackParamList = {
   BandList: undefined;
+  Profile: undefined;
   CreateBand: undefined;
   JoinBand: undefined;
   BandHome: { bandId: string };
@@ -22,9 +21,4 @@ export type BandsStackParamList = {
   CreateScheduleSlot: { bandId: string };
   Studios: { bandId: string };
   CreateStudioCandidate: { bandId: string };
-};
-
-export type MainTabParamList = {
-  BandsTab: NavigatorScreenParams<BandsStackParamList> | undefined;
-  UserTab: undefined;
 };
