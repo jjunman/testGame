@@ -113,7 +113,7 @@ export function BandMembersScreen({ route, navigation }: Props) {
   };
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={route.params.bandId} active="user" navigation={navigation} />}>
+    <Screen fixedFooter={<BandInnerNav bandId={route.params.bandId} active="home" navigation={navigation} />}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>멤버</Text>

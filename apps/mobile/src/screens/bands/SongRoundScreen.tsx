@@ -30,7 +30,7 @@ type SongHubTab = 'vote' | 'library';
 export function SongRoundScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SongHubTab>('vote');
+  const [activeTab, setActiveTab] = useState<SongHubTab>(route.params.initialTab ?? 'vote');
   const [round, setRound] = useState<SongRoundDto | null>(null);
   const [detail, setDetail] = useState<BandHomeDto | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
@@ -72,6 +72,10 @@ export function SongRoundScreen({ route, navigation }: Props) {
     });
     return unsubscribe;
   }, [load, navigation]);
+
+  useEffect(() => {
+    setActiveTab(route.params.initialTab ?? 'vote');
+  }, [route.params.initialTab]);
 
   const candidates = useMemo(() => (round ? [...round.candidates] : []), [round]);
   const songCards = useMemo(() => detail?.songCards.filter((card) => card.kind === 'song') ?? [], [detail]);
@@ -271,19 +275,13 @@ export function SongRoundScreen({ route, navigation }: Props) {
 
   const cardWidth = Math.min(360, Math.max(280, width - 72));
   const cardGap = 12;
-
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="song" navigation={navigation} />}>
+    <Screen fixedFooter={<BandInnerNav bandId={bandId} active={activeTab === 'vote' ? 'vote' : 'song'} navigation={navigation} />}>
       <HeroBanner
         title="노래"
         subtitle={activeTab === 'vote' ? '합주곡 투표를 확인하고 후보를 고르세요.' : '확정곡과 연습 과제를 한곳에서 관리해요.'}
         badge={activeTab === 'vote' ? '투표' : `${songCards.length}곡`}
       />
-
-      <View style={styles.segment}>
-        <SegmentButton label="투표" active={activeTab === 'vote'} onPress={() => setActiveTab('vote')} />
-        <SegmentButton label="곡과 연습" active={activeTab === 'library'} onPress={() => setActiveTab('library')} />
-      </View>
 
       {activeTab === 'vote' ? (
         <View style={styles.section}>
@@ -343,6 +341,10 @@ export function SongRoundScreen({ route, navigation }: Props) {
 
           {isVoting ? (
             <View style={styles.actionStack}>
+              <View style={styles.voteProgressRow}>
+                <Text style={styles.voteProgressLabel}>선택한 곡</Text>
+                <Text style={styles.voteProgressValue}>{myVoteCount} / 2</Text>
+              </View>
               <PrimaryButton
                 label={myVoteCount >= 2 ? '2곡 선택 완료' : '제출하기'}
                 onPress={() => void submitVotes()}
@@ -442,14 +444,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
         </View>
       </Modal>
     </Screen>
-  );
-}
-
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -871,6 +865,25 @@ const styles = StyleSheet.create({
   },
   actionStack: {
     gap: 8,
+  },
+  voteProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primarySoft,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  voteProgressLabel: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  voteProgressValue: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
   },
   subtleEndButton: {
     alignSelf: 'center',

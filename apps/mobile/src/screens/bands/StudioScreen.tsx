@@ -184,8 +184,8 @@ export function StudioScreen({ route, navigation }: Props) {
       <HeroBanner title="합주실 정하기" subtitle="지도에서 집 위치를 찍고 모두에게 가까운 합주실을 골라요." badge="안산" align="center" />
 
       <View style={styles.segment}>
-        <SegmentButton label="내 집 위치" active={activeTab === 'location'} onPress={() => setActiveTab('location')} />
-        <SegmentButton label="후보 / 투표" active={activeTab === 'vote'} onPress={() => setActiveTab('vote')} />
+        <SegmentButton label="1. 내 위치" active={activeTab === 'location'} onPress={() => setActiveTab('location')} />
+        <SegmentButton label="2. 후보 투표" active={activeTab === 'vote'} onPress={() => setActiveTab('vote')} />
       </View>
 
       {activeTab === 'vote' ? (

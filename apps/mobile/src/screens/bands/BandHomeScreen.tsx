@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +55,16 @@ export function BandHomeScreen({ route, navigation }: Props) {
     return unsubscribe;
   }, [load, navigation]);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable style={styles.memberHeaderButton} onPress={() => navigation.navigate('BandMembers', { bandId })}>
+          <Ionicons name="people-outline" size={20} color={theme.colors.primaryDark} />
+        </Pressable>
+      ),
+    });
+  }, [bandId, navigation]);
+
   if (!detail) {
     return (
       <Screen>
@@ -88,7 +98,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       return;
     }
     if (todo.shortcut === 'song_round') {
-      navigation.navigate('SongRound', { bandId });
+      navigation.navigate('SongRound', { bandId, initialTab: 'vote' });
       return;
     }
     if (todo.shortcut === 'schedule') {
@@ -142,11 +152,11 @@ export function BandHomeScreen({ route, navigation }: Props) {
           detail={detail}
           onPress={(target) => {
             if (target === 'song') {
-              navigation.navigate('SongRound', { bandId });
+              navigation.navigate('SongRound', { bandId, initialTab: 'vote' });
               return;
             }
             if (target === 'practice') {
-              navigation.navigate('SongRound', { bandId });
+              navigation.navigate('SongRound', { bandId, initialTab: 'library' });
               return;
             }
             navigation.navigate('Studios', { bandId });
@@ -180,9 +190,14 @@ function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
         <Ionicons name={iconName} size={22} color={theme.colors.textMuted} />
       </View>
       <View style={styles.todoBody}>
-        <Text style={styles.todoTitle}>{todo.title}</Text>
+        <Text style={styles.todoKicker}>{todoDeadlineLabel(todo)}</Text>
+        <Text style={styles.todoTitle} numberOfLines={1}>{todo.title}</Text>
+        <Text style={styles.todoDescription} numberOfLines={2}>{todo.description}</Text>
       </View>
-      <Text style={styles.todoDeadline}>{todoDeadlineLabel(todo)}</Text>
+      <View style={styles.todoGo}>
+        <Text style={styles.todoGoText}>바로가기</Text>
+        <Ionicons name="chevron-forward" size={15} color={theme.colors.primaryDark} />
+      </View>
     </Pressable>
   );
 }
@@ -197,8 +212,12 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
       </View>
       <View style={styles.compactTodoText}>
         <Text style={styles.compactTodoTitle} numberOfLines={1}>{todo.title}</Text>
+        <Text style={styles.compactTodoDescription} numberOfLines={1}>{todo.description}</Text>
       </View>
-      <Text style={styles.compactTodoDeadline}>{todoDeadlineLabel(todo)}</Text>
+      <View style={styles.compactTodoGo}>
+        <Text style={styles.compactTodoDeadline}>{todoDeadlineLabel(todo)}</Text>
+        <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
+      </View>
     </Pressable>
   );
 }
@@ -318,6 +337,14 @@ const styles = StyleSheet.create({
   loadingBody: {
     color: theme.colors.textMuted,
   },
+  memberHeaderButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   retryButton: {
     marginTop: 10,
     alignSelf: 'flex-start',
@@ -394,7 +421,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: theme.radius.md,
-    padding: 14,
+    padding: 15,
     gap: 12,
     borderWidth: 1,
     borderColor: theme.colors.primary,
@@ -409,6 +436,7 @@ const styles = StyleSheet.create({
   todoBody: {
     flex: 1,
     minWidth: 0,
+    gap: 3,
   },
   compactTodoList: {
     gap: 10,
@@ -433,11 +461,22 @@ const styles = StyleSheet.create({
   compactTodoText: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
   },
   compactTodoTitle: {
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: '900',
+  },
+  compactTodoDescription: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  compactTodoGo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   compactTodoDeadline: {
     color: theme.colors.textMuted,
@@ -524,13 +563,28 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: '800',
-    flex: 1,
   },
-  todoDeadline: {
-    color: theme.colors.textMuted,
-    fontWeight: '800',
+  todoKicker: {
+    color: theme.colors.primaryDark,
     fontSize: 12,
-    minWidth: 36,
-    textAlign: 'right',
+    fontWeight: '900',
+  },
+  todoDescription: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  todoGo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  todoGoText: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

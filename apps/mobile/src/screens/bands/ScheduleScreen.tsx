@@ -56,7 +56,6 @@ export function ScheduleScreen({ route, navigation }: Props) {
   const mySelectedCount = slots.filter((slot) => slot.myAvailability === 'yes').length;
   const isLeader = currentBand?.myRole === 'leader';
   const voteLocked = Boolean(activeProposal?.myAvailability) || !activeProposal;
-
   const submitVote = async (availability: 'yes' | 'no') => {
     if (!activeProposal) {
       return;
@@ -103,9 +102,19 @@ export function ScheduleScreen({ route, navigation }: Props) {
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
       <HeroBanner title="우리 모임표" subtitle="이번 합주가 가능한 시간을 한눈에 맞춰봐요." badge="calendar" align="center" />
 
+      <View style={styles.quickActions}>
+        <Pressable style={styles.quickActionPrimary} onPress={() => navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' })}>
+          <Text style={[styles.quickActionLabel, styles.quickActionLabelPrimary]}>내 일정 등록</Text>
+          <Text style={[styles.quickActionMeta, styles.quickActionMetaPrimary]}>{mySelectedCount}칸 선택됨</Text>
+        </Pressable>
+        <Pressable style={styles.quickActionSecondary} onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}>
+          <Text style={styles.quickActionLabel}>합주 시간 제안</Text>
+          <Text style={styles.quickActionMeta}>가능한 시간 고르기</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>찬반투표</Text>
-        <PrimaryButton label="합주 시간 제안하기" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} />
         {confirmedProposal ? (
           <View style={styles.confirmedCard}>
             <StatusBadge label="합주 시간 확정" tone="success" />
@@ -258,6 +267,46 @@ function slotKey(date: string, hour: number) {
 }
 
 const styles = StyleSheet.create({
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quickActionPrimary: {
+    flex: 1,
+    minHeight: 76,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary,
+    padding: 14,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  quickActionSecondary: {
+    flex: 1,
+    minHeight: 76,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primarySoft,
+    borderWidth: 1,
+    borderColor: '#ddd6ff',
+    padding: 14,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  quickActionLabel: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  quickActionMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  quickActionLabelPrimary: {
+    color: '#fff',
+  },
+  quickActionMetaPrimary: {
+    color: 'rgba(255,255,255,0.82)',
+  },
   section: {
     gap: 10,
   },

@@ -5,7 +5,7 @@ import { theme } from '../constants/theme';
 
 type BandInnerNavProps = {
   bandId: string;
-  active: 'home' | 'song' | 'calendar' | 'studio' | 'user';
+  active: 'home' | 'song' | 'vote' | 'calendar' | 'studio';
   navigation: any;
 };
 
@@ -28,10 +28,16 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
             color={active === 'song' ? theme.colors.primary : inactiveColor}
           />
         }
-        onPress={() => navigation.navigate('SongRound', { bandId })}
+        onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'library' })}
       />
       <NavItem
-        label="달력"
+        label="투표"
+        active={active === 'vote'}
+        icon={<Ionicons name={active === 'vote' ? 'checkbox' : 'checkbox-outline'} size={22} color={active === 'vote' ? theme.colors.primary : inactiveColor} />}
+        onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'vote' })}
+      />
+      <NavItem
+        label="일정"
         active={active === 'calendar'}
         icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={22} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('Schedule', { bandId })}
@@ -47,12 +53,6 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
           />
         }
         onPress={() => navigation.navigate('Studios', { bandId })}
-      />
-      <NavItem
-        label="멤버"
-        active={active === 'user'}
-        icon={<Ionicons name={active === 'user' ? 'person' : 'person-outline'} size={22} color={active === 'user' ? theme.colors.primary : inactiveColor} />}
-        onPress={() => navigation.navigate('BandMembers', { bandId })}
       />
     </View>
   );
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   itemActive: {
-    backgroundColor: theme.colors.surfaceMuted,
+    backgroundColor: theme.colors.primarySoft,
   },
   label: {
     color: inactiveColor,
@@ -110,6 +110,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   labelActive: {
-    color: theme.colors.text,
+    color: theme.colors.primaryDark,
   },
 });

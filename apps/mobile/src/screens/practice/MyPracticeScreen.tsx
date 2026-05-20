@@ -58,7 +58,7 @@ export function MyPracticeScreen() {
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>바로가기</Text>
         <View style={styles.quickGrid}>
-          <PrimaryButton label="합주곡" onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id })} />
+          <PrimaryButton label="합주곡" onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id, initialTab: 'library' })} />
           <Pressable
             style={styles.secondaryRow}
             onPress={() => navigation.navigate('PracticeAssignments', { bandId: currentBand.id })}
@@ -77,7 +77,7 @@ export function MyPracticeScreen() {
         <Text style={styles.bodyText}>
           {round?.status === 'voting' ? '후보곡을 보고 최대 2곡까지 투표할 수 있어요.' : round ? '완료된 투표는 노래 탭에서 확인할 수 있어요.' : '아직 시작된 합주곡 투표가 없어요.'}
         </Text>
-        <Pressable style={styles.linkRow} onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id })}>
+        <Pressable style={styles.linkRow} onPress={() => navigation.navigate('SongRound', { bandId: currentBand.id, initialTab: 'library' })}>
           <Text style={styles.linkText}>노래 탭 열기</Text>
         </Pressable>
       </View>

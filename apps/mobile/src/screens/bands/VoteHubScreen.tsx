@@ -61,7 +61,7 @@ export function VoteHubScreen({ route, navigation }: Props) {
           : '진행 중인 합주곡 투표가 없어요.',
         status: songVoting ? (songVoted ? '완료' : '투표 필요') : '진행 없음',
         tone: songVoting ? (songVoted ? 'done' : 'need') : 'none',
-        onPress: () => navigation.navigate('SongRound', { bandId }),
+        onPress: () => navigation.navigate('SongRound', { bandId, initialTab: 'vote' }),
       },
       {
         title: '합주 시간 투표',
@@ -101,7 +101,7 @@ export function VoteHubScreen({ route, navigation }: Props) {
   const needCount = cards.filter((card) => card.tone === 'need').length;
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
+    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="vote" navigation={navigation} />}>
       <HeroBanner
         title="투표 모아보기"
         subtitle={loading ? '투표 현황을 불러오는 중이에요.' : needCount > 0 ? `${needCount}개 투표가 기다리고 있어요.` : '지금 필요한 투표를 모두 확인했어요.'}

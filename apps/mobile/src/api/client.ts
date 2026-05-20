@@ -1,8 +1,8 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse } from '@band/shared-types';
+import Constants from 'expo-constants';
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || 'http://localhost:4000';
+const API_BASE_URL = getApiBaseUrl();
 const TOKEN_KEY = 'band_management_token';
 
 export const tokenStorage = {
@@ -74,4 +74,23 @@ export function toApiAssetUrl(value: string | null | undefined) {
   }
 
   return value;
+}
+
+function getApiBaseUrl() {
+  const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const constants = Constants as typeof Constants & {
+    manifest2?: { extra?: { expoClient?: { hostUri?: string } } };
+  };
+  const hostUri = constants.expoConfig?.hostUri ?? constants.manifest2?.extra?.expoClient?.hostUri;
+  const host = hostUri?.split(':')[0];
+
+  if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    return `http://${host}:4000`;
+  }
+
+  return 'http://localhost:4000';
 }

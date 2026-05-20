@@ -415,11 +415,11 @@ export class BandsService {
 
   private todoPriority(type: string) {
     const priorities: Record<string, number> = {
-      submit_practice: 10,
-      submit_schedule: 20,
+      vote_song: 10,
+      submit_practice: 20,
       vote_schedule_proposal: 30,
-      vote_song: 40,
-      vote_studio: 50,
+      vote_studio: 40,
+      submit_schedule: 50,
     };
 
     return priorities[type] ?? 999;

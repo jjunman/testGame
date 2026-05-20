@@ -11,7 +11,7 @@ export type BandsStackParamList = {
   BandHome: { bandId: string };
   VoteHub: { bandId: string };
   BandMembers: { bandId: string };
-  SongRound: { bandId: string };
+  SongRound: { bandId: string; initialTab?: 'vote' | 'library' };
   AddSongCandidate: { bandId: string };
   PracticeAssignments: { bandId: string };
   CreatePracticeAssignment: { bandId: string };

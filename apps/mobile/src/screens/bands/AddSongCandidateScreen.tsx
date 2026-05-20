@@ -46,7 +46,7 @@ export function AddSongCandidateScreen({ route, navigation }: Props) {
   };
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="song" navigation={navigation} />}>
+    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="vote" navigation={navigation} />}>
       <HeroBanner
         title="후보곡 추가하기"
         subtitle="곡 제목, 가수, 유튜브 링크만 입력하면 바로 후보로 올라가요."
