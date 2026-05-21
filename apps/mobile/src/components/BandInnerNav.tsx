@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
 
@@ -10,8 +10,41 @@ type BandInnerNavProps = {
 };
 
 export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) {
+  const [navWidth, setNavWidth] = useState(0);
+  const indicatorProgress = useRef(new Animated.Value(getActiveIndex(active))).current;
+  const indicatorWidth = navWidth > 0 ? (navWidth - 10) / 5 : 0;
+
+  useEffect(() => {
+    Animated.spring(indicatorProgress, {
+      toValue: getActiveIndex(active),
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 220,
+      mass: 0.65,
+    }).start();
+  }, [active, indicatorProgress]);
+
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} onLayout={(event) => setNavWidth(event.nativeEvent.layout.width)}>
+      {indicatorWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.indicator,
+            {
+              width: indicatorWidth,
+              transform: [
+                {
+                  translateX: indicatorProgress.interpolate({
+                    inputRange: [0, 1, 2, 3, 4],
+                    outputRange: [0, indicatorWidth, indicatorWidth * 2, indicatorWidth * 3, indicatorWidth * 4],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ) : null}
       <NavItem
         label="홈"
         active={active === 'home'}
@@ -60,6 +93,10 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
 
 const inactiveColor = '#7c8491';
 
+function getActiveIndex(active: BandInnerNavProps['active']) {
+  return ['home', 'song', 'vote', 'calendar', 'studio'].indexOf(active);
+}
+
 function NavItem({
   label,
   icon,
@@ -72,7 +109,7 @@ function NavItem({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.item, active && styles.itemActive]}>
+    <Pressable onPress={onPress} style={styles.item}>
       {icon}
       <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{label}</Text>
     </Pressable>
@@ -93,6 +130,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 12,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  indicator: {
+    position: 'absolute',
+    top: 5,
+    bottom: 5,
+    left: 5,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primarySoft,
   },
   item: {
     flex: 1,
@@ -100,9 +146,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
     borderRadius: theme.radius.md,
-  },
-  itemActive: {
-    backgroundColor: theme.colors.primarySoft,
+    zIndex: 1,
   },
   label: {
     color: inactiveColor,

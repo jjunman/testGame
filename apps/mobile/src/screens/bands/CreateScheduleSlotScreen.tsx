@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScheduleSummaryDto } from '@band/shared-types';
 import { api } from '../../api/client';
@@ -33,6 +33,9 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   const [endTime, setEndTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<ScheduleSlotTab>('recommended');
+  const [segmentWidth, setSegmentWidth] = useState(0);
+  const indicatorProgress = useRef(new Animated.Value(0)).current;
+  const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
 
   useEffect(() => {
     void (async () => {
@@ -61,6 +64,16 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
       setEndTime(recommended.endTime);
     }
   }, [recommended]);
+
+  useEffect(() => {
+    Animated.spring(indicatorProgress, {
+      toValue: activeTab === 'recommended' ? 0 : 1,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 220,
+      mass: 0.65,
+    }).start();
+  }, [activeTab, indicatorProgress]);
 
   const submit = async () => {
     if (weekdayIndex === null || !startTime || !endTime) {
@@ -112,10 +125,35 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
         </View>
       </SectionCard>
 
-      <View style={styles.segment}>
-        <SegmentButton label="추천 시간" active={activeTab === 'recommended'} onPress={() => setActiveTab('recommended')} />
-        <SegmentButton label="직접 정하기" active={activeTab === 'manual'} onPress={() => setActiveTab('manual')} />
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={activeTab === 'recommended' ? '직접 정하기로 전환' : '추천 시간으로 전환'}
+        style={styles.segment}
+        onLayout={(event) => setSegmentWidth(event.nativeEvent.layout.width)}
+        onPress={() => setActiveTab((current) => (current === 'recommended' ? 'manual' : 'recommended'))}
+      >
+        {indicatorWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.segmentIndicator,
+              {
+                width: indicatorWidth,
+                transform: [
+                  {
+                    translateX: indicatorProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, indicatorWidth],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ) : null}
+        <SegmentLabel label="추천 시간" active={activeTab === 'recommended'} />
+        <SegmentLabel label="직접 정하기" active={activeTab === 'manual'} />
+      </Pressable>
 
       {activeTab === 'recommended' ? (
         <SectionCard title="추천 시간">
@@ -173,11 +211,11 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   );
 }
 
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function SegmentLabel({ label, active }: { label: string; active: boolean }) {
   return (
-    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
+    <View style={styles.segmentButton}>
       <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -282,6 +320,15 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  segmentIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
   },
   segmentButton: {
     flex: 1,
@@ -289,9 +336,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  segmentButtonActive: {
-    backgroundColor: theme.colors.surface,
+    zIndex: 1,
   },
   segmentText: {
     color: theme.colors.textMuted,

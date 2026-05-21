@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import * as Location from 'expo-location';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import MapView, { Marker, MapPressEvent, Region } from 'react-native-maps';
@@ -39,6 +39,8 @@ export function StudioScreen({ route, navigation }: Props) {
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [editingLocation, setEditingLocation] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioTab>('location');
+  const [segmentWidth, setSegmentWidth] = useState(0);
+  const indicatorProgress = useRef(new Animated.Value(0)).current;
   const { width, height } = useWindowDimensions();
   const isLeader = currentBand?.myRole === 'leader';
   const confirmed = candidates.find((candidate) => candidate.status === 'confirmed') ?? null;
@@ -49,6 +51,7 @@ export function StudioScreen({ route, navigation }: Props) {
   const cardWidth = Math.min(360, Math.max(286, width - 56));
   const cardHeight = Math.min(330, Math.max(304, Math.round(height * 0.38)));
   const cardGap = 14;
+  const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
 
   const load = useCallback(async () => {
     const [nextCandidates, nextLocation] = await Promise.all([
@@ -72,6 +75,16 @@ export function StudioScreen({ route, navigation }: Props) {
     const unsubscribe = navigation.addListener('focus', load);
     return unsubscribe;
   }, [load, navigation]);
+
+  useEffect(() => {
+    Animated.spring(indicatorProgress, {
+      toValue: activeTab === 'location' ? 0 : 1,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 220,
+      mass: 0.65,
+    }).start();
+  }, [activeTab, indicatorProgress]);
 
   const findCurrentLocation = async () => {
     setLocating(true);
@@ -183,10 +196,35 @@ export function StudioScreen({ route, navigation }: Props) {
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="studio" navigation={navigation} />}>
       <HeroBanner title="합주실 정하기" subtitle="지도에서 집 위치를 찍고 모두에게 가까운 합주실을 골라요." badge="안산" align="center" />
 
-      <View style={styles.segment}>
-        <SegmentButton label="1. 내 위치" active={activeTab === 'location'} onPress={() => setActiveTab('location')} />
-        <SegmentButton label="2. 후보 투표" active={activeTab === 'vote'} onPress={() => setActiveTab('vote')} />
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={activeTab === 'location' ? '후보 투표로 전환' : '내 위치로 전환'}
+        style={styles.segment}
+        onLayout={(event) => setSegmentWidth(event.nativeEvent.layout.width)}
+        onPress={() => setActiveTab((current) => (current === 'location' ? 'vote' : 'location'))}
+      >
+        {indicatorWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.segmentIndicator,
+              {
+                width: indicatorWidth,
+                transform: [
+                  {
+                    translateX: indicatorProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, indicatorWidth],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ) : null}
+        <SegmentLabel label="1. 내 위치" active={activeTab === 'location'} />
+        <SegmentLabel label="2. 후보 투표" active={activeTab === 'vote'} />
+      </Pressable>
 
       {activeTab === 'vote' ? (
       <View style={styles.actions}>
@@ -282,11 +320,11 @@ export function StudioScreen({ route, navigation }: Props) {
   );
 }
 
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function SegmentLabel({ label, active }: { label: string; active: boolean }) {
   return (
-    <Pressable style={[styles.segmentButton, active && styles.segmentButtonActive]} onPress={onPress}>
+    <View style={styles.segmentButton}>
       <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -456,6 +494,15 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    overflow: 'hidden',
+  },
+  segmentIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
   },
   segmentButton: {
     flex: 1,
@@ -463,9 +510,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  segmentButtonActive: {
-    backgroundColor: theme.colors.surface,
+    zIndex: 1,
   },
   segmentText: {
     color: theme.colors.textMuted,
