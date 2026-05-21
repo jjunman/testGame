@@ -1,5 +1,4 @@
 ﻿import React, { useState } from 'react';
-import { Text } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PositionType } from '@band/shared-types';
 import { api } from '../../api/client';
@@ -11,6 +10,14 @@ import { BandsStackParamList } from '../../types/navigation';
 type Props = NativeStackScreenProps<BandsStackParamList, 'JoinBand'>;
 
 export function JoinBandScreen({ navigation }: Props) {
+  return (
+    <Screen>
+      <JoinBandForm onComplete={() => navigation.popToTop()} />
+    </Screen>
+  );
+}
+
+export function JoinBandForm({ onComplete }: { onComplete: () => void }) {
   const [inviteCode, setInviteCode] = useState('');
   const [positionType, setPositionType] = useState<PositionType>('lead_guitar');
   const [customPosition, setCustomPosition] = useState('');
@@ -37,7 +44,7 @@ export function JoinBandScreen({ navigation }: Props) {
         positionType,
         ...(positionType === 'custom' ? { customPosition: trimmedCustomPosition } : {}),
       });
-      navigation.popToTop();
+      onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : '밴드 가입에 실패했어요.');
     } finally {
@@ -46,16 +53,13 @@ export function JoinBandScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen>
-      <SectionCard title="밴드 추가하기">
-        <PrimaryButton label="밴드 만들기" onPress={() => navigation.navigate('CreateBand')} />
-        <Text>초대코드를 받았다면 아래에서 바로 참여할 수 있어요.</Text>
+    <SectionCard title="초대코드 입력하기">
         <Label>초대코드</Label>
         <Field
           value={inviteCode}
           onChangeText={(value) => setInviteCode(value.toUpperCase())}
           autoCapitalize="characters"
-          placeholder="예: AKC7K3"
+          placeholder="6자리 코드를 입력.."
         />
         <PositionSelector
           value={positionType}
@@ -65,7 +69,6 @@ export function JoinBandScreen({ navigation }: Props) {
         />
         {error ? <ErrorText>{error}</ErrorText> : null}
         <PrimaryButton label="가입하기" onPress={submit} loading={loading} />
-      </SectionCard>
-    </Screen>
+    </SectionCard>
   );
 }

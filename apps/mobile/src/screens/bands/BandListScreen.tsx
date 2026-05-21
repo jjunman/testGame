@@ -51,7 +51,7 @@ export function BandListScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.actionWrap}>
-        <PrimaryButton label="밴드 추가하기" onPress={() => navigation.navigate('JoinBand')} />
+        <PrimaryButton label="밴드 가입하기" onPress={() => navigation.navigate('BandAdd')} />
       </View>
 
       {bands.length === 0 ? (

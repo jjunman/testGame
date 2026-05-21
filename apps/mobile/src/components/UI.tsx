@@ -51,13 +51,13 @@ export function SectionCard({
   children,
   accent,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   accent?: 'purple' | 'pink';
 }) {
   return (
     <View style={[styles.card, accent === 'purple' && styles.cardPurple, accent === 'pink' && styles.cardPink]}>
-      <Text style={styles.title}>{title}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
       {children}
     </View>
   );

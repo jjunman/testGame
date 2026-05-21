@@ -6,6 +6,7 @@ export type AuthStackParamList = {
 export type BandsStackParamList = {
   BandList: undefined;
   Profile: undefined;
+  BandAdd: undefined;
   CreateBand: undefined;
   JoinBand: undefined;
   BandHome: { bandId: string };

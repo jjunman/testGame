@@ -6,6 +6,7 @@ import { useAuth } from '../store/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { SignupScreen } from '../screens/auth/SignupScreen';
 import { BandListScreen } from '../screens/bands/BandListScreen';
+import { BandAddScreen } from '../screens/bands/BandAddScreen';
 import { CreateBandScreen } from '../screens/bands/CreateBandScreen';
 import { JoinBandScreen } from '../screens/bands/JoinBandScreen';
 import { BandHomeScreen } from '../screens/bands/BandHomeScreen';
@@ -47,7 +48,8 @@ function BandsNavigator() {
     <BandsStack.Navigator screenOptions={stackOptions}>
       <BandsStack.Screen name="BandList" component={BandListScreen} options={{ title: '내 밴드' }} />
       <BandsStack.Screen name="Profile" component={ProfileScreen} options={{ title: '유저' }} />
-      <BandsStack.Screen name="JoinBand" component={JoinBandScreen} options={{ title: '밴드 추가하기' }} />
+      <BandsStack.Screen name="BandAdd" component={BandAddScreen} options={{ title: '밴드 추가하기' }} />
+      <BandsStack.Screen name="JoinBand" component={JoinBandScreen} options={{ title: '초대코드 입력하기' }} />
       <BandsStack.Screen name="CreateBand" component={CreateBandScreen} options={{ title: '밴드 만들기' }} />
       <BandsStack.Screen name="BandHome" component={BandHomeScreen} options={{ title: '밴드 홈', animation: 'none' }} />
       <BandsStack.Screen name="VoteHub" component={VoteHubScreen} options={{ title: '투표 모아보기', animation: 'none' }} />
