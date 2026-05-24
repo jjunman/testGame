@@ -590,7 +590,7 @@ function SongVoteCarousel({
               <Ionicons name="add" size={30} color={theme.colors.primary} />
             </View>
             <Text style={styles.addSongTitle}>후보곡 추가</Text>
-            <Text style={styles.addSongCaption}>곡 제목, 가수, 유튜브 링크를 넣으면 투표 목록 끝에 바로 추가돼요.</Text>
+            <Text style={styles.addSongCaption}>곡 제목, 가수, 유튜브 링크를 입력해 주세요</Text>
           </Pressable>
         ) : null}
       </ScrollView>

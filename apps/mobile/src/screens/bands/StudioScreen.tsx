@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Animated, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import * as Location from 'expo-location';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, MapPressEvent, Region } from 'react-native-maps';
 import { StudioCandidateDto, StudioLocationDto } from '@band/shared-types';
 import { api } from '../../api/client';
@@ -53,9 +54,8 @@ export function StudioScreen({ route, navigation }: Props) {
     confirmed?.studio.latitude != null && confirmed.studio.longitude != null
       ? { latitude: confirmed.studio.latitude, longitude: confirmed.studio.longitude }
       : null;
-  const cardWidth = Math.min(360, Math.max(286, width - 56));
-  const cardHeight = Math.min(330, Math.max(304, Math.round(height * 0.38)));
-  const cardGap = 14;
+  const cardWidth = Math.max(280, width - 32);
+  const cardGap = 12;
   const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
 
   const load = useCallback(async () => {
@@ -217,7 +217,7 @@ export function StudioScreen({ route, navigation }: Props) {
   };
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="studio" navigation={navigation} />}>
+    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="studio" navigation={navigation} />} scrollEnabled={activeTab !== 'vote'}>
       <HeroBanner title="합주실 정하기" subtitle="지도에서 집 위치를 찍고 모두에게 가까운 합주실을 골라요." badge="안산" align="center" />
 
       <Pressable
@@ -336,21 +336,17 @@ export function StudioScreen({ route, navigation }: Props) {
           <Text style={styles.metaText}>{formatAddress(confirmed.studio.address)}</Text>
         </View>
       ) : null}
-
-      {candidates.length === 0 ? (
-        <EmptyState title="아직 후보가 없어요" description="안산 합주실을 후보로 추가하면 부원들이 바로 투표할 수 있어요." />
-      ) : (
         <View style={styles.candidateSection}>
           <Text style={styles.sectionTitle}>합주실 후보</Text>
           <StudioCandidateCarousel
             candidates={candidates}
             activeIndex={activeCandidateIndex}
             cardWidth={cardWidth}
-            cardHeight={cardHeight}
             cardGap={cardGap}
             loadingVoteId={loadingVoteId}
             onIndexChange={setActiveCandidateIndex}
             onVote={vote}
+            onAddCandidate={() => navigation.navigate('CreateStudioCandidate', { bandId })}
           />
           {isLeader ? (
             <PrimaryButton
@@ -362,7 +358,6 @@ export function StudioScreen({ route, navigation }: Props) {
             />
           ) : null}
         </View>
-      )}
       </>
       ) : null}
     </Screen>
@@ -381,24 +376,27 @@ function StudioCandidateCarousel({
   candidates,
   activeIndex,
   cardWidth,
-  cardHeight,
   cardGap,
   loadingVoteId,
   onIndexChange,
   onVote,
+  onAddCandidate,
 }: {
   candidates: StudioCandidateDto[];
   activeIndex: number;
   cardWidth: number;
-  cardHeight: number;
   cardGap: number;
   loadingVoteId: string | null;
   onIndexChange: (index: number) => void;
   onVote: (candidateId: string) => void;
+  onAddCandidate: () => void;
 }) {
+  const totalItems = candidates.length + 1;
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (cardWidth + cardGap));
-    onIndexChange(Math.max(0, Math.min(candidates.length - 1, nextIndex)));
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (cardWidth + cardGap));
+    const clampedIndex = Math.max(0, Math.min(totalItems - 1, rawIndex));
+    const boundedIndex = Math.max(activeIndex - 1, Math.min(activeIndex + 1, clampedIndex));
+    onIndexChange(boundedIndex);
   };
 
   return (
@@ -407,12 +405,13 @@ function StudioCandidateCarousel({
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={cardWidth + cardGap}
+        disableIntervalMomentum
         decelerationRate="fast"
         contentContainerStyle={styles.carouselContent}
         onMomentumScrollEnd={onMomentumScrollEnd}
       >
         {candidates.map((candidate, index) => (
-          <View key={candidate.id} style={[styles.carouselItem, { width: cardWidth, height: cardHeight, marginRight: index === candidates.length - 1 ? 0 : cardGap }]}>
+          <View key={candidate.id} style={[styles.carouselItem, { width: cardWidth, marginRight: cardGap }]}>
             <StudioCard
               candidate={candidate}
               loading={loadingVoteId === candidate.id}
@@ -420,11 +419,19 @@ function StudioCandidateCarousel({
             />
           </View>
         ))}
+        <Pressable style={[styles.card, styles.addStudioCard, { width: cardWidth }]} onPress={onAddCandidate}>
+          <View style={styles.addStudioIcon}>
+            <Ionicons name="add" size={30} color={theme.colors.primary} />
+          </View>
+          <Text style={styles.addStudioTitle}>합주실 후보 추가</Text>
+          <Text style={styles.addStudioCaption}>목록에서 합주실을 골라 후보로 올려요.</Text>
+        </Pressable>
       </ScrollView>
       <View style={styles.carouselDots}>
         {candidates.map((candidate, index) => (
           <View key={candidate.id} style={[styles.carouselDot, index === activeIndex && styles.carouselDotActive, candidate.didVote && styles.carouselDotVoted]} />
         ))}
+        <View style={[styles.carouselDot, activeIndex === candidates.length && styles.carouselDotActive]} />
       </View>
     </View>
   );
@@ -455,18 +462,18 @@ function StudioCard({
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleWrap}>
           <View style={styles.titleRow}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{studio.name}</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>{studio.name}</Text>
             {candidate.recommendationRank === 1 ? <StatusBadge label="추천 1순위" tone="success" /> : null}
           </View>
-          <Text style={styles.metaText} numberOfLines={2}>{formatAddress(studio.address)}</Text>
         </View>
         {candidate.status === 'confirmed' ? <StatusBadge label="확정" tone="success" /> : null}
       </View>
 
       <View style={styles.infoGrid}>
-        <InfoCell label="시간당" value={formatPrice(studio.hourlyPrice)} />
-        <InfoCell label="평균 거리" value={formatDistance(candidate.distanceAverageKm)} />
-        <InfoCell label="위치 미입력" value={`${candidate.missingLocationCount}명`} />
+        <InfoCell icon="location-outline" label="위치" value={formatAddress(studio.address)} wide />
+        <InfoCell icon="cash-outline" label="가격" value={formatPrice(studio.hourlyPrice)} />
+        <InfoCell icon="navigate-outline" label="거리" value={formatDistance(candidate.distanceAverageKm)} />
+        <InfoCell icon="people-outline" label="평균" value={`${candidate.missingLocationCount}명 미입력`} />
       </View>
 
       <View style={styles.noteArea}>
@@ -493,11 +500,14 @@ function StudioCard({
   );
 }
 
-function InfoCell({ label, value }: { label: string; value: string }) {
+function InfoCell({ icon, label, value, wide = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; wide?: boolean }) {
   return (
-    <View style={styles.infoCell}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <View style={[styles.infoCell, wide && styles.infoCellWide]}>
+      <View style={styles.infoCellHeader}>
+        <Ionicons name={icon} size={14} color={theme.colors.primary} />
+        <Text style={styles.infoLabel}>{label}</Text>
+      </View>
+      <Text style={styles.infoValue} numberOfLines={wide ? 2 : 1}>{value}</Text>
     </View>
   );
 }
@@ -587,10 +597,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   carouselShell: {
-    gap: 12,
+    gap: 8,
   },
   carouselContent: {
-    paddingRight: 20,
+    alignItems: 'center',
   },
   carouselItem: {
     flexShrink: 0,
@@ -704,18 +714,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    height: '100%',
+    minHeight: 286,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 16,
-    gap: 14,
+    padding: 12,
+    gap: 10,
     overflow: 'hidden',
   },
   cardSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: '#fbfaff',
+    backgroundColor: theme.colors.primarySoft,
   },
   cardConfirmed: {
     borderColor: '#5fc47b',
@@ -728,7 +738,7 @@ const styles = StyleSheet.create({
   },
   cardTitleWrap: {
     flex: 1,
-    gap: 8,
+    gap: 0,
   },
   titleRow: {
     flexDirection: 'row',
@@ -738,8 +748,10 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '900',
+    lineHeight: 23,
+    marginBottom: 4,
   },
   metaText: {
     color: theme.colors.textMuted,
@@ -749,15 +761,24 @@ const styles = StyleSheet.create({
   },
   infoGrid: {
     flexDirection: 'row',
-    gap: 10,
-    marginVertical: 2,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   infoCell: {
     flex: 1,
+    minWidth: 0,
     borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.surfaceMuted,
-    padding: 11,
+    backgroundColor: theme.colors.surface,
+    padding: 7,
+    gap: 3,
+  },
+  infoCellHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
+  },
+  infoCellWide: {
+    flexBasis: '100%',
   },
   infoLabel: {
     color: theme.colors.textMuted,
@@ -806,6 +827,34 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   votedButton: {
-    backgroundColor: theme.colors.textMuted,
+    backgroundColor: '#1f2a44',
+  },
+  addStudioCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+    gap: 12,
+    borderStyle: 'dashed',
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  addStudioIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primarySoft,
+  },
+  addStudioTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  addStudioCaption: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    textAlign: 'center',
   },
 });

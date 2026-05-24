@@ -24,7 +24,7 @@ export function AddSongCandidateScreen({ route, navigation }: Props) {
 
   const submit = async () => {
     if (!canSubmit) {
-      Alert.alert('입력 필요', '곡 제목, 가수, 유튜브 링크를 모두 입력해 주세요.');
+      Alert.alert('입력 필요', '곡 제목, 가수, 유튜브 링크를 입력해 주세요.');
       return;
     }
 

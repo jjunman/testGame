@@ -5,7 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BandSummary } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, PrimaryButton, StatusBadge } from '../../components/UI';
+import { EmptyState, StatusBadge } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -45,14 +45,6 @@ export function BandListScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <View style={styles.headerCard}>
-        <Text style={styles.pageTitle}>내 밴드</Text>
-        <Text style={styles.pageSubtitle}>밴드를 고르면 바로 메인 허브로 이어집니다.</Text>
-      </View>
-
-      <View style={styles.actionWrap}>
-        <PrimaryButton label="밴드 가입하기" onPress={() => navigation.navigate('BandAdd')} />
-      </View>
 
       {bands.length === 0 ? (
         <EmptyState
@@ -88,20 +80,24 @@ export function BandListScreen({ navigation }: Props) {
             </Pressable>
           );
         })}
+        <Pressable style={styles.addBandCard} onPress={() => navigation.navigate('BandAdd')}>
+          <View style={styles.addBandGlow} />
+          <View style={styles.addBandRow}>
+            <View style={styles.addBandIcon}>
+              <Ionicons name="add" size={26} color="#fff" />
+            </View>
+            <View style={styles.addBandTextWrap}>
+              <Text style={styles.addBandTitle}>밴드 가입하기</Text>
+              <Text style={styles.addBandSubtitle}>만들기 또는 초대코드 입력</Text>
+            </View>
+          </View>
+        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  headerCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    padding: 16,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
   userButton: {
     width: 38,
     height: 38,
@@ -109,18 +105,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.primarySoft,
-  },
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: theme.colors.text,
-  },
-  pageSubtitle: {
-    color: theme.colors.textMuted,
-    lineHeight: 20,
-  },
-  actionWrap: {
-    gap: 10,
   },
   listWrap: {
     gap: 12,
@@ -171,5 +155,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+  addBandCard: {
+    minHeight: 126,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: '#d9d5ff',
+    backgroundColor: '#f8f7ff',
+    padding: 16,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  addBandGlow: {
+    position: 'absolute',
+    right: -34,
+    top: -42,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  addBandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  addBandIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+  },
+  addBandTextWrap: {
+    flex: 1,
+    gap: 5,
+  },
+  addBandTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  addBandSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
