@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { StudioDto } from '@band/shared-types';
 import { api } from '../../api/client';
@@ -22,13 +23,14 @@ const DEFAULT_REGION: Region = {
 export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const mapRef = useRef<MapView | null>(null);
+  const studioListRef = useRef<ScrollView | null>(null);
+  const { width } = useWindowDimensions();
   const [studios, setStudios] = useState<StudioDto[]>([]);
   const [selectedStudioId, setSelectedStudioId] = useState<string | null>(null);
-  const [mapRegion, setMapRegion] = useState<Region>(DEFAULT_REGION);
-  const [expanded, setExpanded] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [activeStudioIndex, setActiveStudioIndex] = useState(0);
 
   const loadStudios = useCallback(async () => {
     setLoading(true);
@@ -38,7 +40,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
       setSelectedStudioId((current) => current ?? nextStudios[0]?.id ?? null);
       const firstLocated = nextStudios.find(hasCoordinate);
       if (firstLocated) {
-        setMapRegion(toRegion(firstLocated));
+        mapRef.current?.animateToRegion(toRegion(firstLocated), 350);
       }
     } catch (error) {
       Alert.alert('목록 불러오기 실패', error instanceof Error ? error.message : '합주실 목록을 불러오지 못했어요.');
@@ -77,14 +79,36 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
     setSelectedStudioId(studio.id);
     if (hasCoordinate(studio)) {
       const nextRegion = toRegion(studio);
-      setMapRegion(nextRegion);
       mapRef.current?.animateToRegion(nextRegion, 350);
     }
   };
 
-  const visibleStudios = expanded ? studios : studios.slice(0, 3);
   const locatedStudios = studios.filter(hasCoordinate);
   const selectedStudio = studios.find((studio) => studio.id === selectedStudioId) ?? null;
+  const studioCardWidth = Math.max(260, width - 64);
+  const studioCardGap = 12;
+  const onStudioScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (studioCardWidth + studioCardGap));
+    const clampedIndex = Math.max(0, Math.min(studios.length - 1, rawIndex));
+    const boundedIndex = Math.max(activeStudioIndex - 1, Math.min(activeStudioIndex + 1, clampedIndex));
+    setActiveStudioIndex(boundedIndex);
+    const nextStudio = studios[boundedIndex];
+    if (nextStudio) {
+      selectStudio(nextStudio);
+    }
+  };
+  const scrollToStudioIndex = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(studios.length - 1, index));
+    setActiveStudioIndex(nextIndex);
+    const nextStudio = studios[nextIndex];
+    if (nextStudio) {
+      selectStudio(nextStudio);
+    }
+    studioListRef.current?.scrollTo({
+      x: nextIndex * (studioCardWidth + studioCardGap),
+      animated: true,
+    });
+  };
 
   return (
     <Screen>
@@ -94,43 +118,67 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
         <PrimaryButton label="목록 새로고침" onPress={loadStudios} loading={loading} />
         {studios.length > 0 ? (
           <Text style={styles.countText}>
-            {expanded ? `제공 중인 합주실 ${studios.length}곳` : `가까운 순 ${Math.min(3, studios.length)}곳 표시 중`}
+            {`제공 중인 합주실 ${studios.length}곳`}
           </Text>
         ) : null}
         {studios.length === 0 ? (
           <EmptyState title="제공 목록이 비어 있어요" description="잠시 후 다시 불러와 주세요." />
         ) : (
           <>
-            <MapView ref={mapRef} style={styles.map} region={mapRegion} onRegionChangeComplete={setMapRegion}>
+            <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION}>
               {locatedStudios.map((studio) => (
                 <Marker
-                  key={studio.id}
+                  key={`${studio.id}-${studio.id === selectedStudioId ? 'selected' : 'idle'}`}
                   coordinate={{ latitude: studio.latitude!, longitude: studio.longitude! }}
                   title={studio.name}
                   description={studio.address ?? undefined}
-                  pinColor={studio.id === selectedStudioId ? theme.colors.primary : '#7b8496'}
+                  pinColor={studio.id === selectedStudioId ? '#ef4444' : '#7b8496'}
                   onPress={() => selectStudio(studio)}
                 />
               ))}
             </MapView>
             {selectedStudio ? <Text style={styles.selectedText}>선택됨: {selectedStudio.name}</Text> : null}
-            <View style={styles.studioList}>
-              {visibleStudios.map((studio) => (
-                <StudioOption
-                  key={studio.id}
-                  studio={studio}
-                  selected={selectedStudioId === studio.id}
-                  onPress={() => selectStudio(studio)}
-                />
+            <ScrollView
+              ref={studioListRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={studioCardWidth + studioCardGap}
+              disableIntervalMomentum
+              contentContainerStyle={styles.studioList}
+              onMomentumScrollEnd={onStudioScrollEnd}
+            >
+              {studios.map((studio, index) => (
+                <View key={studio.id} style={[styles.studioCardWrap, { width: studioCardWidth, marginRight: index === studios.length - 1 ? 0 : studioCardGap }]}>
+                  <StudioOption
+                    studio={studio}
+                    selected={selectedStudioId === studio.id}
+                    onPress={() => selectStudio(studio)}
+                  />
+                </View>
               ))}
+            </ScrollView>
+            <View style={styles.carouselNav}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="이전 합주실 후보"
+                disabled={activeStudioIndex === 0}
+                onPress={() => scrollToStudioIndex(activeStudioIndex - 1)}
+                style={[styles.carouselArrow, activeStudioIndex === 0 && styles.carouselArrowDisabled]}
+              >
+                <Text style={styles.carouselArrowText}>{'<'}</Text>
+              </Pressable>
+              <Text style={styles.carouselCount}>{`${activeStudioIndex + 1}/${studios.length}`}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="다음 합주실 후보"
+                disabled={activeStudioIndex >= studios.length - 1}
+                onPress={() => scrollToStudioIndex(activeStudioIndex + 1)}
+                style={[styles.carouselArrow, activeStudioIndex >= studios.length - 1 && styles.carouselArrowDisabled]}
+              >
+                <Text style={styles.carouselArrowText}>{'>'}</Text>
+              </Pressable>
             </View>
-            {studios.length > 3 ? (
-              <PrimaryButton
-                label={expanded ? '접기' : '전체 보기'}
-                onPress={() => setExpanded((current) => !current)}
-                style={styles.toggleButton}
-              />
-            ) : null}
           </>
         )}
       </SectionCard>
@@ -158,19 +206,24 @@ function StudioOption({
       <View style={styles.optionHeader}>
         <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{studio.name}</Text>
       </View>
-      <StudioInfo label="위치" value={studio.address ?? '주소 확인 필요'} selected={selected} />
-      <StudioInfo label="가격" value={formatPrice(studio.hourlyPrice)} selected={selected} />
-      <StudioInfo label="내 거리" value={formatDistance(studio.myDistanceKm)} selected={selected} />
-      <StudioInfo label="평균" value={formatDistance(studio.distanceAverageKm)} selected={selected} />
+      <View style={styles.infoGrid}>
+        <StudioInfo icon="location-outline" label="위치" value={studio.address ?? '주소 확인 필요'} selected={selected} wide />
+        <StudioInfo icon="cash-outline" label="가격" value={formatPrice(studio.hourlyPrice)} selected={selected} />
+        <StudioInfo icon="navigate-outline" label="거리" value={formatDistance(studio.myDistanceKm)} selected={selected} />
+        <StudioInfo icon="people-outline" label="평균" value={formatDistance(studio.distanceAverageKm)} selected={selected} />
+      </View>
     </Pressable>
   );
 }
 
-function StudioInfo({ label, value, selected }: { label: string; value: string; selected: boolean }) {
+function StudioInfo({ icon, label, value, selected, wide = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; selected: boolean; wide?: boolean }) {
   return (
-    <View style={styles.infoRow}>
-      <Text style={[styles.infoLabel, selected && styles.optionMetaSelected]}>{label}</Text>
-      <Text style={[styles.infoValue, selected && styles.optionMetaSelected]}>{value}</Text>
+    <View style={[styles.infoCell, wide && styles.infoCellWide, selected && styles.infoCellSelected]}>
+      <View style={styles.infoCellHeader}>
+        <Ionicons name={icon} size={14} color={selected ? theme.colors.primary : theme.colors.textMuted} />
+        <Text style={[styles.infoLabel, selected && styles.optionMetaSelected]}>{label}</Text>
+      </View>
+      <Text style={[styles.infoValue, selected && styles.optionMetaSelected]} numberOfLines={2}>{value}</Text>
     </View>
   );
 }
@@ -204,8 +257,11 @@ function toRegion(studio: StudioDto): Region {
 
 const styles = StyleSheet.create({
   studioList: {
-    gap: 8,
     marginTop: 10,
+    alignItems: 'center',
+  },
+  studioCardWrap: {
+    flexShrink: 0,
   },
   map: {
     height: 220,
@@ -225,17 +281,47 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 8,
   },
+  carouselNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  carouselArrow: {
+    width: 34,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  carouselArrowDisabled: {
+    opacity: 0.35,
+  },
+  carouselArrowText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  carouselCount: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+    minWidth: 46,
+  },
   studioOption: {
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
     backgroundColor: '#fff',
-    padding: 14,
-    gap: 8,
+    padding: 12,
+    gap: 12,
   },
   studioOptionSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
   },
   optionHeader: {
     flexDirection: 'row',
@@ -250,32 +336,44 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   optionTitleSelected: {
-    color: '#fff',
+    color: theme.colors.text,
   },
-  infoRow: {
+  infoGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  infoCell: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
+    padding: 7,
+    gap: 3,
+  },
+  infoCellWide: {
+    flexBasis: '100%',
+  },
+  infoCellSelected: {
+    backgroundColor: '#fff',
+  },
+  infoCellHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   infoLabel: {
-    width: 44,
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
-    lineHeight: 17,
   },
   infoValue: {
-    flex: 1,
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    lineHeight: 17,
+    lineHeight: 14,
   },
   optionMetaSelected: {
-    color: 'rgba(255,255,255,0.86)',
-  },
-  toggleButton: {
-    marginTop: 10,
-    backgroundColor: theme.colors.primaryDark,
+    color: theme.colors.textMuted,
   },
 });

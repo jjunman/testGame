@@ -20,7 +20,14 @@ export type PracticeAssignmentStatus = 'open' | 'closed';
 export type PracticeSubmissionStatus = 'submitted';
 export type ScheduleAvailabilityType = 'yes' | 'no';
 export type StudioCandidateStatus = 'open' | 'confirmed';
-export type TodoType = 'vote_song' | 'vote_schedule_proposal' | 'vote_studio' | 'submit_practice' | 'submit_schedule';
+export type TodoType =
+  | 'start_song_round'
+  | 'vote_song'
+  | 'vote_schedule_proposal'
+  | 'vote_studio'
+  | 'submit_practice'
+  | 'submit_schedule'
+  | 'start_studio';
 
 export type BandSummary = {
   id: string;

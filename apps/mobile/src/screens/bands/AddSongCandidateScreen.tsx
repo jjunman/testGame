@@ -36,7 +36,7 @@ export function AddSongCandidateScreen({ route, navigation }: Props) {
         youtubeUrl: youtubeUrl.trim(),
       });
       Alert.alert('제출 완료', '후보곡을 추가했습니다.', [
-        { text: '확인', onPress: () => navigation.navigate('BandHome', { bandId }) },
+        { text: '확인', onPress: () => navigation.navigate('SongRound', { bandId, initialTab: 'vote' }) },
       ]);
     } catch (error) {
       Alert.alert('제출 실패', error instanceof Error ? error.message : '후보곡을 추가하지 못했습니다.');

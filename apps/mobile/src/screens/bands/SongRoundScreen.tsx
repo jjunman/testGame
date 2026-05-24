@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ImageBackground,
-  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -37,9 +36,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
   const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null);
   const [endingRound, setEndingRound] = useState(false);
   const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
-  const [startingVote, setStartingVote] = useState(false);
-  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
-  const [deadlineOffsetDays, setDeadlineOffsetDays] = useState<1 | 3 | 7>(3);
   const [expandedSongCardId, setExpandedSongCardId] = useState<string | null>(null);
   const [editingSongCardId, setEditingSongCardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -79,29 +75,20 @@ export function SongRoundScreen({ route, navigation }: Props) {
 
   const candidates = useMemo(() => (round ? [...round.candidates] : []), [round]);
   const songCards = useMemo(() => detail?.songCards.filter((card) => card.kind === 'song') ?? [], [detail]);
-  const hasActiveSongVote = round?.status === 'voting';
   const isVoting = round?.status === 'voting';
   const isPosted = round?.status === 'posted';
   const isDone = round?.status === 'done';
   const isLeader = round?.myRole === 'leader';
-  const canAddCandidate = Boolean(isVoting || isPosted);
+  const canAddCandidate = !isDone;
   const myVoteCount = candidates.filter((candidate) => candidate.didVote).length;
   const hasMyVote = myVoteCount > 0;
-  const deadlineLabel = useMemo(() => {
-    if (deadlineOffsetDays === 1) {
-      return '내일까지';
-    }
-    if (deadlineOffsetDays === 7) {
-      return '일주일 뒤까지';
-    }
-    return '3일 뒤까지';
-  }, [deadlineOffsetDays]);
 
   useEffect(() => {
-    if (activeCandidateIndex >= candidates.length) {
-      setActiveCandidateIndex(Math.max(0, candidates.length - 1));
+    const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
+    if (activeCandidateIndex >= totalItems) {
+      setActiveCandidateIndex(Math.max(0, totalItems - 1));
     }
-  }, [activeCandidateIndex, candidates.length]);
+  }, [activeCandidateIndex, canAddCandidate, candidates.length]);
 
   const reloadAfterMutation = async () => {
     setExpandedSongCardId(null);
@@ -109,24 +96,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
     await load();
   };
 
-  const startSongVote = async () => {
-    setStartingVote(true);
-    try {
-      const deadline = new Date();
-      deadline.setDate(deadline.getDate() + deadlineOffsetDays);
-      deadline.setHours(23, 59, 0, 0);
-      await api.post(`/bands/${bandId}/song-round/start`, {
-        deadlineAt: deadline.toISOString(),
-      });
-      setDeadlineModalOpen(false);
-      setActiveTab('vote');
-      await load();
-    } catch (error) {
-      Alert.alert('투표 시작 실패', error instanceof Error ? error.message : '합주곡 투표를 시작하지 못했어요.');
-    } finally {
-      setStartingVote(false);
-    }
-  };
 
   const toggleVote = async (candidateId: string, didVote: boolean) => {
     if (!round) {
@@ -273,55 +242,37 @@ export function SongRoundScreen({ route, navigation }: Props) {
     Alert.alert('투표 제출 완료', '제출되었습니다.');
   };
 
-  const cardWidth = Math.min(360, Math.max(280, width - 72));
-  const cardGap = 12;
+  const cardWidth = Math.max(280, width - 32);
+  const cardGap = 0;
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active={activeTab === 'vote' ? 'vote' : 'song'} navigation={navigation} />}>
-      <HeroBanner
-        title="노래"
-        subtitle={activeTab === 'vote' ? '합주곡 투표를 확인하고 후보를 고르세요.' : '확정곡과 연습 과제를 한곳에서 관리해요.'}
-        badge={activeTab === 'vote' ? '투표' : `${songCards.length}곡`}
-      />
+    <Screen
+      fixedFooter={<BandInnerNav bandId={bandId} active={activeTab === 'vote' ? 'vote' : 'song'} navigation={navigation} />}
+      scrollEnabled={activeTab !== 'vote'}
+    >
+      {activeTab === 'library' ? (
+        <HeroBanner
+          title="곡과 연습"
+          subtitle="확정곡과 연습 과제를 한곳에서 관리해요."
+          badge={`${songCards.length}곡`}
+        />
+      ) : null}
 
       {activeTab === 'vote' ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>{isVoting ? '투표 단계' : isPosted ? '후보 모집' : '합주곡 투표'}</Text>
+              <Text style={styles.sectionTitle}>합주곡 투표</Text>
               <Text style={styles.sectionCaption}>
                 {round?.votingDeadlineAt
-                  ? `단계 종료까지 ${new Date(round.votingDeadlineAt).toLocaleString('ko-KR')}`
-                  : isPosted ? '후보곡을 먼저 추가한 뒤 투표를 시작해요.' : '투표를 시작하면 후보곡을 고를 수 있어요.'}
+                  ? `마감일 ${new Date(round.votingDeadlineAt).toLocaleString('ko-KR')}`
+                  : isPosted ? '후보곡을 추가하면 자동으로 투표가 시작돼요.' : '후보곡을 추가하면 일주일짜리 투표가 바로 시작돼요.'}
               </Text>
             </View>
             {isVoting ? <StatusBadge label={`D-${daysLeft(round?.votingDeadlineAt)}`} tone="warning" /> : null}
           </View>
 
-          <View style={styles.actionRow}>
-            {hasActiveSongVote ? (
-              <View style={styles.readonlyAction}>
-                <Text style={styles.readonlyActionText}>투표 진행 중</Text>
-              </View>
-            ) : (
-              <Pressable
-                style={[styles.secondaryAction, startingVote && styles.secondaryActionDisabled]}
-                onPress={() => setDeadlineModalOpen(true)}
-                disabled={startingVote}
-              >
-                <Text style={styles.secondaryActionText}>{startingVote ? '시작 중...' : '투표 시작'}</Text>
-              </Pressable>
-            )}
-            {canAddCandidate ? (
-              <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('AddSongCandidate', { bandId })}>
-                <Text style={styles.secondaryActionText}>후보곡 추가</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
           {isDone ? (
             <EmptyState title="진행 중인 투표가 없어요" description="합주곡 투표가 완료되었어요. 곡과 연습 탭에서 확정곡을 확인할 수 있어요." />
-          ) : candidates.length === 0 ? (
-            <EmptyState title="아직 후보곡이 없어요" description="후보곡을 추가하거나 투표를 시작하면 여기에 카드가 나타나요." />
           ) : (
             <SongVoteCarousel
               candidates={candidates}
@@ -336,6 +287,8 @@ export function SongRoundScreen({ route, navigation }: Props) {
               onIndexChange={setActiveCandidateIndex}
               onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
               onDelete={deleteCandidate}
+              canAddCandidate={canAddCandidate}
+              onAddCandidate={() => navigation.navigate('AddSongCandidate', { bandId })}
             />
           )}
 
@@ -411,38 +364,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
         </View>
       )}
 
-      <Modal visible={deadlineModalOpen} transparent animationType="fade" onRequestClose={() => setDeadlineModalOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>합주곡 투표 시작</Text>
-            <Text style={styles.modalBody}>투표 마감일을 먼저 정해 주세요. 시작하면 멤버들이 후보곡을 올리고 바로 투표할 수 있어요.</Text>
-            <View style={styles.deadlineOptions}>
-              {([
-                { label: '내일', value: 1 },
-                { label: '3일 뒤', value: 3 },
-                { label: '7일 뒤', value: 7 },
-              ] as const).map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={[styles.deadlineChip, deadlineOffsetDays === option.value && styles.deadlineChipActive]}
-                  onPress={() => setDeadlineOffsetDays(option.value)}
-                >
-                  <Text style={[styles.deadlineChipText, deadlineOffsetDays === option.value && styles.deadlineChipTextActive]}>{option.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.deadlineSummary}>선택됨: {deadlineLabel}</Text>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancel} onPress={() => setDeadlineModalOpen(false)}>
-                <Text style={styles.modalCancelText}>취소</Text>
-              </Pressable>
-              <Pressable style={styles.modalConfirm} onPress={() => void startSongVote()}>
-                <Text style={styles.modalConfirmText}>시작하기</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -563,6 +484,8 @@ function SongVoteCarousel({
   onIndexChange,
   onVote,
   onDelete,
+  canAddCandidate,
+  onAddCandidate,
 }: {
   candidates: SongCandidateDto[];
   activeIndex: number;
@@ -576,10 +499,15 @@ function SongVoteCarousel({
   onIndexChange: (index: number) => void;
   onVote: (candidate: SongCandidateDto) => void;
   onDelete: (candidate: SongCandidateDto) => void;
+  canAddCandidate: boolean;
+  onAddCandidate: () => void;
 }) {
+  const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (cardWidth + cardGap));
-    onIndexChange(Math.max(0, Math.min(candidates.length - 1, nextIndex)));
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (cardWidth + cardGap));
+    const clampedIndex = Math.max(0, Math.min(totalItems - 1, rawIndex));
+    const boundedIndex = Math.max(activeIndex - 1, Math.min(activeIndex + 1, clampedIndex));
+    onIndexChange(boundedIndex);
   };
 
   return (
@@ -588,12 +516,12 @@ function SongVoteCarousel({
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={cardWidth + cardGap}
+        disableIntervalMomentum
         decelerationRate="fast"
         contentContainerStyle={styles.carouselContent}
         onMomentumScrollEnd={onMomentumScrollEnd}
       >
         {candidates.map((candidate, index) => {
-          const active = index === activeIndex;
           const voteDisabled = !isVoting || !canEditSelection || submittingId !== null || deletingCandidateId !== null;
           const canDelete = isVoting && currentUserId === candidate.createdByUserId;
           return (
@@ -601,13 +529,20 @@ function SongVoteCarousel({
               key={candidate.id}
               style={[
                 styles.songVoteCard,
-                { width: cardWidth, marginRight: index === candidates.length - 1 ? 0 : cardGap },
+                { width: cardWidth, marginRight: index === candidates.length - 1 && !canAddCandidate ? 0 : cardGap },
                 candidate.didVote && styles.songVoteCardSelected,
               ]}
             >
               <View style={styles.youtubePanel}>
-                {active && candidate.youtubeVideoId ? (
-                  <YoutubePlayer height={Math.round((cardWidth - 28) * 9 / 16)} videoId={candidate.youtubeVideoId} />
+                {candidate.youtubeVideoId ? (
+                  <YoutubePlayer
+                    height={Math.round((cardWidth - 2) * 9 / 16)}
+                    width={cardWidth - 2}
+                    videoId={candidate.youtubeVideoId}
+                    play={false}
+                    webViewStyle={styles.youtubePlayer}
+                    webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
+                  />
                 ) : (
                   <ImageBackground source={{ uri: candidate.thumbnailUrl ?? undefined }} imageStyle={styles.youtubeFallbackImage} style={styles.youtubeFallback}>
                     <View style={styles.youtubeFallbackOverlay} />
@@ -646,11 +581,26 @@ function SongVoteCarousel({
             </Pressable>
           );
         })}
+        {canAddCandidate ? (
+          <Pressable
+            style={[styles.songVoteCard, styles.addSongCard, { width: cardWidth }]}
+            onPress={onAddCandidate}
+          >
+            <View style={styles.addSongIcon}>
+              <Ionicons name="add" size={30} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.addSongTitle}>후보곡 추가</Text>
+            <Text style={styles.addSongCaption}>곡 제목, 가수, 유튜브 링크를 넣으면 투표 목록 끝에 바로 추가돼요.</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
       <View style={styles.carouselDots}>
         {candidates.map((candidate, index) => (
           <View key={candidate.id} style={[styles.carouselDot, index === activeIndex && styles.carouselDotActive, candidate.didVote && styles.carouselDotVoted]} />
         ))}
+        {canAddCandidate ? (
+          <View style={[styles.carouselDot, activeIndex === candidates.length && styles.carouselDotActive]} />
+        ) : null}
       </View>
     </View>
   );
@@ -670,7 +620,7 @@ function formatDueLabel(value: string) {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 10,
+    gap: 6,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -685,9 +635,9 @@ const styles = StyleSheet.create({
   },
   sectionCaption: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 1,
   },
   segment: {
     flexDirection: 'row',
@@ -751,12 +701,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   carouselShell: {
-    gap: 10,
+    gap: 6,
+    marginBottom: 6,
   },
   carouselContent: {
-    paddingRight: 18,
+    alignItems: 'center',
   },
   songVoteCard: {
+    minHeight: 430,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
@@ -767,9 +719,41 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.surface,
   },
+  addSongCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+    gap: 12,
+    borderStyle: 'dashed',
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  addSongIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primarySoft,
+  },
+  addSongTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  addSongCaption: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   youtubePanel: {
     backgroundColor: '#111',
-    minHeight: 150,
+    aspectRatio: 16 / 9,
+    overflow: 'hidden',
+  },
+  youtubePlayer: {
+    backgroundColor: '#111',
   },
   youtubeFallback: {
     aspectRatio: 16 / 9,
@@ -864,7 +848,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   actionStack: {
-    gap: 8,
+    gap: 6,
   },
   voteProgressRow: {
     flexDirection: 'row',
@@ -873,7 +857,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.primarySoft,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 7,
   },
   voteProgressLabel: {
     color: theme.colors.text,

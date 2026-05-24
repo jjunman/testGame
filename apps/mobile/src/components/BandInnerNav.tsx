@@ -9,20 +9,28 @@ type BandInnerNavProps = {
   navigation: any;
 };
 
+let lastActiveIndex = 0;
+
 export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) {
   const [navWidth, setNavWidth] = useState(0);
-  const indicatorProgress = useRef(new Animated.Value(getActiveIndex(active))).current;
+  const activeIndex = getActiveIndex(active);
+  const indicatorProgress = useRef(new Animated.Value(lastActiveIndex)).current;
   const indicatorWidth = navWidth > 0 ? (navWidth - 10) / 5 : 0;
 
   useEffect(() => {
+    if (indicatorWidth === 0) {
+      return;
+    }
+
     Animated.spring(indicatorProgress, {
-      toValue: getActiveIndex(active),
+      toValue: activeIndex,
       useNativeDriver: true,
       damping: 20,
       stiffness: 220,
       mass: 0.65,
     }).start();
-  }, [active, indicatorProgress]);
+    lastActiveIndex = activeIndex;
+  }, [activeIndex, indicatorProgress, indicatorWidth]);
 
   return (
     <View style={styles.wrap} onLayout={(event) => setNavWidth(event.nativeEvent.layout.width)}>
@@ -52,7 +60,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
-        label="노래"
+        label="연습"
         active={active === 'song'}
         icon={
           <MaterialCommunityIcons

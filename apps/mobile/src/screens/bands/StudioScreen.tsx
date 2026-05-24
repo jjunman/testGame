@@ -41,6 +41,7 @@ export function StudioScreen({ route, navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StudioTab>('location');
   const [segmentWidth, setSegmentWidth] = useState(0);
   const indicatorProgress = useRef(new Animated.Value(0)).current;
+  const mapRef = useRef<MapView | null>(null);
   const { width, height } = useWindowDimensions();
   const isLeader = currentBand?.myRole === 'leader';
   const confirmed = candidates.find((candidate) => candidate.status === 'confirmed') ?? null;
@@ -48,6 +49,10 @@ export function StudioScreen({ route, navigation }: Props) {
   const savedLocationCoordinate = hasSavedLocation && location
     ? { latitude: location.latitude!, longitude: location.longitude! }
     : null;
+  const confirmedStudioCoordinate =
+    confirmed?.studio.latitude != null && confirmed.studio.longitude != null
+      ? { latitude: confirmed.studio.latitude, longitude: confirmed.studio.longitude }
+      : null;
   const cardWidth = Math.min(360, Math.max(286, width - 56));
   const cardHeight = Math.min(330, Math.max(304, Math.round(height * 0.38)));
   const cardGap = 14;
@@ -67,6 +72,10 @@ export function StudioScreen({ route, navigation }: Props) {
       setAddressQuery(nextLocation.label ?? '');
       setEditingLocation(false);
     } else {
+      const nextConfirmed = nextCandidates.find((candidate) => candidate.status === 'confirmed') ?? null;
+      if (nextConfirmed?.studio.latitude != null && nextConfirmed.studio.longitude != null) {
+        setMapRegion(toRegion({ latitude: nextConfirmed.studio.latitude, longitude: nextConfirmed.studio.longitude }));
+      }
       setEditingLocation(true);
     }
   }, [bandId]);
@@ -85,6 +94,21 @@ export function StudioScreen({ route, navigation }: Props) {
       mass: 0.65,
     }).start();
   }, [activeTab, indicatorProgress]);
+
+  useEffect(() => {
+    if (activeTab !== 'location' || !draftCoordinate || !confirmedStudioCoordinate) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      mapRef.current?.fitToCoordinates([draftCoordinate, confirmedStudioCoordinate], {
+        edgePadding: { top: 48, right: 48, bottom: 48, left: 48 },
+        animated: true,
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [activeTab, confirmedStudioCoordinate, draftCoordinate]);
 
   const findCurrentLocation = async () => {
     setLocating(true);
@@ -198,7 +222,7 @@ export function StudioScreen({ route, navigation }: Props) {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={activeTab === 'location' ? '후보 투표로 전환' : '내 위치로 전환'}
+        accessibilityLabel={activeTab === 'location' ? '합주실 정하기로 전환' : '내 위치로 전환'}
         style={styles.segment}
         onLayout={(event) => setSegmentWidth(event.nativeEvent.layout.width)}
         onPress={() => setActiveTab((current) => (current === 'location' ? 'vote' : 'location'))}
@@ -222,8 +246,8 @@ export function StudioScreen({ route, navigation }: Props) {
             ]}
           />
         ) : null}
-        <SegmentLabel label="1. 내 위치" active={activeTab === 'location'} />
-        <SegmentLabel label="2. 후보 투표" active={activeTab === 'vote'} />
+        <SegmentLabel label="내 위치" active={activeTab === 'location'} />
+        <SegmentLabel label="합주실 정하기" active={activeTab === 'vote'} />
       </Pressable>
 
       {activeTab === 'vote' ? (
@@ -258,23 +282,48 @@ export function StudioScreen({ route, navigation }: Props) {
           />
           <PrimaryButton label="주소로 찾기" onPress={findAddressLocation} loading={geocoding} style={styles.addressButton} />
         </View>
-        <MapView style={styles.map} region={mapRegion} onRegionChangeComplete={setMapRegion} onPress={onMapPress}>
+          </>
+        )}
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          region={mapRegion}
+          onRegionChangeComplete={setMapRegion}
+          onPress={editingLocation ? onMapPress : undefined}
+        >
           {draftCoordinate ? (
             <Marker
               coordinate={draftCoordinate}
-              draggable
+              draggable={editingLocation}
               title="내 집 위치"
               onDragEnd={(event) => setDraftCoordinate(event.nativeEvent.coordinate)}
             />
           ) : null}
+          {confirmedStudioCoordinate ? (
+            <Marker
+              coordinate={confirmedStudioCoordinate}
+              pinColor={theme.colors.primary}
+              title={confirmed?.studio.name ?? '확정 합주실'}
+              description={formatAddress(confirmed?.studio.address ?? null)}
+            />
+          ) : null}
         </MapView>
+        {confirmedStudioCoordinate ? (
+          <Text style={styles.coordinateText}>확정 합주실: {confirmed?.studio.name}</Text>
+        ) : null}
+        <View style={styles.mapLegend}>
+          <LegendDot color="red" label="내 집" />
+          {confirmedStudioCoordinate ? <LegendDot color={theme.colors.primary} label="확정 합주실" /> : null}
+        </View>
+        {editingLocation ? (
+          <>
         <View style={styles.mapActions}>
           <PrimaryButton label="내 위치 찾기" onPress={findCurrentLocation} loading={locating} style={styles.mapButton} />
           <PrimaryButton label="이 위치로 저장" onPress={saveLocation} loading={savingLocation} disabled={!draftCoordinate} style={styles.mapButton} />
         </View>
             {draftCoordinate ? <Text style={styles.coordinateText}>{formatCoordinate(draftCoordinate)}</Text> : null}
           </>
-        )}
+        ) : null}
       </View>
       ) : null}
 
@@ -422,7 +471,6 @@ function StudioCard({
 
       <View style={styles.noteArea}>
         {distanceNotice ? <Text style={styles.noteText} numberOfLines={1}>{distanceNotice}</Text> : null}
-        {studio.priceNote ? <Text style={styles.noteText} numberOfLines={1}>{studio.priceNote}</Text> : null}
         {candidate.note ? <Text style={styles.noteText} numberOfLines={1}>메모: {candidate.note}</Text> : null}
       </View>
 
@@ -459,6 +507,15 @@ function LinkButton({ label, url }: { label: string; url: string }) {
     <Pressable style={styles.linkButton} onPress={() => void Linking.openURL(url)}>
       <Text style={styles.linkButtonText}>{label}</Text>
     </Pressable>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{label}</Text>
+    </View>
   );
 }
 
@@ -601,6 +658,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  mapLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+  },
+  legendText: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   locationEditButton: {
     alignSelf: 'flex-start',
     paddingVertical: 2,
@@ -632,8 +709,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 14,
-    gap: 12,
+    padding: 16,
+    gap: 14,
     overflow: 'hidden',
   },
   cardSelected: {
@@ -647,11 +724,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   cardTitleWrap: {
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   titleRow: {
     flexDirection: 'row',
@@ -672,14 +749,15 @@ const styles = StyleSheet.create({
   },
   infoGrid: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    marginVertical: 2,
   },
   infoCell: {
     flex: 1,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surfaceMuted,
-    padding: 9,
-    gap: 4,
+    padding: 11,
+    gap: 5,
   },
   infoLabel: {
     color: theme.colors.textMuted,
@@ -698,11 +776,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   noteArea: {
-    minHeight: 22,
-    gap: 3,
+    minHeight: 18,
+    gap: 5,
   },
   cardFooter: {
-    marginTop: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

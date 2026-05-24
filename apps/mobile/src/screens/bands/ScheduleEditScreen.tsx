@@ -106,7 +106,7 @@ export function ScheduleEditScreen({ route, navigation }: Props) {
           <Text style={styles.sectionTitle}>내 가능 시간</Text>
           <StatusBadge label={`${selectedCount}칸 선택`} tone={selectedCount > 0 ? 'success' : 'warning'} />
         </View>
-        <Text style={styles.caption}>가능한 시간을 표에서 눌러 선택해 주세요. 저장하면 DB에 시간 셀로 쌓이고 모두 가능한 시간이 자동으로 계산돼요.</Text>
+        <Text style={styles.caption}>가능한 시간을 표에서 눌러 선택해 주세요.</Text>
 
         <View style={styles.legendItems}>
           <LegendDot color={theme.colors.primary} label="모두 가능" />

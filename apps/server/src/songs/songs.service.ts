@@ -19,6 +19,8 @@ import { SongCatalog } from './song-catalog.entity';
 import { SongRound } from './song-round.entity';
 import { SongVote } from './song-vote.entity';
 
+const DEFAULT_SONG_VOTE_DAYS = 7;
+
 @Injectable()
 export class SongsService {
   constructor(
@@ -87,8 +89,8 @@ export class SongsService {
   }
 
   async addCandidate(userId: string, bandId: string, dto: CreateSongCandidateDto) {
-    await this.bandsService.requireMembership(userId, bandId);
-    const round = await this.getActiveRoundOrThrow(bandId);
+    const membership = await this.bandsService.requireMembership(userId, bandId);
+    const round = await this.getOrCreateVotingRound(membership);
     if (round.status === SongRoundStatus.DONE) {
       throw new BadRequestException('완료된 라운드에는 후보곡을 추가할 수 없습니다.');
     }
@@ -423,6 +425,51 @@ export class SongsService {
       throw new NotFoundException('진행 중인 곡 선정 라운드가 없습니다.');
     }
     return round;
+  }
+
+  private async getOrCreateVotingRound(membership: BandMember) {
+    const existingRound = await this.getActiveRound(membership.band.id);
+    if (existingRound?.status === SongRoundStatus.VOTING) {
+      return existingRound;
+    }
+
+    const deadlineAt = this.getDefaultVotingDeadline();
+    if (existingRound?.status === SongRoundStatus.POSTED) {
+      existingRound.status = SongRoundStatus.VOTING;
+      existingRound.votingDeadlineAt = deadlineAt;
+      const savedRound = await this.roundsRepository.save(existingRound);
+      await this.notifySongVoteStarted(membership, savedRound.id);
+      return savedRound;
+    }
+
+    const savedRound = await this.roundsRepository.save(
+      this.roundsRepository.create({
+        band: membership.band,
+        status: SongRoundStatus.VOTING,
+        createdByUser: membership.user,
+        votingDeadlineAt: deadlineAt,
+      }),
+    );
+    await this.notifySongVoteStarted(membership, savedRound.id);
+    return savedRound;
+  }
+
+  private getDefaultVotingDeadline() {
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() + DEFAULT_SONG_VOTE_DAYS);
+    deadline.setHours(23, 59, 0, 0);
+    return deadline;
+  }
+
+  private notifySongVoteStarted(membership: BandMember, roundId: string) {
+    return this.notificationsService.notifyBandMembers(
+      membership.band.id,
+      {
+        title: membership.band.name,
+        body: '합주곡 투표가 열렸어요. 후보곡을 골라 주세요.',
+        data: { type: 'song_vote', bandId: membership.band.id, roundId },
+      },
+    );
   }
 
   private toYouTubeThumbnailUrl(videoId?: string | null) {

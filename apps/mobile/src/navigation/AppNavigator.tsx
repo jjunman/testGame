@@ -54,7 +54,7 @@ function BandsNavigator() {
       <BandsStack.Screen name="BandHome" component={BandHomeScreen} options={{ title: '밴드 홈', animation: 'none' }} />
       <BandsStack.Screen name="VoteHub" component={VoteHubScreen} options={{ title: '투표 모아보기', animation: 'none' }} />
       <BandsStack.Screen name="BandMembers" component={BandMembersScreen} options={{ title: '멤버 / 포인트', animation: 'none' }} />
-      <BandsStack.Screen name="SongRound" component={SongRoundScreen} options={{ title: '합주곡 정하기', animation: 'none' }} />
+      <BandsStack.Screen name="SongRound" component={SongRoundScreen} options={{ title: '곡과 연습', animation: 'none' }} />
       <BandsStack.Screen name="AddSongCandidate" component={AddSongCandidateScreen} options={{ title: '곡 추가하기' }} />
       <BandsStack.Screen name="PracticeAssignments" component={PracticeAssignmentListScreen} options={{ title: '개인 연습' }} />
       <BandsStack.Screen name="CreatePracticeAssignment" component={CreatePracticeAssignmentScreen} options={{ title: '연습 과제 만들기' }} />

@@ -100,18 +100,9 @@ export function ScheduleScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
-      <HeroBanner title="우리 모임표" subtitle="이번 합주가 가능한 시간을 한눈에 맞춰봐요." badge="calendar" align="center" />
+      <HeroBanner title="우리 일정" subtitle="합주 일정을 맞춰봐요" align="center" />
 
-      <View style={styles.quickActions}>
-        <Pressable style={styles.quickActionPrimary} onPress={() => navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' })}>
-          <Text style={[styles.quickActionLabel, styles.quickActionLabelPrimary]}>내 일정 등록</Text>
-          <Text style={[styles.quickActionMeta, styles.quickActionMetaPrimary]}>{mySelectedCount}칸 선택됨</Text>
-        </Pressable>
-        <Pressable style={styles.quickActionSecondary} onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}>
-          <Text style={styles.quickActionLabel}>합주 시간 제안</Text>
-          <Text style={styles.quickActionMeta}>가능한 시간 고르기</Text>
-        </Pressable>
-      </View>
+      <PrimaryButton label="합주 시간 제안" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>찬반투표</Text>
@@ -159,7 +150,6 @@ export function ScheduleScreen({ route, navigation }: Props) {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>시간표 미리보기</Text>
-          <StatusBadge label={`${mySelectedCount}칸 선택`} tone={mySelectedCount > 0 ? 'success' : 'warning'} />
         </View>
         <Text style={styles.caption}>오전, 오후 시간표를 각각 눌러 편집 화면에서 가능한 시간을 등록할 수 있어요.</Text>
 
@@ -267,46 +257,6 @@ function slotKey(date: string, hour: number) {
 }
 
 const styles = StyleSheet.create({
-  quickActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  quickActionPrimary: {
-    flex: 1,
-    minHeight: 76,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary,
-    padding: 14,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  quickActionSecondary: {
-    flex: 1,
-    minHeight: 76,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primarySoft,
-    borderWidth: 1,
-    borderColor: '#ddd6ff',
-    padding: 14,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  quickActionLabel: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  quickActionMeta: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  quickActionLabelPrimary: {
-    color: '#fff',
-  },
-  quickActionMetaPrimary: {
-    color: 'rgba(255,255,255,0.82)',
-  },
   section: {
     gap: 10,
   },

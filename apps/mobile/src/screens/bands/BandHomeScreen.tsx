@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, PracticeAssignmentDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
@@ -16,8 +16,10 @@ type Props = NativeStackScreenProps<BandsStackParamList, 'BandHome'>;
 export function BandHomeScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const { setCurrentBand } = useCurrentBand();
+  const { width } = useWindowDimensions();
   const [detail, setDetail] = useState<BandHomeDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTodoIndex, setActiveTodoIndex] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -65,6 +67,13 @@ export function BandHomeScreen({ route, navigation }: Props) {
     });
   }, [bandId, navigation]);
 
+  useEffect(() => {
+    const todoCount = detail?.todos?.length ?? 0;
+    if (activeTodoIndex >= todoCount) {
+      setActiveTodoIndex(Math.max(0, todoCount - 1));
+    }
+  }, [activeTodoIndex, detail?.todos?.length]);
+
   if (!detail) {
     return (
       <Screen>
@@ -82,8 +91,12 @@ export function BandHomeScreen({ route, navigation }: Props) {
   }
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
-  const primaryTodo = todos[0] ?? null;
-  const secondaryTodos = todos.slice(1);
+  const todoCardWidth = Math.min(360, Math.max(286, width - 56));
+  const todoCardGap = 12;
+  const onTodoScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (todoCardWidth + todoCardGap));
+    setActiveTodoIndex(Math.max(0, Math.min(todos.length - 1, nextIndex)));
+  };
 
   const openTodo = async (todo: TodoItemDto) => {
     if (todo.type === 'submit_practice') {
@@ -132,18 +145,29 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>지금 할 일</Text>
-        {primaryTodo ? (
-          <PrimaryTodoCard todo={primaryTodo} onPress={() => void openTodo(primaryTodo)} />
+        {todos.length > 0 ? (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={todoCardWidth + todoCardGap}
+              contentContainerStyle={styles.todoCarousel}
+              onMomentumScrollEnd={onTodoScrollEnd}
+            >
+              {todos.map((todo, index) => (
+                <View key={`${todo.type}-${todo.targetId ?? index}`} style={[styles.todoCardWrap, { width: todoCardWidth }, index === todos.length - 1 && styles.todoCardWrapLast]}>
+                  <PrimaryTodoCard todo={todo} onPress={() => void openTodo(todo)} />
+                </View>
+              ))}
+            </ScrollView>
+            {todos.length > 1 ? (
+              <Text style={styles.todoCarouselCount}>{`${activeTodoIndex + 1}/${todos.length}`}</Text>
+            ) : null}
+          </>
         ) : (
           <EmptyState title="지금은 할 일이 없어요" description="투표나 연습 과제가 생기면 여기에서 바로 확인할 수 있어요." />
         )}
-        {secondaryTodos.length > 0 ? (
-          <View style={styles.compactTodoList}>
-            {secondaryTodos.map((todo) => (
-              <CompactTodoItem key={todo.type} todo={todo} onPress={() => void openTodo(todo)} />
-            ))}
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -192,7 +216,6 @@ function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
       <View style={styles.todoBody}>
         <Text style={styles.todoKicker}>{todoDeadlineLabel(todo)}</Text>
         <Text style={styles.todoTitle} numberOfLines={1}>{todo.title}</Text>
-        <Text style={styles.todoDescription} numberOfLines={2}>{todo.description}</Text>
       </View>
       <View style={styles.todoGo}>
         <Text style={styles.todoGoText}>바로가기</Text>
@@ -418,6 +441,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   primaryTodoCard: {
+    minHeight: 104,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: theme.radius.md,
@@ -426,6 +450,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.primary,
     backgroundColor: '#fbfaff',
+  },
+  todoCarousel: {
+    paddingRight: 16,
+  },
+  todoCardWrap: {
+    flexShrink: 0,
+    marginRight: 12,
+  },
+  todoCardWrapLast: {
+    marginRight: 0,
+  },
+  todoCarouselCount: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   todoIcon: {
     width: 28,
@@ -568,12 +608,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     fontSize: 12,
     fontWeight: '900',
-  },
-  todoDescription: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
   },
   todoGo: {
     flexDirection: 'row',

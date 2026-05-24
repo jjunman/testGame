@@ -333,6 +333,24 @@ export class BandsService {
       });
     }
 
+    if (!votingRound) {
+      const completedSongRound = await this.roundsRepository.findOne({
+        where: { band: { id: bandId }, status: SongRoundStatus.DONE },
+        order: { createdAt: 'DESC' },
+      });
+      if (!completedSongRound) {
+        const dueAt = this.daysFromNow(3);
+        todos.push({
+          type: 'start_song_round',
+          title: '합주곡 정하기',
+          description: '후보 곡을 모으고 투표를 시작해 주세요.',
+          dueLabel: this.formatTodoDueLabel(dueAt),
+          dueAt: dueAt.toISOString(),
+          shortcut: 'song_round',
+        });
+      }
+    }
+
     const activeProposal = await this.scheduleProposalsRepository.findOne({
       where: { band: { id: bandId }, active: true },
       relations: ['votes', 'votes.user'],
@@ -351,11 +369,12 @@ export class BandsService {
     }
 
     const studioCandidates = await this.studioCandidatesRepository.find({
-      where: { band: { id: bandId }, status: 'open' },
+      where: { band: { id: bandId } },
       relations: ['votes', 'votes.user'],
       order: { createdAt: 'ASC' },
     });
-    const activeStudioCandidates = studioCandidates.filter((candidate) => !this.isStudioVoteClosed(candidate));
+    const activeStudioCandidates = studioCandidates.filter((candidate) => candidate.status === 'open' && !this.isStudioVoteClosed(candidate));
+    const confirmedStudio = studioCandidates.some((candidate) => candidate.status === 'confirmed');
     if (
       activeStudioCandidates.length > 0 &&
       !activeStudioCandidates.some((candidate) => candidate.votes?.some((vote) => vote.user.id === userId))
@@ -365,6 +384,17 @@ export class BandsService {
         type: 'vote_studio',
         title: '합주실 투표하기',
         description: '부원들이 올린 합주실 후보 중 하나를 선택해 주세요.',
+        dueLabel: this.formatTodoDueLabel(dueAt),
+        dueAt: dueAt.toISOString(),
+        shortcut: 'studio',
+      });
+    }
+    if (studioCandidates.length === 0 && !confirmedStudio) {
+      const dueAt = this.daysFromNow(7);
+      todos.push({
+        type: 'start_studio',
+        title: '합주실 잡기',
+        description: '집 위치를 등록하고 합주실 후보를 정해 주세요.',
         dueLabel: this.formatTodoDueLabel(dueAt),
         dueAt: dueAt.toISOString(),
         shortcut: 'studio',
@@ -415,11 +445,13 @@ export class BandsService {
 
   private todoPriority(type: string) {
     const priorities: Record<string, number> = {
+      start_song_round: 5,
       vote_song: 10,
       submit_practice: 20,
       vote_schedule_proposal: 30,
       vote_studio: 40,
       submit_schedule: 50,
+      start_studio: 60,
     };
 
     return priorities[type] ?? 999;
