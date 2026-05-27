@@ -27,7 +27,10 @@ export type TodoType =
   | 'vote_studio'
   | 'submit_practice'
   | 'submit_schedule'
-  | 'start_studio';
+  | 'start_studio'
+  | 'quick_song_round'
+  | 'quick_schedule'
+  | 'quick_studio';
 
 export type BandSummary = {
   id: string;

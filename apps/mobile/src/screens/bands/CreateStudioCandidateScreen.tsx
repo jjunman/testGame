@@ -257,7 +257,7 @@ function toRegion(studio: StudioDto): Region {
 
 const styles = StyleSheet.create({
   studioList: {
-    marginTop: 10,
+    marginTop: 12,
     alignItems: 'center',
   },
   studioCardWrap: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 14,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 12,
   },
   countText: {
     color: theme.colors.textMuted,
@@ -279,14 +279,14 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     fontSize: 12,
     fontWeight: '900',
-    marginTop: 8,
+    marginTop: 10,
   },
   carouselNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    marginTop: 8,
+    marginTop: 10,
   },
   carouselArrow: {
     width: 34,
@@ -316,8 +316,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.colors.border,
     backgroundColor: '#fff',
-    padding: 12,
-    gap: 12,
+    padding: 14,
+    gap: 14,
   },
   studioOptionSelected: {
     borderColor: theme.colors.primary,
@@ -341,15 +341,15 @@ const styles = StyleSheet.create({
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   infoCell: {
     flex: 1,
     minWidth: 0,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surfaceMuted,
-    padding: 7,
-    gap: 3,
+    padding: 8,
+    gap: 4,
   },
   infoCellWide: {
     flexBasis: '100%',

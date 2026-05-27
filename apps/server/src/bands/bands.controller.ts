@@ -142,7 +142,7 @@ export class BandsController {
     @Param('bandId') bandId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    res.locals.message = '할 일 목록을 불러왔습니다.';
+    res.locals.message = '지금 할 일을 불러왔습니다.';
     return this.bandsService.getTodos(user.userId, bandId);
   }
 }

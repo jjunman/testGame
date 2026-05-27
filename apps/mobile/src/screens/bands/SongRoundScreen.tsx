@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ImageBackground,
@@ -79,9 +79,8 @@ export function SongRoundScreen({ route, navigation }: Props) {
   const isPosted = round?.status === 'posted';
   const isDone = round?.status === 'done';
   const isLeader = round?.myRole === 'leader';
-  const canAddCandidate = !isDone;
+  const canAddCandidate = !isDone && !candidates.some((candidate) => candidate.createdByUserId === user?.id);
   const myVoteCount = candidates.filter((candidate) => candidate.didVote).length;
-  const hasMyVote = myVoteCount > 0;
 
   useEffect(() => {
     const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
@@ -238,6 +237,10 @@ export function SongRoundScreen({ route, navigation }: Props) {
   };
 
   const submitVotes = async () => {
+    if (myVoteCount !== 2) {
+      Alert.alert('투표 미완료', '2곡을 투표해 주세요.');
+      return;
+    }
     await load();
     Alert.alert('투표 제출 완료', '제출되었습니다.');
   };
@@ -302,7 +305,8 @@ export function SongRoundScreen({ route, navigation }: Props) {
                 label={myVoteCount >= 2 ? '2곡 선택 완료' : '제출하기'}
                 onPress={() => void submitVotes()}
                 loading={submittingId !== null}
-                disabled={!hasMyVote || endingRound}
+                disabled={endingRound}
+                style={myVoteCount !== 2 ? styles.submitButtonIncomplete : undefined}
               />
               {isLeader ? (
                 <Pressable
@@ -503,29 +507,51 @@ function SongVoteCarousel({
   onAddCandidate: () => void;
 }) {
   const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const [playingCandidateId, setPlayingCandidateId] = useState<string | null>(null);
+  const scrollToIndex = (index: number) => {
+    if (totalItems === 0) {
+      return;
+    }
+    const nextIndex = Math.max(0, Math.min(totalItems - 1, index));
+    setPlayingCandidateId(null);
+    onIndexChange(nextIndex);
+    scrollRef.current?.scrollTo({
+      x: nextIndex * (cardWidth + cardGap),
+      animated: true,
+    });
+  };
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (cardWidth + cardGap));
     const clampedIndex = Math.max(0, Math.min(totalItems - 1, rawIndex));
     const boundedIndex = Math.max(activeIndex - 1, Math.min(activeIndex + 1, clampedIndex));
+    if (boundedIndex !== activeIndex) {
+      setPlayingCandidateId(null);
+    }
     onIndexChange(boundedIndex);
   };
 
   return (
     <View style={styles.carouselShell}>
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={cardWidth + cardGap}
         disableIntervalMomentum
         decelerationRate="fast"
+        directionalLockEnabled
+        nestedScrollEnabled
         contentContainerStyle={styles.carouselContent}
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => setPlayingCandidateId(null)}
         onMomentumScrollEnd={onMomentumScrollEnd}
       >
         {candidates.map((candidate, index) => {
           const voteDisabled = !isVoting || !canEditSelection || submittingId !== null || deletingCandidateId !== null;
           const canDelete = isVoting && currentUserId === candidate.createdByUserId;
           return (
-            <Pressable
+            <View
               key={candidate.id}
               style={[
                 styles.songVoteCard,
@@ -539,7 +565,15 @@ function SongVoteCarousel({
                     height={Math.round((cardWidth - 2) * 9 / 16)}
                     width={cardWidth - 2}
                     videoId={candidate.youtubeVideoId}
-                    play={false}
+                    play={playingCandidateId === candidate.id}
+                    onChangeState={(state: string) => {
+                      if (state === 'playing') {
+                        setPlayingCandidateId(candidate.id);
+                      }
+                      if ((state === 'paused' || state === 'ended') && playingCandidateId === candidate.id) {
+                        setPlayingCandidateId(null);
+                      }
+                    }}
                     webViewStyle={styles.youtubePlayer}
                     webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
                   />
@@ -555,21 +589,23 @@ function SongVoteCarousel({
                   <Text style={styles.songCardIndex}>{index + 1} / {candidates.length}</Text>
                   <Text style={[styles.songCardVoteCount, candidate.didVote && styles.songCardVoteCountSelected]}>{candidate.voteCount}표</Text>
                 </View>
-                <Text style={styles.songCardTitle} numberOfLines={2}>{candidate.title}</Text>
+                <View style={styles.songTitleRow}>
+                  <Text style={styles.songCardTitle} numberOfLines={2}>{candidate.title}</Text>
+                  {canDelete ? (
+                    <Pressable
+                      onPress={() => onDelete(candidate)}
+                      disabled={deletingCandidateId === candidate.id || submittingId !== null}
+                      style={[
+                        styles.songDeleteIconButton,
+                        (deletingCandidateId === candidate.id || submittingId !== null) && styles.songDeleteButtonDisabled,
+                      ]}
+                    >
+                      <Ionicons name="trash-outline" size={17} color={theme.colors.textMuted} />
+                    </Pressable>
+                  ) : null}
+                </View>
                 <Text style={styles.songCardArtist} numberOfLines={1}>{candidate.artist}</Text>
                 {candidate.warningMessage ? <Text style={styles.songCardWarning}>{candidate.warningMessage}</Text> : null}
-                {canDelete ? (
-                  <Pressable
-                    onPress={() => onDelete(candidate)}
-                    disabled={deletingCandidateId === candidate.id || submittingId !== null}
-                    style={[
-                      styles.songDeleteButton,
-                      (deletingCandidateId === candidate.id || submittingId !== null) && styles.songDeleteButtonDisabled,
-                    ]}
-                  >
-                    <Text style={styles.songDeleteButtonText}>{deletingCandidateId === candidate.id ? '삭제 중...' : '삭제'}</Text>
-                  </Pressable>
-                ) : null}
                 <PrimaryButton
                   label={candidate.didVote ? '이 곡 투표 취소' : '이 곡 투표하기'}
                   onPress={() => onVote(candidate)}
@@ -578,7 +614,7 @@ function SongVoteCarousel({
                   style={candidate.didVote ? styles.songVoteCancelButton : undefined}
                 />
               </View>
-            </Pressable>
+            </View>
           );
         })}
         {canAddCandidate ? (
@@ -594,13 +630,22 @@ function SongVoteCarousel({
           </Pressable>
         ) : null}
       </ScrollView>
-      <View style={styles.carouselDots}>
-        {candidates.map((candidate, index) => (
-          <View key={candidate.id} style={[styles.carouselDot, index === activeIndex && styles.carouselDotActive, candidate.didVote && styles.carouselDotVoted]} />
-        ))}
-        {canAddCandidate ? (
-          <View style={[styles.carouselDot, activeIndex === candidates.length && styles.carouselDotActive]} />
-        ) : null}
+      <View style={styles.carouselNav}>
+        <Pressable
+          onPress={() => scrollToIndex(activeIndex - 1)}
+          disabled={activeIndex === 0}
+          style={[styles.carouselArrow, activeIndex === 0 && styles.carouselArrowDisabled]}
+        >
+          <Text style={styles.carouselArrowText}>{'<'}</Text>
+        </Pressable>
+        <Text style={styles.carouselCount}>{`${Math.min(activeIndex + 1, Math.max(totalItems, 1))} / ${Math.max(totalItems, 1)}`}</Text>
+        <Pressable
+          onPress={() => scrollToIndex(activeIndex + 1)}
+          disabled={activeIndex >= totalItems - 1}
+          style={[styles.carouselArrow, activeIndex >= totalItems - 1 && styles.carouselArrowDisabled]}
+        >
+          <Text style={styles.carouselArrowText}>{'>'}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -620,7 +665,7 @@ function formatDueLabel(value: string) {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 6,
+    gap: 8,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -701,8 +746,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   carouselShell: {
-    gap: 6,
-    marginBottom: 6,
+    gap: 8,
+    marginBottom: 8,
   },
   carouselContent: {
     alignItems: 'center',
@@ -774,8 +819,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   songCardBody: {
-    padding: 13,
-    gap: 8,
+    padding: 15,
+    gap: 14,
   },
   songCardTopRow: {
     flexDirection: 'row',
@@ -797,15 +842,23 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   songCardTitle: {
+    flex: 1,
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: '900',
     lineHeight: 23,
   },
+  songTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 2,
+  },
   songCardArtist: {
     color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '700',
+    marginTop: 1,
   },
   songCardWarning: {
     color: '#d1475d',
@@ -821,6 +874,16 @@ const styles = StyleSheet.create({
   songDeleteButtonDisabled: {
     opacity: 0.45,
   },
+  songDeleteIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
   songDeleteButtonText: {
     color: theme.colors.textMuted,
     fontSize: 12,
@@ -829,26 +892,40 @@ const styles = StyleSheet.create({
   songVoteCancelButton: {
     backgroundColor: theme.colors.textMuted,
   },
-  carouselDots: {
+  submitButtonIncomplete: {
+    backgroundColor: theme.colors.textMuted,
+  },
+  carouselNav: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 12,
   },
-  carouselDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: theme.colors.border,
+  carouselArrow: {
+    width: 34,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  carouselDotActive: {
-    width: 18,
-    backgroundColor: theme.colors.text,
+  carouselArrowDisabled: {
+    opacity: 0.35,
   },
-  carouselDotVoted: {
-    backgroundColor: theme.colors.primary,
+  carouselArrowText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  carouselCount: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+    minWidth: 50,
   },
   actionStack: {
-    gap: 6,
+    gap: 8,
   },
   voteProgressRow: {
     flexDirection: 'row',
@@ -857,7 +934,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.primarySoft,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   voteProgressLabel: {
     color: theme.colors.text,

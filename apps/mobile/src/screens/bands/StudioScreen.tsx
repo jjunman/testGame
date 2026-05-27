@@ -250,13 +250,6 @@ export function StudioScreen({ route, navigation }: Props) {
         <SegmentLabel label="합주실 정하기" active={activeTab === 'vote'} />
       </Pressable>
 
-      {activeTab === 'vote' ? (
-      <View style={styles.actions}>
-        <PrimaryButton label="합주실 후보 추가" onPress={() => navigation.navigate('CreateStudioCandidate', { bandId })} />
-      </View>
-
-      ) : null}
-
       {activeTab === 'location' ? (
       <View style={[styles.locationCard, hasSavedLocation && !editingLocation && styles.locationCardCompact]}>
         <View style={styles.locationHeader}>
@@ -594,10 +587,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.textMuted,
   },
   candidateSection: {
-    gap: 12,
+    gap: 14,
   },
   carouselShell: {
-    gap: 8,
+    gap: 10,
   },
   carouselContent: {
     alignItems: 'center',
@@ -714,13 +707,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    minHeight: 286,
+    minHeight: 292,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 12,
-    gap: 10,
+    padding: 14,
+    gap: 12,
     overflow: 'hidden',
   },
   cardSelected: {
@@ -751,7 +744,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     lineHeight: 23,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   metaText: {
     color: theme.colors.textMuted,
@@ -762,15 +755,15 @@ const styles = StyleSheet.create({
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   infoCell: {
     flex: 1,
     minWidth: 0,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surface,
-    padding: 7,
-    gap: 3,
+    padding: 8,
+    gap: 4,
   },
   infoCellHeader: {
     flexDirection: 'row',

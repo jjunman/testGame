@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primarySoft,
   },
   listWrap: {
-    gap: 12,
+    gap: 14,
   },
   cardWrap: {
     borderRadius: theme.radius.md,
@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   bandCard: {
-    minHeight: 126,
+    minHeight: 132,
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 18,
     borderRadius: theme.radius.md,
   },
   cardTop: {
@@ -157,12 +157,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   addBandCard: {
-    minHeight: 126,
+    minHeight: 132,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: '#d9d5ff',
     backgroundColor: '#f8f7ff',
-    padding: 16,
+    padding: 18,
     justifyContent: 'center',
     overflow: 'hidden',
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   addBandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 18,
   },
   addBandIcon: {
     width: 42,
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
   addBandTextWrap: {
     flex: 1,
-    gap: 5,
+    gap: 6,
   },
   addBandTitle: {
     color: theme.colors.text,

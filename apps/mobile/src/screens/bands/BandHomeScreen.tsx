@@ -91,8 +91,8 @@ export function BandHomeScreen({ route, navigation }: Props) {
   }
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
-  const todoCardWidth = Math.min(360, Math.max(286, width - 56));
   const todoCardGap = 12;
+  const todoCardWidth = Math.max(260, width - 32 - todoCardGap);
   const onTodoScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (todoCardWidth + todoCardGap));
     setActiveTodoIndex(Math.max(0, Math.min(todos.length - 1, nextIndex)));
@@ -107,7 +107,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       return;
     }
     if (todo.type === 'submit_schedule') {
-      navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' });
+      navigation.navigate('Schedule', { bandId });
       return;
     }
     if (todo.shortcut === 'song_round') {
@@ -138,25 +138,26 @@ export function BandHomeScreen({ route, navigation }: Props) {
         </View>
         <View style={styles.summaryStats}>
           <SummaryStat label="멤버 수" value={formatCount(detail.memberCount, '명', 1)} />
-          <SummaryStat label="해야할 일" value={formatCount(todos.length, '개')} />
+          <SummaryStat label="내 할 일" value={formatCount(todos.length, '개')} />
           <SummaryStat label="초대코드" value={detail.inviteCode} />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>지금 할 일</Text>
+        <Text style={styles.sectionTitle}>내 할 일</Text>
         {todos.length > 0 ? (
           <>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
+              disableIntervalMomentum
               snapToInterval={todoCardWidth + todoCardGap}
               contentContainerStyle={styles.todoCarousel}
               onMomentumScrollEnd={onTodoScrollEnd}
             >
               {todos.map((todo, index) => (
-                <View key={`${todo.type}-${todo.targetId ?? index}`} style={[styles.todoCardWrap, { width: todoCardWidth }, index === todos.length - 1 && styles.todoCardWrapLast]}>
+                <View key={`${todo.type}-${todo.targetId ?? index}`} style={[styles.todoCardWrap, { width: todoCardWidth, marginRight: index === todos.length - 1 ? 0 : todoCardGap }]}>
                   <PrimaryTodoCard todo={todo} onPress={() => void openTodo(todo)} />
                 </View>
               ))}
@@ -207,6 +208,7 @@ function formatCount(value: number | null | undefined, unit: string, fallback = 
 
 function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
   const iconName = todoIconName(todo);
+  const deadlineLabel = todoDeadlineLabel(todo);
 
   return (
     <Pressable style={styles.primaryTodoCard} onPress={onPress}>
@@ -214,7 +216,7 @@ function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
         <Ionicons name={iconName} size={22} color={theme.colors.textMuted} />
       </View>
       <View style={styles.todoBody}>
-        <Text style={styles.todoKicker}>{todoDeadlineLabel(todo)}</Text>
+        {deadlineLabel ? <Text style={styles.todoKicker}>{deadlineLabel}</Text> : null}
         <Text style={styles.todoTitle} numberOfLines={1}>{todo.title}</Text>
       </View>
       <View style={styles.todoGo}>
@@ -246,6 +248,9 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
 }
 
 function todoDeadlineLabel(todo: TodoItemDto) {
+  if (todo.type === 'quick_song_round' || todo.type === 'quick_schedule' || todo.type === 'quick_studio') {
+    return '';
+  }
   if (todo.dueAt) {
     const diff = new Date(todo.dueAt).getTime() - Date.now();
     const day = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
@@ -452,14 +457,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbfaff',
   },
   todoCarousel: {
-    paddingRight: 16,
+    alignItems: 'center',
   },
   todoCardWrap: {
     flexShrink: 0,
-    marginRight: 12,
-  },
-  todoCardWrapLast: {
-    marginRight: 0,
   },
   todoCarouselCount: {
     color: theme.colors.textMuted,
