@@ -190,11 +190,13 @@ export class BandsService {
       order: { dueAt: 'DESC' },
     });
 
-    const latestAssignmentByCandidateId = new Map<string, PracticeAssignment>();
+    const assignmentsByCandidateId = new Map<string, PracticeAssignment[]>();
     for (const assignment of practiceAssignments) {
       const candidateId = assignment.songCandidate?.id;
-      if (candidateId && !latestAssignmentByCandidateId.has(candidateId)) {
-        latestAssignmentByCandidateId.set(candidateId, assignment);
+      if (candidateId) {
+        const assignments = assignmentsByCandidateId.get(candidateId) ?? [];
+        assignments.push(assignment);
+        assignmentsByCandidateId.set(candidateId, assignments);
       }
     }
 
@@ -207,11 +209,18 @@ export class BandsService {
       practiceAssignmentId?: string | null;
       practiceDueAt?: string | null;
       practiceStatus?: PracticeAssignmentStatus | null;
+      practiceAssignments?: Array<{
+        id: string;
+        title: string;
+        dueAt: string;
+        status: PracticeAssignmentStatus;
+      }>;
       kind: 'song' | 'picking';
     }> = completedRounds
       .filter((round) => round.finalCandidate?.songCatalog)
       .map((round) => {
-        const practiceAssignment = latestAssignmentByCandidateId.get(round.finalCandidate!.id);
+        const practiceAssignments = assignmentsByCandidateId.get(round.finalCandidate!.id) ?? [];
+        const practiceAssignment = practiceAssignments[0] ?? null;
 
         return {
         id: round.finalCandidate!.id,
@@ -226,6 +235,12 @@ export class BandsService {
         practiceAssignmentId: practiceAssignment?.id ?? null,
         practiceDueAt: practiceAssignment?.dueAt?.toISOString() ?? null,
         practiceStatus: practiceAssignment?.status ?? null,
+        practiceAssignments: practiceAssignments.map((assignment) => ({
+          id: assignment.id,
+          title: assignment.title,
+          dueAt: assignment.dueAt.toISOString(),
+          status: assignment.status,
+        })),
         kind: 'song' as const,
       };
       });

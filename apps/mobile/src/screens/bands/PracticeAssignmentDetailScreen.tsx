@@ -70,6 +70,7 @@ type DraftRecording = {
   createdAt: string;
   source: 'recorded' | 'picked';
   durationSec?: number | null;
+  syncOffsetMs?: number | null;
   waveform?: number[];
 };
 
@@ -91,11 +92,14 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   const [generatingMix, setGeneratingMix] = useState(false);
   const [closingAssignment, setClosingAssignment] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recordingStopSignal, setRecordingStopSignal] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const recordingRef = useRef<any>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingAutoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingTargetStartAtRef = useRef<number | null>(null);
+  const recordingSyncOffsetMsRef = useRef<number>(0);
   const autoMixRequestedRef = useRef<string | null>(null);
   const waveformRef = useRef<number[]>([]);
 
@@ -156,13 +160,20 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     };
   }, []);
 
-  const addDraft = async (uri: string, source: DraftRecording['source'], waveform?: number[], durationSec?: number | null) => {
+  const addDraft = async (
+    uri: string,
+    source: DraftRecording['source'],
+    waveform?: number[],
+    durationSec?: number | null,
+    syncOffsetMs = 0,
+  ) => {
     const nextDraft: DraftRecording = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       uri,
       createdAt: new Date().toISOString(),
       source,
       durationSec: durationSec ?? null,
+      syncOffsetMs,
       waveform: normalizeWaveform(waveform),
     };
     await persistDrafts([nextDraft, ...drafts].slice(0, MAX_DRAFTS));
@@ -195,6 +206,8 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       isMeteringEnabled: true,
     });
     await nextRecording.startAsync();
+    const targetStartAt = recordingTargetStartAtRef.current;
+    recordingSyncOffsetMsRef.current = targetStartAt === null ? 0 : Math.max(-1500, Math.min(1500, Date.now() - targetStartAt));
     recordingRef.current = nextRecording;
     waveformRef.current = [];
     meteringTimerRef.current = setInterval(() => {
@@ -226,6 +239,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     }
 
     setCountdown(RECORDING_COUNTDOWN_SECONDS);
+    recordingTargetStartAtRef.current = Date.now() + RECORDING_COUNTDOWN_SECONDS * 1000;
     countdownTimerRef.current = setInterval(() => {
       setCountdown((current) => {
         if (current === null) {
@@ -263,8 +277,13 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     await recordingRef.current.stopAndUnloadAsync();
     const uri = recordingRef.current.getURI();
     const waveform = waveformRef.current;
+    const syncOffsetMs = recordingSyncOffsetMsRef.current;
+    const requiredSec = getRequiredRecordingSec(detail);
+    const normalizedDurationSec = requiredSec ?? durationSec;
     recordingRef.current = null;
+    recordingTargetStartAtRef.current = null;
     setRecording(false);
+    setRecordingStopSignal((value) => value + 1);
 
     if (!uri) {
       Alert.alert('저장 실패', '녹음 파일을 저장하지 못했어요.');
@@ -276,7 +295,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       return;
     }
 
-    await addDraft(uri, 'recorded', waveform, durationSec);
+    await addDraft(uri, 'recorded', waveform, normalizedDurationSec, syncOffsetMs);
     setMode('practice');
   };
 
@@ -300,7 +319,10 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       recordingAutoStopTimerRef.current = null;
     }
     waveformRef.current = [];
+    recordingTargetStartAtRef.current = null;
+    recordingSyncOffsetMsRef.current = 0;
     setRecording(false);
+    setRecordingStopSignal((value) => value + 1);
     Alert.alert('녹음 취소', '이번 녹음은 저장하지 않았어요.');
   };
 
@@ -395,6 +417,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       type: 'audio/m4a',
     } as never);
     form.append('durationSec', String(selectedDraft.durationSec ?? ''));
+    form.append('syncOffsetMs', String(selectedDraft.syncOffsetMs ?? 0));
 
     setUploading(true);
     try {
@@ -459,6 +482,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           youtubeVideoId={youtubeVideoId}
           detail={detail}
           recording={recording}
+          stopSignal={recordingStopSignal}
           countdown={countdown}
           onStartRecording={() => void startRecording()}
           onStopRecording={() => void stopRecording()}
@@ -610,6 +634,7 @@ function PracticePanel({
   youtubeVideoId,
   detail,
   recording,
+  stopSignal,
   countdown,
   onStartRecording,
   onStopRecording,
@@ -620,6 +645,7 @@ function PracticePanel({
   youtubeVideoId: string | null;
   detail: PracticeDetailDto;
   recording: boolean;
+  stopSignal: number;
   countdown: number | null;
   onStartRecording: () => void;
   onStopRecording: () => void;
@@ -631,6 +657,7 @@ function PracticePanel({
   const sourceStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sourceStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sourcePlaying, setSourcePlaying] = useState(false);
+  const [playerResetKey, setPlayerResetKey] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -661,15 +688,16 @@ function PracticePanel({
     clearSourceStartTimer();
     clearSourceStopTimer();
     setSourcePlaying(false);
+    setPlayerResetKey((value) => value + 1);
     playerRef.current?.pauseVideo?.();
     playerRef.current?.getInternalPlayer?.()?.pauseVideo?.();
   };
 
   useEffect(() => {
-    if (!recording && countdown === null) {
+    if (stopSignal > 0) {
       stopSourcePlayback();
     }
-  }, [countdown, recording]);
+  }, [stopSignal]);
 
   const handleRecordPress = () => {
     if (recording) {
@@ -720,7 +748,13 @@ function PracticePanel({
       <Text style={styles.panelTitle}>연습하기</Text>
       <View style={styles.youtubeBox}>
         {youtubeVideoId ? (
-          <YoutubePlayer ref={playerRef} height={178} play={sourcePlaying} videoId={youtubeVideoId} />
+          <YoutubePlayer
+            key={`${youtubeVideoId}-${playerResetKey}`}
+            ref={playerRef}
+            height={178}
+            play={sourcePlaying}
+            videoId={youtubeVideoId}
+          />
         ) : (
           <View style={styles.playerFallback}>
             <MaterialCommunityIcons name="youtube" size={38} color={theme.colors.primary} />

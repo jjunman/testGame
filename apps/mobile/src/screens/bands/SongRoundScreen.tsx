@@ -346,6 +346,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
                   editYoutubeUrl={editYoutubeUrl}
                   editingSong={editingSong}
                   onPress={() => openSongCard(card)}
+                  onOpenPractice={(assignmentId) => navigation.navigate('PracticeAssignmentDetail', { bandId, assignmentId })}
                   onToggleMore={() => {
                     setExpandedSongCardId((current) => (current === card.id ? null : card.id));
                     setEditingSongCardId(null);
@@ -381,6 +382,7 @@ function SongLibraryCard({
   editYoutubeUrl,
   editingSong,
   onPress,
+  onOpenPractice,
   onToggleMore,
   onEdit,
   onDelete,
@@ -399,6 +401,7 @@ function SongLibraryCard({
   editYoutubeUrl: string;
   editingSong: boolean;
   onPress: () => void;
+  onOpenPractice: (assignmentId: string) => void;
   onToggleMore: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -410,6 +413,7 @@ function SongLibraryCard({
   onCancelEdit: () => void;
 }) {
   const practiceClosed = card.practiceStatus === 'closed';
+  const practiceAssignments = card.practiceAssignments ?? [];
 
   return (
     <View style={[styles.songCardShell, practiceClosed && styles.songCardShellClosed]}>
@@ -454,6 +458,23 @@ function SongLibraryCard({
           </Text>
         </View>
       </Pressable>
+      {practiceAssignments.length > 1 ? (
+        <View style={styles.practiceList}>
+          {practiceAssignments.map((assignment) => (
+            <Pressable
+              key={assignment.id}
+              style={styles.practiceListItem}
+              onPress={() => onOpenPractice(assignment.id)}
+            >
+              <View style={styles.practiceListBody}>
+                <Text style={styles.practiceListTitle} numberOfLines={1}>{assignment.title}</Text>
+                <Text style={styles.practiceListMeta} numberOfLines={1}>{formatDueLabel(assignment.dueAt)}</Text>
+              </View>
+              <StatusBadge label={assignment.status === 'open' ? '연습' : '완료'} tone={assignment.status === 'open' ? 'warning' : 'default'} />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {editing ? (
         <View style={styles.songFoldout}>
           <View style={styles.songEditForm}>
@@ -1041,6 +1062,40 @@ const styles = StyleSheet.create({
   },
   inlineMenuDanger: {
     color: theme.colors.danger,
+  },
+  practiceList: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 7,
+  },
+  practiceListItem: {
+    minHeight: 42,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  practiceListBody: {
+    flex: 1,
+    gap: 2,
+  },
+  practiceListTitle: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  practiceListMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   songFoldout: {
     borderTopWidth: 1,

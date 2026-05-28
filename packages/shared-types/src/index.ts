@@ -210,6 +210,12 @@ export type BandSongCardDto = {
   practiceAssignmentId?: string | null;
   practiceDueAt?: string | null;
   practiceStatus?: 'open' | 'closed' | null;
+  practiceAssignments?: Array<{
+    id: string;
+    title: string;
+    dueAt: string;
+    status: 'open' | 'closed';
+  }>;
   kind: 'song' | 'picking';
 };
 

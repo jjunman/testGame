@@ -30,6 +30,9 @@ export class PracticeSubmission {
   @Column({ name: 'duration_sec', type: 'int', nullable: true })
   durationSec: number | null;
 
+  @Column({ name: 'sync_offset_ms', type: 'int', default: 0 })
+  syncOffsetMs: number;
+
   @CreateDateColumn({ name: 'submitted_at' })
   submittedAt: Date;
 

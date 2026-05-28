@@ -70,11 +70,12 @@ export class PracticeController {
     @CurrentUser() user: { userId: string },
     @Param('assignmentId') assignmentId: string,
     @Body('durationSec') durationSec: string | undefined,
+    @Body('syncOffsetMs') syncOffsetMs: string | undefined,
     @UploadedFile() file: Express.Multer.File,
     @Res({ passthrough: true }) res: Response,
   ) {
     res.locals.message = '녹음 파일을 제출했습니다.';
-    return this.practiceService.submit(user.userId, assignmentId, file, durationSec);
+    return this.practiceService.submit(user.userId, assignmentId, file, durationSec, syncOffsetMs);
   }
 
   @Post('practice-assignments/:assignmentId/close')

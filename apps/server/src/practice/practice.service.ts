@@ -159,7 +159,7 @@ export class PracticeService {
     };
   }
 
-  async submit(userId: string, assignmentId: string, file: Express.Multer.File, clientDurationSec?: string) {
+  async submit(userId: string, assignmentId: string, file: Express.Multer.File, clientDurationSec?: string, clientSyncOffsetMs?: string) {
     if (!file) {
       throw new BadRequestException('업로드할 오디오 파일이 필요합니다.');
     }
@@ -177,6 +177,8 @@ export class PracticeService {
     const probedDurationSec = await this.getAudioDurationSec(file.path);
     const parsedClientDurationSec = clientDurationSec ? Number(clientDurationSec) : null;
     const durationSec = probedDurationSec ?? (Number.isFinite(parsedClientDurationSec) ? parsedClientDurationSec : null);
+    const parsedSyncOffsetMs = clientSyncOffsetMs ? Number(clientSyncOffsetMs) : 0;
+    const syncOffsetMs = Number.isFinite(parsedSyncOffsetMs) ? Math.max(-1500, Math.min(1500, Math.round(parsedSyncOffsetMs))) : 0;
     const requiredSec = this.getRequiredRecordingSec(assignment);
     if (requiredSec !== null && (durationSec === null || durationSec + 0.75 < requiredSec)) {
       await fs.unlink(file.path).catch(() => undefined);
@@ -196,6 +198,7 @@ export class PracticeService {
         user: user!,
         audioUrl,
         durationSec: durationSec === null ? null : Math.round(durationSec),
+        syncOffsetMs,
         status: PracticeSubmissionStatus.SUBMITTED,
       }),
     );
@@ -296,11 +299,27 @@ export class PracticeService {
 
     const outputName = `${assignment.id}-${Date.now()}.mp3`;
     const outputPath = path.join(mixesDir, outputName);
+    const requiredSec = this.getRequiredRecordingSec(assignment);
+    const targetDurationFilter = requiredSec === null ? '' : `,apad,atrim=duration=${requiredSec},asetpts=PTS-STARTPTS`;
+    const preparedStreams = inputPaths
+      .map(
+        (_inputPath, index) =>
+          `[${index}:a]aresample=44100,aformat=channel_layouts=stereo,` +
+          `loudnorm=I=-18:LRA=11:TP=-1.5${targetDurationFilter}[p${index}]`,
+      )
+      .join(';');
+    const mixInputs = inputPaths.map((_inputPath, index) => `[p${index}]`).join('');
+    const mixDuration = requiredSec === null ? 'longest' : 'first';
+    const filterComplex = `${preparedStreams};${mixInputs}amix=inputs=${inputPaths.length}:duration=${mixDuration}:dropout_transition=0:normalize=0,` +
+      'loudnorm=I=-16:LRA=11:TP=-1.5[mix]';
+
     const args = [
       '-y',
       ...inputPaths.flatMap((inputPath) => ['-i', inputPath]),
       '-filter_complex',
-      `amix=inputs=${inputPaths.length}:duration=longest:dropout_transition=0:normalize=1`,
+      filterComplex,
+      '-map',
+      '[mix]',
       '-ac',
       '2',
       '-ar',
