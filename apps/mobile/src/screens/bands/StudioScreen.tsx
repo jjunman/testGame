@@ -327,8 +327,14 @@ export function StudioScreen({ route, navigation }: Props) {
           <StatusBadge label="확정된 합주실" tone="success" />
           <Text style={styles.confirmedTitle}>{confirmed.studio.name}</Text>
           <Text style={styles.metaText}>{formatAddress(confirmed.studio.address)}</Text>
+          <PrimaryButton
+            label="합주실 변경"
+            onPress={() => navigation.navigate('CreateStudioCandidate', { bandId })}
+            style={styles.secondaryAction}
+          />
         </View>
       ) : null}
+        {!confirmed ? (
         <View style={styles.candidateSection}>
           <Text style={styles.sectionTitle}>합주실 후보</Text>
           <StudioCandidateCarousel
@@ -351,6 +357,7 @@ export function StudioScreen({ route, navigation }: Props) {
             />
           ) : null}
         </View>
+        ) : null}
       </>
       ) : null}
     </Screen>

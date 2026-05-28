@@ -69,6 +69,7 @@ type DraftRecording = {
   uri: string;
   createdAt: string;
   source: 'recorded' | 'picked';
+  takeNumber?: number;
   durationSec?: number | null;
   syncOffsetMs?: number | null;
   waveform?: number[];
@@ -172,6 +173,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       uri,
       createdAt: new Date().toISOString(),
       source,
+      takeNumber: getNextTakeNumber(drafts),
       durationSec: durationSec ?? null,
       syncOffsetMs,
       waveform: normalizeWaveform(waveform),
@@ -299,7 +301,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     setMode('practice');
   };
 
-  const cancelRecording = async () => {
+  const cancelRecording = async (options?: { silent?: boolean }) => {
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = null;
@@ -323,8 +325,31 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     recordingSyncOffsetMsRef.current = 0;
     setRecording(false);
     setRecordingStopSignal((value) => value + 1);
-    Alert.alert('녹음 취소', '이번 녹음은 저장하지 않았어요.');
+    if (!options?.silent) {
+          Alert.alert('녹음 취소', '이번 녹음은 저장하지 않았어요.');
+    }
   };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (mode === 'main') {
+        return;
+      }
+
+      const actionType = event.data.action.type;
+      if (actionType !== 'GO_BACK' && actionType !== 'POP' && actionType !== 'POP_TO_TOP') {
+        return;
+      }
+
+      event.preventDefault();
+      if (mode === 'practice' && (recording || countdown !== null || recordingRef.current)) {
+        void cancelRecording({ silent: true });
+      }
+      setMode('main');
+    });
+
+    return unsubscribe;
+  }, [cancelRecording, countdown, mode, navigation, recording]);
 
   const generateMix = async (options?: { silent?: boolean }) => {
     if (submissions.length === 0) {
@@ -448,6 +473,26 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   const dueLabel = new Date(detail.dueAt).toLocaleDateString('ko-KR');
   const progress = getPracticeProgress(detail.startSec, detail.endSec);
 
+  if (detail.isClosed) {
+    return (
+      <Screen fixedFooter={<BandInnerNav bandId={bandId} active="song" navigation={navigation} />}>
+        <ClosedPracticeResult
+          title={songTitle}
+          artist={artist}
+          imageUrl={coverImage}
+          mySubmission={detail.mySubmission}
+          submissions={submissions}
+          isLeader={isLeader}
+          mixAudioUrl={detail.mixAudioUrl}
+          mixGeneratedAt={detail.mixGeneratedAt}
+          generatingMix={generatingMix}
+          onGenerateMix={() => void generateMix()}
+          onPlay={(uri) => void playAudioUri(uri)}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="song" navigation={navigation} />}>
       <PracticeHeader
@@ -521,6 +566,95 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   );
 }
 
+function ClosedPracticeResult({
+  title,
+  artist,
+  imageUrl,
+  mySubmission,
+  submissions,
+  isLeader,
+  mixAudioUrl,
+  mixGeneratedAt,
+  generatingMix,
+  onGenerateMix,
+  onPlay,
+}: {
+  title: string;
+  artist: string;
+  imageUrl: string;
+  mySubmission: PracticeDetailDto['mySubmission'];
+  submissions: PracticeSubmissionDto[];
+  isLeader: boolean;
+  mixAudioUrl: string | null;
+  mixGeneratedAt: string | null;
+  generatingMix: boolean;
+  onGenerateMix: () => void;
+  onPlay: (uri: string) => void;
+}) {
+  const playableSubmissions = isLeader ? submissions : mySubmission ? [
+    {
+      id: mySubmission.id,
+      userId: 'me',
+      userName: '내 녹음본',
+      audioUrl: mySubmission.audioUrl,
+      submittedAt: mySubmission.submittedAt,
+    },
+  ] : [];
+
+  return (
+    <View style={styles.closedResult}>
+      <ImageBackground source={{ uri: imageUrl }} imageStyle={styles.closedThumbImage} style={styles.closedThumb}>
+        <View style={styles.closedThumbOverlay} />
+        <View style={styles.closedThumbText}>
+          <Text style={styles.closedTitle} numberOfLines={2}>{title}</Text>
+          <Text style={styles.closedArtist} numberOfLines={1}>{artist}</Text>
+        </View>
+        <StatusBadge label="연습 완료" tone="success" />
+      </ImageBackground>
+
+      {mixAudioUrl ? (
+        <RemoteAudioPlayer
+          uri={mixAudioUrl}
+          title="믹스 녹음본"
+          subtitle={mixGeneratedAt ? `생성 ${new Date(mixGeneratedAt).toLocaleString('ko-KR')}` : '멤버 제출본을 합친 녹음본'}
+        />
+      ) : submissions.length > 0 ? (
+        <View style={styles.mixButton}>
+          <Ionicons name={generatingMix ? 'hourglass-outline' : 'albums-outline'} size={18} color="#fff" />
+          <View style={styles.submissionBody}>
+            <Text style={styles.submissionTitle}>{generatingMix ? '믹스 생성 중' : '믹스 준비 중'}</Text>
+            <Text style={styles.submissionMeta}>{`${submissions.length}개의 녹음본을 합치고 있어요`}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {mixAudioUrl && isLeader ? (
+        <PrimaryButton label="믹스 다시 생성하기" onPress={onGenerateMix} loading={generatingMix} style={styles.secondaryAction} />
+      ) : null}
+
+      {playableSubmissions.length > 0 ? (
+        <View style={styles.closedSubmissionList}>
+          {playableSubmissions.map((submission) => (
+            <Pressable key={submission.id} style={styles.closedSubmissionItem} onPress={() => onPlay(submission.audioUrl)}>
+              <ImageBackground source={{ uri: imageUrl }} imageStyle={styles.closedSubmissionImage} style={styles.closedSubmissionThumb}>
+                <View style={styles.closedSubmissionOverlay} />
+                <Ionicons name="play" size={17} color="#fff" />
+              </ImageBackground>
+              <View style={styles.closedSubmissionBody}>
+                <Text style={styles.closedSubmissionTitle} numberOfLines={1}>{submission.userName}</Text>
+                <Text style={styles.closedSubmissionMeta}>{new Date(submission.submittedAt).toLocaleString('ko-KR')}</Text>
+              </View>
+              <Ionicons name="volume-high-outline" size={20} color={theme.colors.primary} />
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <EmptyState title="녹음본이 없어요" description="마감 전에 제출된 녹음본이 없어서 들을 파일이 없어요." />
+      )}
+    </View>
+  );
+}
+
 function PracticeHeader({
   title,
   artist,
@@ -578,15 +712,13 @@ function PracticeModeTimeline({
       {steps.map((step, index) => {
         const active = mode === step.mode;
         return (
-          <React.Fragment key={step.mode}>
-            <Pressable style={styles.stepItem} onPress={() => onChange(step.mode)}>
-              <View style={[styles.stepDot, step.completed && styles.stepDotDone, active && styles.stepDotActive]}>
-                <Ionicons name={step.completed ? 'checkmark' : step.icon} size={14} color={active || step.completed ? '#fff' : theme.colors.primary} />
-              </View>
-              <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{step.label}</Text>
-            </Pressable>
+          <Pressable key={step.mode} style={styles.stepItem} onPress={() => onChange(step.mode)}>
             {index < steps.length - 1 ? <View style={[styles.stepLine, step.completed && styles.stepLineDone]} /> : null}
-          </React.Fragment>
+            <View style={[styles.stepDot, step.completed && styles.stepDotDone, active && styles.stepDotActive]}>
+              <Ionicons name={step.completed ? 'checkmark' : step.icon} size={14} color={active || step.completed ? '#fff' : theme.colors.primary} />
+            </View>
+            <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{step.label}</Text>
+          </Pressable>
         );
       })}
     </View>
@@ -774,7 +906,7 @@ function PracticePanel({
         onRecord={handleRecordPress}
         onCancel={handleCancelPress}
       />
-      <PrimaryButton label="녹음 파일 불러오기" onPress={onImport} disabled={detail.isClosed} style={styles.secondaryAction} />
+      <PrimaryButton label="파일 불러오기" onPress={onImport} disabled={detail.isClosed} style={styles.secondaryAction} />
       <PrimaryButton label="제출하러 가기" onPress={onSubmit} />
     </View>
   );
@@ -865,13 +997,14 @@ function SubmitPanel({
         <View style={styles.draftList}>
           {drafts.map((draft, index) => {
             const selected = draft.id === selectedDraftId;
+            const takeNumber = draft.takeNumber ?? getLegacyTakeNumber(drafts, index);
             return (
               <Pressable key={draft.id} style={[styles.draftItem, selected && styles.draftItemSelected]} onPress={() => onSelect(draft.id)}>
                 <View style={[styles.selectBadge, selected && styles.selectBadgeSelected]}>
                   <Ionicons name={selected ? 'checkmark' : 'musical-note'} size={14} color={selected ? '#fff' : theme.colors.primary} />
                 </View>
                 <View style={styles.draftBody}>
-                  <Text style={[styles.draftTitle, selected && styles.draftTitleSelected]}>take_{String(index + 1).padStart(2, '0')}</Text>
+                  <Text style={[styles.draftTitle, selected && styles.draftTitleSelected]}>take_{String(takeNumber).padStart(2, '0')}</Text>
                   <Text style={[styles.draftMeta, selected && styles.draftMetaSelected]}>
                     {draft.source === 'recorded' ? '직접 녹음' : '불러온 파일'} · {new Date(draft.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                   </Text>
@@ -1256,6 +1389,17 @@ function buildDurationMessage(detail: PracticeDetailDto | null, durationSec: num
   return `이 과제는 최소 ${formatSeconds(requiredSec)} 녹음해야 저장할 수 있어요. 현재 녹음 길이: ${actual}`;
 }
 
+function getNextTakeNumber(drafts: DraftRecording[]) {
+  return drafts.reduce((max, draft, index) => Math.max(max, draft.takeNumber ?? getLegacyTakeNumber(drafts, index)), 0) + 1;
+}
+
+function getLegacyTakeNumber(drafts: DraftRecording[], index: number) {
+  const ordered = [...drafts].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const draft = drafts[index];
+  const legacyIndex = ordered.findIndex((item) => item.id === draft.id);
+  return legacyIndex >= 0 ? legacyIndex + 1 : index + 1;
+}
+
 function getYoutubeVideoId(url: string | null) {
   if (!url) {
     return null;
@@ -1317,6 +1461,81 @@ const styles = StyleSheet.create({
   headerImage: {
     borderRadius: 8,
   },
+  closedResult: {
+    gap: 12,
+  },
+  closedThumb: {
+    minHeight: 220,
+    borderRadius: 8,
+    overflow: 'hidden',
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  closedThumbImage: {
+    borderRadius: 8,
+  },
+  closedThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(14, 12, 30, 0.48)',
+  },
+  closedThumbText: {
+    gap: 5,
+  },
+  closedTitle: {
+    color: '#fff',
+    fontSize: 25,
+    fontWeight: '900',
+    lineHeight: 31,
+  },
+  closedArtist: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  closedSubmissionList: {
+    gap: 8,
+  },
+  closedSubmissionItem: {
+    minHeight: 72,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  closedSubmissionThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#20242c',
+  },
+  closedSubmissionImage: {
+    borderRadius: 8,
+  },
+  closedSubmissionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(14, 12, 30, 0.44)',
+  },
+  closedSubmissionBody: {
+    flex: 1,
+    gap: 3,
+  },
+  closedSubmissionTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  closedSubmissionMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(14, 12, 30, 0.54)',
@@ -1360,9 +1579,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   stepItem: {
-    width: 48,
+    flex: 1,
     alignItems: 'center',
     gap: 6,
+    position: 'relative',
   },
   stepDot: {
     width: 30,
@@ -1373,6 +1593,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   stepDotActive: {
     borderColor: theme.colors.primary,
@@ -1391,12 +1612,13 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
   },
   stepLine: {
-    flex: 1,
+    position: 'absolute',
+    top: 14,
+    left: '50%',
+    right: '-50%',
     height: 2,
     borderRadius: 999,
     backgroundColor: theme.colors.primarySoft,
-    marginHorizontal: 2,
-    marginBottom: 20,
   },
   stepLineDone: {
     backgroundColor: theme.colors.primary,
