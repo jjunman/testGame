@@ -138,7 +138,7 @@ export class ScheduleService {
         const message = allAvailable
           ? '모두가 가능한 시간대예요'
           : unavailableMemberNames.includes(currentUserName ?? '')
-            ? '내가 불가능한 시간대예요'
+            ? '내가 가능 표시하지 않은 시간대예요'
             : `${unavailableMemberNames.join(', ')}를 제외하고 가능한 시간대예요`;
 
         return {
@@ -217,12 +217,9 @@ export class ScheduleService {
       where: { proposal: { id: proposal.id }, user: { id: userId } },
     });
 
-    if (existing) {
-      throw new BadRequestException('찬반 응답은 한 번만 제출할 수 있습니다.');
-    }
-
     const savedVote = await this.proposalVotesRepository.save(
       this.proposalVotesRepository.create({
+        id: existing?.id,
         proposal,
         user: user!,
         availability: dto.availability,
@@ -292,7 +289,7 @@ export class ScheduleService {
       : !proposal.active
         ? '찬반투표가 종료되었지만 모두 찬성하지 않아 확정되지 않았어요'
         : noNames.includes(currentUserName ?? '')
-          ? '내가 불가능한 시간대예요'
+          ? '내가 반대했어요'
           : noNames.length > 0
             ? `${noNames.join(', ')}를 제외하고 가능한 시간대예요`
             : '아직 모든 멤버의 응답이 모이지 않았어요';

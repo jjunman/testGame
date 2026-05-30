@@ -248,9 +248,6 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
 }
 
 function todoDeadlineLabel(todo: TodoItemDto) {
-  if (todo.type === 'quick_song_round' || todo.type === 'quick_schedule' || todo.type === 'quick_studio') {
-    return '';
-  }
   if (todo.dueAt) {
     const diff = new Date(todo.dueAt).getTime() - Date.now();
     const day = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));

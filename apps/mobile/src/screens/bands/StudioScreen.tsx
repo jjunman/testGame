@@ -8,7 +8,7 @@ import { StudioCandidateDto, StudioLocationDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
+import { EmptyState, Field, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -218,7 +218,6 @@ export function StudioScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="studio" navigation={navigation} />} scrollEnabled={activeTab !== 'vote'}>
-      <HeroBanner title="합주실 정하기" subtitle="지도에서 집 위치를 찍고 모두에게 가까운 합주실을 골라요." badge="안산" align="center" />
 
       <Pressable
         accessibilityRole="button"

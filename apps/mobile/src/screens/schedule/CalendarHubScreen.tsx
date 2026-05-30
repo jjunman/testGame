@@ -37,7 +37,7 @@ export function CalendarHubScreen() {
   if (!currentBand) {
     return (
       <Screen>
-        <HeroBanner title="달력" subtitle="밴드를 선택하면 합주 시간 흐름을 볼 수 있어요." badge="선택 필요" />
+        <HeroBanner title="달력" subtitle="밴드를 선택하면 합주 시간 흐름을 볼 수 있어요." />
         <EmptyState title="선택된 밴드가 없어요" description="내 밴드에서 사용할 밴드를 먼저 선택해 주세요." />
         <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandList')} />
       </Screen>
@@ -52,7 +52,6 @@ export function CalendarHubScreen() {
         title={`${currentBand.name} 달력`}
         subtitle={topSummary?.message ?? '합주 가능한 시간과 최근 제안을 한 번에 확인해요.'}
         imageUrl={currentBand.thumbnailUrl}
-        badge={`${slots.length}개 일정`}
       />
 
       <View style={styles.panel}>
@@ -70,7 +69,6 @@ export function CalendarHubScreen() {
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
           <Text style={styles.panelTitle}>최근 일정</Text>
-          <StatusBadge label={`${slots.length}개`} />
         </View>
         {slots.length === 0 ? (
           <EmptyState title="아직 제안된 시간이 없어요" description="합주 시간이 올라오면 여기에서 바로 확인할 수 있어요." />

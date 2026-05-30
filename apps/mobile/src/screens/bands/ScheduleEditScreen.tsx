@@ -99,7 +99,7 @@ export function ScheduleEditScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
-      <HeroBanner title={editorTitle} subtitle="가능한 시간을 크게 눌러서 저장해요." badge="edit" align="center" />
+      <HeroBanner title={editorTitle} subtitle="합주가 가능한 시간을 눌러주세요" align="center" />
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>

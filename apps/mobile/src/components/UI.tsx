@@ -196,7 +196,7 @@ export function OptionRow({
         <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{title}</Text>
         {subtitle ? <Text style={[styles.optionSubtitle, selected && styles.optionSubtitleSelected]}>{subtitle}</Text> : null}
       </View>
-      {trailing ?? <StatusBadge label={selected ? '선택됨' : '선택'} tone={selected ? 'success' : 'default'} />}
+      {trailing}
     </Pressable>
   );
 }

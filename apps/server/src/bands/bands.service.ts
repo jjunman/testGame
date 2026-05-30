@@ -454,48 +454,7 @@ export class BandsService {
         shortcut: 'schedule',
       });
     }
-
-    this.addDefaultShortcutTodos(todos);
     return todos.sort((a, b) => this.todoPriority(a.type) - this.todoPriority(b.type));
-  }
-
-  private addDefaultShortcutTodos(
-    todos: Array<{
-      type: string;
-      title: string;
-      description: string;
-      dueLabel: string;
-      dueAt?: string | null;
-      shortcut: 'song_round' | 'practice' | 'schedule' | 'studio';
-      targetId?: string | null;
-    }>,
-  ) {
-    todos.push(
-      {
-        type: 'quick_song_round',
-        title: '곡 정하기',
-        description: '합주곡 후보와 투표 화면으로 바로 이동해요.',
-        dueLabel: '바로가기',
-        dueAt: null,
-        shortcut: 'song_round',
-      },
-      {
-        type: 'quick_schedule',
-        title: '일정 정하기',
-        description: '내 일정 등록과 합주 시간 투표를 확인해요.',
-        dueLabel: '바로가기',
-        dueAt: null,
-        shortcut: 'schedule',
-      },
-      {
-        type: 'quick_studio',
-        title: '합주실 정하기',
-        description: '위치 등록, 후보 추가, 합주실 투표로 이동해요.',
-        dueLabel: '바로가기',
-        dueAt: null,
-        shortcut: 'studio',
-      },
-    );
   }
 
   private todoPriority(type: string) {
@@ -507,9 +466,6 @@ export class BandsService {
       vote_studio: 40,
       submit_schedule: 50,
       start_studio: 60,
-      quick_song_round: 100,
-      quick_schedule: 110,
-      quick_studio: 120,
     };
 
     return priorities[type] ?? 999;

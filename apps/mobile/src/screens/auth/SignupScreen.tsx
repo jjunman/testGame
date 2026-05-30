@@ -33,7 +33,6 @@ export function SignupScreen({ navigation }: Props) {
       <HeroBanner
         title="새 밴드 시작"
         subtitle="먼저 계정을 만들고, 원하는 밴드에 참여하거나 직접 밴드를 만들어보세요."
-        badge="Quick setup"
       />
       <SectionCard title="회원가입">
         <Label>이름</Label>

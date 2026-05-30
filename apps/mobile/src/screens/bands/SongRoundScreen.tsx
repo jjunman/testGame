@@ -79,15 +79,16 @@ export function SongRoundScreen({ route, navigation }: Props) {
   const isPosted = round?.status === 'posted';
   const isDone = round?.status === 'done';
   const isLeader = round?.myRole === 'leader';
-  const canAddCandidate = !isDone && !candidates.some((candidate) => candidate.createdByUserId === user?.id);
+  const canAddCandidate = true;
+  const visibleCandidates = isDone ? [] : candidates;
   const myVoteCount = candidates.filter((candidate) => candidate.didVote).length;
 
   useEffect(() => {
-    const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
+    const totalItems = visibleCandidates.length + (canAddCandidate ? 1 : 0);
     if (activeCandidateIndex >= totalItems) {
       setActiveCandidateIndex(Math.max(0, totalItems - 1));
     }
-  }, [activeCandidateIndex, canAddCandidate, candidates.length]);
+  }, [activeCandidateIndex, canAddCandidate, visibleCandidates.length]);
 
   const reloadAfterMutation = async () => {
     setExpandedSongCardId(null);
@@ -256,7 +257,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
         <HeroBanner
           title="곡과 연습"
           subtitle="확정곡과 연습 과제를 한곳에서 관리해요."
-          badge={`${songCards.length}곡`}
         />
       ) : null}
 
@@ -266,34 +266,30 @@ export function SongRoundScreen({ route, navigation }: Props) {
             <View>
               <Text style={styles.sectionTitle}>합주곡 투표</Text>
               <Text style={styles.sectionCaption}>
-                {round?.votingDeadlineAt
-                  ? `마감일 ${new Date(round.votingDeadlineAt).toLocaleString('ko-KR')}`
-                  : isPosted ? '후보곡을 추가하면 자동으로 투표가 시작돼요.' : '후보곡을 추가하면 일주일짜리 투표가 바로 시작돼요.'}
+                {isDone
+                  ? '새 후보곡을 추가하면 다시 투표가 시작돼요.'
+                  : round?.votingDeadlineAt
+                    ? `마감 ${new Date(round.votingDeadlineAt).toLocaleString('ko-KR')}`
+                    : isPosted ? '후보곡을 추가하면 자동으로 투표가 시작돼요.' : '후보곡을 추가하면 일주일짜리 투표가 바로 시작돼요.'}
               </Text>
             </View>
-            {isVoting ? <StatusBadge label={`D-${daysLeft(round?.votingDeadlineAt)}`} tone="warning" /> : null}
           </View>
-
-          {isDone ? (
-            <EmptyState title="진행 중인 투표가 없어요" description="합주곡 투표가 완료되었어요. 곡과 연습 탭에서 확정곡을 확인할 수 있어요." />
-          ) : (
-            <SongVoteCarousel
-              candidates={candidates}
-              activeIndex={activeCandidateIndex}
-              cardWidth={cardWidth}
-              cardGap={cardGap}
-              canEditSelection={Boolean(isVoting)}
-              isVoting={Boolean(isVoting)}
-              submittingId={submittingId}
-              deletingCandidateId={deletingCandidateId}
-              currentUserId={user?.id ?? null}
-              onIndexChange={setActiveCandidateIndex}
-              onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
-              onDelete={deleteCandidate}
-              canAddCandidate={canAddCandidate}
-              onAddCandidate={() => navigation.navigate('AddSongCandidate', { bandId })}
-            />
-          )}
+          <SongVoteCarousel
+            candidates={visibleCandidates}
+            activeIndex={activeCandidateIndex}
+            cardWidth={cardWidth}
+            cardGap={cardGap}
+            canEditSelection={Boolean(isVoting)}
+            isVoting={Boolean(isVoting)}
+            submittingId={submittingId}
+            deletingCandidateId={deletingCandidateId}
+            currentUserId={user?.id ?? null}
+            onIndexChange={setActiveCandidateIndex}
+            onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
+            onDelete={deleteCandidate}
+            canAddCandidate={canAddCandidate}
+            onAddCandidate={() => navigation.navigate('AddSongCandidate', { bandId })}
+          />
 
           {isVoting ? (
             <View style={styles.actionStack}>
@@ -426,7 +422,6 @@ function SongLibraryCard({
           <View style={styles.songListTop}>
             <Text style={styles.songTitle} numberOfLines={1}>{card.title}</Text>
             <View style={styles.songActions}>
-              <StatusBadge label={practiceClosed ? '완료' : card.practiceAssignmentId ? '연습' : '곡'} tone={practiceClosed ? 'default' : 'default'} />
               <Pressable
                 style={[styles.songMenuButton, expanded && styles.songMenuButtonActive]}
                 hitSlop={10}
@@ -670,14 +665,6 @@ function SongVoteCarousel({
       </View>
     </View>
   );
-}
-
-function daysLeft(value?: string | null) {
-  if (!value) {
-    return '?';
-  }
-  const diff = new Date(value).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
 function formatDueLabel(value: string) {

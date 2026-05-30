@@ -102,11 +102,6 @@ export class SongsService {
       relations: ['songCatalog', 'createdByUser'],
     });
 
-    const alreadySubmittedByUser = existingCandidate.some((candidate) => candidate.createdByUser.id === userId);
-    if (alreadySubmittedByUser) {
-      throw new BadRequestException('후보곡은 한 사람당 한 곡만 올릴 수 있습니다.');
-    }
-
     const duplicated = existingCandidate.some(
       (candidate) =>
         candidate.songCatalog.title.trim().toLowerCase() === normalizedTitle &&

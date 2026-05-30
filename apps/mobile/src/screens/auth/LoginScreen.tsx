@@ -26,7 +26,6 @@ export function LoginScreen({ navigation }: Props) {
       <HeroBanner
         title="합주 매니지먼트"
         subtitle="합주 준비부터 과제, 투표, 일정 조율까지 한곳에서 관리해요."
-        badge="Welcome back"
       />
       <SectionCard title="로그인">
         <Text>오늘 해야 할 연습과 밴드 일정이 한눈에 보이도록 화면을 정리해둘게요.</Text>

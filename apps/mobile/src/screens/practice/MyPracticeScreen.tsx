@@ -37,7 +37,7 @@ export function MyPracticeScreen() {
   if (!currentBand) {
     return (
       <Screen>
-        <HeroBanner title="노래" subtitle="밴드를 선택하면 합주곡과 연습 과제를 볼 수 있어요." badge="선택 필요" />
+        <HeroBanner title="노래" subtitle="밴드를 선택하면 합주곡과 연습 과제를 볼 수 있어요." />
         <EmptyState title="선택된 밴드가 없어요" description="내 밴드에서 사용할 밴드를 먼저 선택해 주세요." />
         <PrimaryButton label="내 밴드로 이동" onPress={() => navigation.navigate('BandList')} />
       </Screen>
@@ -52,7 +52,6 @@ export function MyPracticeScreen() {
         title={`${currentBand.name} 노래`}
         subtitle="투표와 연습 과제를 한 곳에서 이어서 확인해요."
         imageUrl={currentBand.thumbnailUrl}
-        badge={round?.status === 'voting' ? '투표 중' : '연습'}
       />
 
       <View style={styles.panel}>

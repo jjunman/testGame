@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BandHomeDto, BandSongCardDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, HeroBanner, Label, PrimaryButton, SectionCard, StatusBadge } from '../../components/UI';
+import { EmptyState, Field, HeroBanner, Label, PrimaryButton, SectionCard } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -117,7 +117,6 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
       <HeroBanner
         title="연습 과제 만들기"
         subtitle="리더가 연습 구간과 마감일을 정하면 멤버들이 바로 연습을 시작할 수 있어요."
-        badge="리더 전용"
       />
 
       <SectionCard title="과제 정보">
@@ -150,7 +149,6 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
                       {song.artist}
                     </Text>
                   </View>
-                  <StatusBadge label={selected ? '선택됨' : '곡'} tone={selected ? 'success' : 'default'} />
                 </Pressable>
               );
             })}

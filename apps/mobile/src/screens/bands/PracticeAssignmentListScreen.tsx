@@ -28,7 +28,6 @@ export function PracticeAssignmentListScreen({ route, navigation }: Props) {
       <HeroBanner
         title="개인 연습"
         subtitle="연습 마감일과 제출 상태를 한 번에 확인해요."
-        badge={`${items.length}개 과제`}
       />
 
       <PrimaryButton

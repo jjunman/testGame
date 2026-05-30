@@ -112,7 +112,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <HeroBanner title="합주실 후보 추가" subtitle="앱에서 제공하는 안산 합주실 목록에서 후보를 골라요." badge="안산" />
+      <HeroBanner title="합주실 후보 추가" subtitle="앱에서 제공하는 안산 합주실 목록에서 후보를 골라요." />
 
       <SectionCard title="앱 제공 합주실">
         <PrimaryButton label="목록 새로고침" onPress={loadStudios} loading={loading} />

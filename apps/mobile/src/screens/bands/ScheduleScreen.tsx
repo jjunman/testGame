@@ -55,7 +55,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
   const confirmedProposal = proposal && !proposal.active && proposal.confirmed ? proposal : null;
   const mySelectedCount = slots.filter((slot) => slot.myAvailability === 'yes').length;
   const isLeader = currentBand?.myRole === 'leader';
-  const voteLocked = Boolean(activeProposal?.myAvailability) || !activeProposal;
+  const voteLocked = !activeProposal;
   const submitVote = async (availability: 'yes' | 'no') => {
     if (!activeProposal) {
       return;
@@ -113,6 +113,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
               {formatScheduleLabel(confirmedProposal.date, confirmedProposal.startTime, confirmedProposal.endTime)}
             </Text>
             <Text style={styles.voteMessage}>모두가 찬성해서 이 시간으로 합주가 확정됐어요.</Text>
+                      <PrimaryButton label="일정 변경" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} style={styles.secondaryAction} />
           </View>
         ) : null}
         {!activeProposal && !confirmedProposal ? (
@@ -129,8 +130,27 @@ export function ScheduleScreen({ route, navigation }: Props) {
               내 응답: {activeProposal.myAvailability === 'yes' ? '찬성' : activeProposal.myAvailability === 'no' ? '반대' : '미응답'}
             </Text>
             <View style={styles.voteActions}>
-              <PrimaryButton label="찬성" onPress={() => void submitVote('yes')} loading={voting} disabled={voteLocked || endingProposal} />
-              <PrimaryButton label="반대" onPress={() => void submitVote('no')} loading={voting} disabled={voteLocked || endingProposal} style={styles.noButton} />
+              <PrimaryButton
+                label={activeProposal.myAvailability === 'yes' ? '찬성 선택됨' : '찬성'}
+                onPress={() => void submitVote('yes')}
+                loading={voting}
+                disabled={voteLocked || endingProposal}
+                style={[
+                  activeProposal.myAvailability === 'yes' && styles.yesButtonSelected,
+                  activeProposal.myAvailability === 'no' && styles.unselectedVoteButton,
+                ]}
+              />
+              <PrimaryButton
+                label={activeProposal.myAvailability === 'no' ? '반대 선택됨' : '반대'}
+                onPress={() => void submitVote('no')}
+                loading={voting}
+                disabled={voteLocked || endingProposal}
+                style={[
+                  styles.noButton,
+                  activeProposal.myAvailability === 'yes' && styles.unselectedVoteButton,
+                  activeProposal.myAvailability === 'no' && styles.noButtonSelected,
+                ]}
+              />
             </View>
             {isLeader ? (
               <Pressable
@@ -141,7 +161,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
                 <Text style={styles.subtleEndButtonText}>{endingProposal ? '끝내는 중...' : '지금 끝내기'}</Text>
               </Pressable>
             ) : null}
-            {voteLocked ? <Text style={styles.lockedHint}>찬반 응답은 한 번 제출하면 변경할 수 없어요.</Text> : null}
+            {activeProposal.myAvailability ? <Text style={styles.lockedHint}>응답은 투표가 끝나기 전까지 다시 바꿀 수 있어요.</Text> : null}
             {activeProposal.confirmed ? <StatusBadge label="합주 시간 확정" tone="success" /> : null}
           </View>
         ) : null}
@@ -409,6 +429,24 @@ const styles = StyleSheet.create({
   },
   noButton: {
     backgroundColor: theme.colors.textMuted,
+  },
+  yesButtonSelected: {
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.primaryDark,
+  },
+  unselectedVoteButton: {
+    backgroundColor: '#94a3b8',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  noButtonSelected: {
+    backgroundColor: '#ef4444',
+    borderWidth: 2,
+    borderColor: '#b91c1c',
+  },
+  secondaryAction: {
+    backgroundColor: theme.colors.primaryDark,
   },
   subtleEndButton: {
     alignSelf: 'center',

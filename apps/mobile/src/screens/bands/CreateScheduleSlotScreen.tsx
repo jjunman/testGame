@@ -105,7 +105,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
 
   return (
     <Screen scrollEnabled={false}>
-      <HeroBanner title="합주 시간 제안하기" subtitle="몇 시간 합주할지 고르면, 가능한 연속 시간대를 추천해요." badge="일정" />
+      <HeroBanner title="합주 시간 제안하기" subtitle="몇 시간 합주할지 고르면, 가능한 연속 시간대를 추천해요." />
 
       <SectionCard title="합주 길이">
         <Label>몇 시간 합주할까요?</Label>

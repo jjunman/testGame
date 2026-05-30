@@ -50,7 +50,6 @@ export function AddSongCandidateScreen({ route, navigation }: Props) {
       <HeroBanner
         title="후보곡 추가하기"
         subtitle="곡 제목, 가수, 유튜브 링크만 입력하면 바로 후보로 올라가요."
-        badge="후보 등록"
       />
 
       <View style={styles.formCard}>
