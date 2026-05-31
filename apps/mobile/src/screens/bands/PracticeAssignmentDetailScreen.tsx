@@ -571,6 +571,7 @@ function ClosedPracticeResult({
   generatingMix: boolean;
   onGenerateMix: () => void;
 }) {
+  const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
   const playableSubmissions = isLeader ? submissions : mySubmission ? [
     {
       id: mySubmission.id,
@@ -595,6 +596,9 @@ function ClosedPracticeResult({
 
       {mixAudioUrl ? (
         <RemoteAudioPlayer
+          audioId="mix"
+          activeAudioId={activeAudioId}
+                onActiveAudioChange={setActiveAudioId}
           uri={mixAudioUrl}
           title="믹스 녹음본"
           subtitle={mixGeneratedAt ? `생성 ${new Date(mixGeneratedAt).toLocaleString('ko-KR')}` : '멤버 제출본을 합친 녹음본'}
@@ -619,6 +623,9 @@ function ClosedPracticeResult({
             {playableSubmissions.map((submission) => (
               <SubmissionTilePlayer
                 key={submission.id}
+                audioId={submission.id}
+                activeAudioId={activeAudioId}
+                onActiveAudioChange={setActiveAudioId}
                 uri={submission.audioUrl}
                 title={submission.userName}
                 positionLabel={submission.positionLabel}
@@ -1082,6 +1089,7 @@ function SubmissionsPanel({
   generatingMix: boolean;
   onGenerateMix: () => void;
 }) {
+  const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
   if (!isClosed) {
     return (
       <View style={styles.panel}>
@@ -1092,6 +1100,9 @@ function SubmissionsPanel({
         />
         {mySubmission ? (
           <SubmissionTilePlayer
+            audioId={mySubmission.id}
+            activeAudioId={activeAudioId}
+                onActiveAudioChange={setActiveAudioId}
             uri={mySubmission.audioUrl}
             title="내 제출본 확인"
             positionLabel={mySubmission.positionLabel}
@@ -1119,6 +1130,9 @@ function SubmissionsPanel({
       {mixAudioUrl ? (
         <>
           <RemoteAudioPlayer
+            audioId="mix"
+            activeAudioId={activeAudioId}
+                onActiveAudioChange={setActiveAudioId}
             uri={mixAudioUrl}
             title="믹싱된 녹음본"
             subtitle={
@@ -1150,12 +1164,18 @@ function SubmissionsPanel({
 }
 
 function RemoteAudioPlayer({
+  audioId,
+  activeAudioId,
+  onActiveAudioChange,
   uri,
   title,
   subtitle,
   onRefresh,
   refreshing = false,
 }: {
+  audioId: string;
+  activeAudioId: string | null;
+  onActiveAudioChange: (id: string | null) => void;
   uri: string;
   title: string;
   subtitle: string;
@@ -1184,6 +1204,14 @@ function RemoteAudioPlayer({
     setLoading(false);
   }, [uri]);
 
+  useEffect(() => {
+    if (activeAudioId !== audioId && soundRef.current && playing) {
+      void soundRef.current.stopAsync().catch(() => undefined);
+      void soundRef.current.setPositionAsync(0).catch(() => undefined);
+      setPlaying(false);
+    }
+  }, [activeAudioId, audioId, playing]);
+
   const togglePlayback = async () => {
     if (loading) {
       return;
@@ -1193,6 +1221,7 @@ function RemoteAudioPlayer({
       await soundRef.current.stopAsync();
       await soundRef.current.setPositionAsync(0);
       setPlaying(false);
+      onActiveAudioChange(null);
       return;
     }
 
@@ -1213,6 +1242,7 @@ function RemoteAudioPlayer({
         });
         soundRef.current = sound;
       }
+      onActiveAudioChange(audioId);
       await soundRef.current.playAsync();
       setPlaying(true);
     } catch (error) {
@@ -1244,11 +1274,17 @@ function RemoteAudioPlayer({
 }
 
 function SubmissionTilePlayer({
+  audioId,
+  activeAudioId,
+  onActiveAudioChange,
   uri,
   title,
   positionLabel,
   dateLabel,
 }: {
+  audioId: string;
+  activeAudioId: string | null;
+  onActiveAudioChange: (id: string | null) => void;
   uri: string;
   title: string;
   positionLabel: string;
@@ -1276,6 +1312,14 @@ function SubmissionTilePlayer({
     setLoading(false);
   }, [uri]);
 
+  useEffect(() => {
+    if (activeAudioId !== audioId && soundRef.current && playing) {
+      void soundRef.current.stopAsync().catch(() => undefined);
+      void soundRef.current.setPositionAsync(0).catch(() => undefined);
+      setPlaying(false);
+    }
+  }, [activeAudioId, audioId, playing]);
+
   const togglePlayback = async () => {
     if (loading) {
       return;
@@ -1285,6 +1329,7 @@ function SubmissionTilePlayer({
       await soundRef.current.stopAsync();
       await soundRef.current.setPositionAsync(0);
       setPlaying(false);
+      onActiveAudioChange(null);
       return;
     }
 
@@ -1305,6 +1350,7 @@ function SubmissionTilePlayer({
         });
         soundRef.current = sound;
       }
+      onActiveAudioChange(audioId);
       await soundRef.current.playAsync();
       setPlaying(true);
     } catch (error) {
