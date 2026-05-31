@@ -354,13 +354,12 @@ export class BandsService {
         order: { createdAt: 'DESC' },
       });
       if (!completedSongRound) {
-        const dueAt = this.daysFromNow(3);
         todos.push({
           type: 'start_song_round',
           title: '합주곡 정하기',
           description: '후보 곡을 모으고 투표를 시작해 주세요.',
-          dueLabel: this.formatTodoDueLabel(dueAt),
-          dueAt: dueAt.toISOString(),
+          dueLabel: '시작 필요',
+          dueAt: null,
           shortcut: 'song_round',
         });
       }
@@ -405,13 +404,12 @@ export class BandsService {
       });
     }
     if (studioCandidates.length === 0 && !confirmedStudio) {
-      const dueAt = this.daysFromNow(7);
       todos.push({
         type: 'start_studio',
         title: '합주실 잡기',
         description: '집 위치를 등록하고 합주실 후보를 정해 주세요.',
-        dueLabel: this.formatTodoDueLabel(dueAt),
-        dueAt: dueAt.toISOString(),
+        dueLabel: '시작 필요',
+        dueAt: null,
         shortcut: 'studio',
       });
     }
@@ -444,13 +442,12 @@ export class BandsService {
     })) > 0;
 
     if (!hasSubmittedSchedule) {
-      const dueAt = this.daysFromNow(7);
       todos.push({
         type: 'submit_schedule',
         title: '일정 등록하기',
         description: '가능한 합주 시간대를 입력해 주세요.',
-        dueLabel: this.formatTodoDueLabel(dueAt),
-        dueAt: dueAt.toISOString(),
+        dueLabel: '등록 필요',
+        dueAt: null,
         shortcut: 'schedule',
       });
     }

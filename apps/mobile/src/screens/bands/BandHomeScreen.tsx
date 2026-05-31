@@ -262,7 +262,7 @@ function todoDeadlineLabel(todo: TodoItemDto) {
   if (todo.dueLabel === '내일 마감') {
     return 'D-1';
   }
-  return 'D-0';
+  return todo.dueLabel ?? '';
 }
 
 function todoIconName(todo: TodoItemDto): keyof typeof Ionicons.glyphMap {

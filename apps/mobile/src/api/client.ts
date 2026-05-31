@@ -77,11 +77,6 @@ export function toApiAssetUrl(value: string | null | undefined) {
 }
 
 function getApiBaseUrl() {
-  const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (configured) {
-    return configured;
-  }
-
   const constants = Constants as typeof Constants & {
     manifest2?: { extra?: { expoClient?: { hostUri?: string } } };
   };
@@ -90,6 +85,11 @@ function getApiBaseUrl() {
 
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
     return `http://${host}:4000`;
+  }
+
+  const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
   }
 
   return 'http://localhost:4000';

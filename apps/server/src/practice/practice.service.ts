@@ -14,7 +14,7 @@ import ffmpegPath from 'ffmpeg-static';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
-import { PracticeAssignmentStatus, PracticeSubmissionStatus } from '../common/enums';
+import { PositionType, PracticeAssignmentStatus, PracticeSubmissionStatus } from '../common/enums';
 import { PointsService } from '../points/points.service';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { UsersService } from '../users/users.service';
@@ -118,6 +118,7 @@ export class PracticeService {
           userId: member.userId,
           name: member.name,
           role: member.role,
+          positionLabel: member.positionLabel,
           submitted: Boolean(submission),
           submittedAt: submission?.submittedAt.toISOString() ?? null,
           pointChange: memberPointStatus.changeAmount,
@@ -148,6 +149,7 @@ export class PracticeService {
         ? {
             id: mySubmission.id,
             audioUrl: mySubmission.audioUrl,
+            positionLabel: this.positionLabel(membership.positionType, membership.customPosition),
             submittedAt: mySubmission.submittedAt.toISOString(),
           }
         : null,
@@ -249,11 +251,14 @@ export class PracticeService {
       where: { assignment: { id: assignmentId } },
       order: { submittedAt: 'ASC' },
     });
+    const members = await this.bandsService.getMembers(userId, assignment.band.id);
+    const memberByUserId = new Map(members.map((member) => [member.userId, member]));
 
     return submissions.map((submission) => ({
       id: submission.id,
       userId: submission.user.id,
       userName: submission.user.name,
+      positionLabel: memberByUserId.get(submission.user.id)?.positionLabel ?? '파트 미정',
       audioUrl: submission.audioUrl,
       submittedAt: submission.submittedAt.toISOString(),
     }));
@@ -374,6 +379,19 @@ export class PracticeService {
     return assignment.endSec - assignment.startSec;
   }
 
+  private positionLabel(positionType: PositionType, customPosition: string | null) {
+    const labels: Record<PositionType, string> = {
+      [PositionType.LEAD_GUITAR]: '\ub9ac\ub4dc\uae30\ud0c0',
+      [PositionType.SUB_GUITAR]: '\uc11c\ube0c\uae30\ud0c0',
+      [PositionType.BASS]: '\ubca0\uc774\uc2a4',
+      [PositionType.DRUMS]: '\ub4dc\ub7fc',
+      [PositionType.PIANO]: '\ud53c\uc544\ub178',
+      [PositionType.VOCAL]: '\ubcf4\uceec',
+      [PositionType.CUSTOM]: customPosition ?? '\uc9c1\uc811 \uc785\ub825',
+    };
+
+    return labels[positionType];
+  }
   private async getAudioDurationSec(filePath: string) {
     if (!ffmpegPath) {
       return null;

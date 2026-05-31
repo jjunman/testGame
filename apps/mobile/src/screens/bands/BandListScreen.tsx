@@ -69,7 +69,7 @@ export function BandListScreen({ navigation }: Props) {
               <ImageBackground source={{ uri: band.thumbnailUrl || fallbackBandImage }} imageStyle={styles.cardImage} style={styles.bandCard}>
                 <View style={styles.cardDim} />
                 <View style={styles.cardTop}>
-                  <StatusBadge label={selected ? '현재 밴드' : band.myRole === 'leader' ? '리더' : '멤버'} tone={selected ? 'success' : 'default'} />
+                  <StatusBadge label={band.myRole === 'leader' ? '리더' : '멤버'} tone="default" />
                   <Text style={styles.inviteCode}>{band.inviteCode}</Text>
                 </View>
                 <View style={styles.cardBottom}>

@@ -90,6 +90,7 @@ export type PracticeSubmissionDto = {
   id: string;
   userId: string;
   userName: string;
+  positionLabel: string;
   audioUrl: string;
   submittedAt: string;
 };

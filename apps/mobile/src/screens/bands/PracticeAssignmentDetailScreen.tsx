@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
 import type { AVPlaybackStatus } from 'expo-av/build/AV.types';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,6 +33,7 @@ type PracticeDetailDto = {
   mySubmission: {
     id: string;
     audioUrl: string;
+    positionLabel: string;
     submittedAt: string;
   } | null;
   isClosed: boolean;
@@ -47,6 +47,7 @@ type PracticeDetailDto = {
     userId: string;
     name: string;
     role: string;
+    positionLabel: string;
     submitted: boolean;
     submittedAt: string | null;
     pointChange: number;
@@ -60,6 +61,7 @@ type PracticeSubmissionDto = {
   id: string;
   userId: string;
   userName: string;
+  positionLabel: string;
   audioUrl: string;
   submittedAt: string;
 };
@@ -179,22 +181,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       waveform: normalizeWaveform(waveform),
     };
     await persistDrafts([nextDraft, ...drafts].slice(0, MAX_DRAFTS));
-  };
-
-  const importAudioFile = async () => {
-    const picked = await DocumentPicker.getDocumentAsync({
-      type: 'audio/*',
-      copyToCacheDirectory: true,
-    });
-    if (!picked.canceled) {
-      const durationSec = await getAudioDurationSec(picked.assets[0].uri);
-      if (!isLongEnoughForAssignment(durationSec, detail)) {
-        Alert.alert('녹음 길이 부족', buildDurationMessage(detail, durationSec));
-        return;
-      }
-      await addDraft(picked.assets[0].uri, 'picked', createFallbackWaveform(picked.assets[0].uri), durationSec);
-      setMode('practice');
-    }
   };
 
   const beginRecording = async () => {
@@ -487,7 +473,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           mixGeneratedAt={detail.mixGeneratedAt}
           generatingMix={generatingMix}
           onGenerateMix={() => void generateMix()}
-          onPlay={(uri) => void playAudioUri(uri)}
         />
       </Screen>
     );
@@ -532,7 +517,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           onStartRecording={() => void startRecording()}
           onStopRecording={() => void stopRecording()}
           onCancel={() => void cancelRecording()}
-          onImport={() => void importAudioFile()}
           onSubmit={() => setMode('submit')}
         />
       ) : null}
@@ -544,7 +528,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           uploading={uploading}
           onSelect={setSelectedDraftId}
           onSubmit={() => void submitSelectedDraft()}
-          onImport={() => void importAudioFile()}
         />
       ) : null}
 
@@ -555,7 +538,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           memberStatuses={detail.memberStatuses}
           isLeader={isLeader}
           isClosed={detail.isClosed}
-          onPlay={(uri) => void playAudioUri(uri)}
           mixAudioUrl={detail.mixAudioUrl}
           mixGeneratedAt={detail.mixGeneratedAt}
           generatingMix={generatingMix}
@@ -577,7 +559,6 @@ function ClosedPracticeResult({
   mixGeneratedAt,
   generatingMix,
   onGenerateMix,
-  onPlay,
 }: {
   title: string;
   artist: string;
@@ -589,13 +570,13 @@ function ClosedPracticeResult({
   mixGeneratedAt: string | null;
   generatingMix: boolean;
   onGenerateMix: () => void;
-  onPlay: (uri: string) => void;
 }) {
   const playableSubmissions = isLeader ? submissions : mySubmission ? [
     {
       id: mySubmission.id,
       userId: 'me',
       userName: '내 녹음본',
+      positionLabel: mySubmission.positionLabel,
       audioUrl: mySubmission.audioUrl,
       submittedAt: mySubmission.submittedAt,
     },
@@ -617,6 +598,8 @@ function ClosedPracticeResult({
           uri={mixAudioUrl}
           title="믹스 녹음본"
           subtitle={mixGeneratedAt ? `생성 ${new Date(mixGeneratedAt).toLocaleString('ko-KR')}` : '멤버 제출본을 합친 녹음본'}
+          onRefresh={isLeader ? onGenerateMix : undefined}
+          refreshing={generatingMix}
         />
       ) : submissions.length > 0 ? (
         <View style={styles.mixButton}>
@@ -628,26 +611,22 @@ function ClosedPracticeResult({
         </View>
       ) : null}
 
-      {mixAudioUrl && isLeader ? (
-        <PrimaryButton label="믹스 다시 생성하기" onPress={onGenerateMix} loading={generatingMix} style={styles.secondaryAction} />
-      ) : null}
 
       {playableSubmissions.length > 0 ? (
-        <View style={styles.closedSubmissionList}>
-          {playableSubmissions.map((submission) => (
-            <Pressable key={submission.id} style={styles.closedSubmissionItem} onPress={() => onPlay(submission.audioUrl)}>
-              <ImageBackground source={{ uri: imageUrl }} imageStyle={styles.closedSubmissionImage} style={styles.closedSubmissionThumb}>
-                <View style={styles.closedSubmissionOverlay} />
-                <Ionicons name="play" size={17} color="#fff" />
-              </ImageBackground>
-              <View style={styles.closedSubmissionBody}>
-                <Text style={styles.closedSubmissionTitle} numberOfLines={1}>{submission.userName}</Text>
-                <Text style={styles.closedSubmissionMeta}>{new Date(submission.submittedAt).toLocaleString('ko-KR')}</Text>
-              </View>
-              <Ionicons name="volume-high-outline" size={20} color={theme.colors.primary} />
-            </Pressable>
-          ))}
-        </View>
+        <>
+          <Text style={styles.submissionSectionLabel}>-- 멤버들의 개별 녹음본 --</Text>
+          <View style={styles.closedSubmissionList}>
+            {playableSubmissions.map((submission) => (
+              <SubmissionTilePlayer
+                key={submission.id}
+                uri={submission.audioUrl}
+                title={submission.userName}
+                positionLabel={submission.positionLabel}
+                dateLabel={formatDateOnly(submission.submittedAt)}
+              />
+            ))}
+          </View>
+        </>
       ) : (
         <EmptyState title="녹음본이 없어요" description="마감 전에 제출된 녹음본이 없어서 들을 파일이 없어요." />
       )}
@@ -771,7 +750,6 @@ function PracticePanel({
   onStartRecording,
   onStopRecording,
   onCancel,
-  onImport,
   onSubmit,
 }: {
   youtubeVideoId: string | null;
@@ -782,7 +760,6 @@ function PracticePanel({
   onStartRecording: () => void;
   onStopRecording: () => void;
   onCancel: () => void;
-  onImport: () => void;
   onSubmit: () => void;
 }) {
   const playerRef = useRef<any>(null);
@@ -906,7 +883,6 @@ function PracticePanel({
         onRecord={handleRecordPress}
         onCancel={handleCancelPress}
       />
-      <PrimaryButton label="파일 불러오기" onPress={onImport} disabled={detail.isClosed} style={styles.secondaryAction} />
       <PrimaryButton label="제출하러 가기" onPress={onSubmit} />
     </View>
   );
@@ -974,14 +950,12 @@ function SubmitPanel({
   uploading,
   onSelect,
   onSubmit,
-  onImport,
 }: {
   drafts: DraftRecording[];
   selectedDraftId: string | null;
   uploading: boolean;
   onSelect: (id: string) => void;
   onSubmit: () => void;
-  onImport: () => void;
 }) {
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null;
 
@@ -992,7 +966,7 @@ function SubmitPanel({
         draft={selectedDraft}
       />
       {drafts.length === 0 ? (
-        <EmptyState title="임시 저장 녹음본이 없어요" description="녹음하거나 오디오 파일을 불러오면 최대 5개까지 보관돼요." />
+        <EmptyState title="임시 저장 녹음본이 없어요" description="연습 화면에서 직접 녹음하면 최대 5개까지 보관돼요." />
       ) : (
         <View style={styles.draftList}>
           {drafts.map((draft, index) => {
@@ -1014,7 +988,6 @@ function SubmitPanel({
           })}
         </View>
       )}
-      <PrimaryButton label="녹음 파일 추가하기" onPress={onImport} style={styles.secondaryAction} />
       <PrimaryButton label="제출하기" onPress={onSubmit} loading={uploading} disabled={!selectedDraftId} />
     </View>
   );
@@ -1094,7 +1067,6 @@ function SubmissionsPanel({
   memberStatuses,
   isLeader,
   isClosed,
-  onPlay,
   mixAudioUrl,
   mixGeneratedAt,
   generatingMix,
@@ -1105,7 +1077,6 @@ function SubmissionsPanel({
   memberStatuses: PracticeDetailDto['memberStatuses'];
   isLeader: boolean;
   isClosed: boolean;
-  onPlay: (uri: string) => void;
   mixAudioUrl: string | null;
   mixGeneratedAt: string | null;
   generatingMix: boolean;
@@ -1120,13 +1091,12 @@ function SubmissionsPanel({
           description="마감기한이 끝나면 멤버들의 제출본을 합친 믹스 녹음본을 여기에서 들을 수 있어요."
         />
         {mySubmission ? (
-          <Pressable style={styles.submissionMain} onPress={() => onPlay(mySubmission.audioUrl)}>
-            <Ionicons name="play" size={18} color="#fff" />
-            <View style={styles.submissionBody}>
-              <Text style={styles.submissionTitle}>내 제출본 확인</Text>
-              <Text style={styles.submissionMeta}>{new Date(mySubmission.submittedAt).toLocaleString('ko-KR')}</Text>
-            </View>
-          </Pressable>
+          <SubmissionTilePlayer
+            uri={mySubmission.audioUrl}
+            title="내 제출본 확인"
+            positionLabel={mySubmission.positionLabel}
+            dateLabel={formatDateOnly(mySubmission.submittedAt)}
+          />
         ) : null}
       </View>
     );
@@ -1156,8 +1126,9 @@ function SubmissionsPanel({
                 ? `생성됨 ${new Date(mixGeneratedAt).toLocaleString('ko-KR')}`
                 : '멤버 제출본을 합친 믹스'
             }
+            onRefresh={onGenerateMix}
+            refreshing={generatingMix}
           />
-          <PrimaryButton label="믹스 다시 생성하기" onPress={onGenerateMix} loading={generatingMix} style={styles.secondaryAction} />
         </>
       ) : null}
       {submissions.length === 0 ? (
@@ -1178,7 +1149,19 @@ function SubmissionsPanel({
   );
 }
 
-function RemoteAudioPlayer({ uri, title, subtitle }: { uri: string; title: string; subtitle: string }) {
+function RemoteAudioPlayer({
+  uri,
+  title,
+  subtitle,
+  onRefresh,
+  refreshing = false,
+}: {
+  uri: string;
+  title: string;
+  subtitle: string;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const soundRef = useRef<Awaited<ReturnType<typeof Audio.Sound.createAsync>>['sound'] | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1207,7 +1190,8 @@ function RemoteAudioPlayer({ uri, title, subtitle }: { uri: string; title: strin
     }
 
     if (soundRef.current && playing) {
-      await soundRef.current.pauseAsync();
+      await soundRef.current.stopAsync();
+      await soundRef.current.setPositionAsync(0);
       setPlaying(false);
       return;
     }
@@ -1248,9 +1232,97 @@ function RemoteAudioPlayer({ uri, title, subtitle }: { uri: string; title: strin
         <Text style={styles.remotePlayerMeta}>{subtitle}</Text>
       </View>
       <Pressable style={styles.remotePlayerButton} onPress={() => void togglePlayback()} disabled={loading}>
-        <Ionicons name={loading ? 'hourglass-outline' : playing ? 'pause' : 'play'} size={18} color="#fff" />
+        <Ionicons name={loading ? 'hourglass-outline' : playing ? 'stop' : 'play'} size={18} color="#fff" />
       </Pressable>
+      {onRefresh ? (
+        <Pressable style={styles.remotePlayerRefreshButton} onPress={onRefresh} disabled={refreshing || loading}>
+          <Ionicons name={refreshing ? 'hourglass-outline' : 'refresh'} size={17} color="#fff" />
+        </Pressable>
+      ) : null}
     </View>
+  );
+}
+
+function SubmissionTilePlayer({
+  uri,
+  title,
+  positionLabel,
+  dateLabel,
+}: {
+  uri: string;
+  title: string;
+  positionLabel: string;
+  dateLabel: string;
+}) {
+  const soundRef = useRef<Awaited<ReturnType<typeof Audio.Sound.createAsync>>['sound'] | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        void soundRef.current.unloadAsync().catch(() => undefined);
+        soundRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (soundRef.current) {
+      void soundRef.current.unloadAsync().catch(() => undefined);
+      soundRef.current = null;
+    }
+    setPlaying(false);
+    setLoading(false);
+  }, [uri]);
+
+  const togglePlayback = async () => {
+    if (loading) {
+      return;
+    }
+
+    if (soundRef.current && playing) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.setPositionAsync(0);
+      setPlaying(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!soundRef.current) {
+        const audioUri = toApiAssetUrl(uri) ?? uri;
+        const { sound } = await withTimeout<Awaited<ReturnType<typeof Audio.Sound.createAsync>>>(
+          Audio.Sound.createAsync({ uri: audioUri }),
+          AUDIO_LOAD_TIMEOUT_MS,
+          '녹음본을 불러오지 못했어요. 서버 주소와 네트워크를 확인해 주세요.',
+        );
+        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setPlaying(false);
+            void sound.setPositionAsync(0).catch(() => undefined);
+          }
+        });
+        soundRef.current = sound;
+      }
+      await soundRef.current.playAsync();
+      setPlaying(true);
+    } catch (error) {
+      Alert.alert('재생 실패', error instanceof Error ? error.message : '녹음본을 재생하지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Pressable style={[styles.submissionTile, playing && styles.submissionTileActive]} onPress={() => void togglePlayback()} disabled={loading}>
+      <View style={[styles.submissionTileIcon, playing && styles.submissionTileIconActive]}>
+        <Ionicons name={loading ? 'hourglass-outline' : playing ? 'stop' : 'play'} size={20} color={playing ? '#fff' : theme.colors.primary} />
+      </View>
+      <Text style={styles.submissionTileTitle} numberOfLines={2}>{title}</Text>
+      <Text style={styles.submissionTilePosition} numberOfLines={1}>{positionLabel}</Text>
+      <Text style={styles.submissionTileMeta} numberOfLines={1}>{dateLabel}</Text>
+    </Pressable>
   );
 }
 
@@ -1286,11 +1358,6 @@ function AudioPreview({ title, emptyText }: { title: string; emptyText: string }
       <Text style={styles.audioHint}>{emptyText}</Text>
     </View>
   );
-}
-
-async function playAudioUri(uri: string) {
-  const { sound } = await Audio.Sound.createAsync({ uri: toApiAssetUrl(uri) ?? uri });
-  await sound.playAsync();
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -1331,17 +1398,6 @@ function normalizeWaveform(samples?: number[]) {
   });
 }
 
-function createFallbackWaveform(seed: string) {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 9973;
-  }
-  return Array.from({ length: 32 }, (_, index) => {
-    const value = Math.sin((index + 1) * (hash % 13 + 3)) * 0.5 + 0.5;
-    return 0.18 + value * 0.72;
-  });
-}
-
 function FakeTimeline({ startSec, endSec }: { startSec: number | null; endSec: number | null }) {
   const start = Math.max(4, Math.min(78, (startSec ?? 15) / 2));
   const width = Math.max(16, Math.min(58, ((endSec ?? 60) - (startSec ?? 15)) / 2));
@@ -1353,16 +1409,6 @@ function FakeTimeline({ startSec, endSec }: { startSec: number | null; endSec: n
       <View style={[styles.timelineHandle, { left: `${Math.min(94, start + width)}%` }]} />
     </View>
   );
-}
-
-async function getAudioDurationSec(uri: string) {
-  try {
-    const { sound, status } = await Audio.Sound.createAsync({ uri }, {}, false);
-    await sound.unloadAsync();
-    return status.isLoaded && typeof status.durationMillis === 'number' ? status.durationMillis / 1000 : null;
-  } catch {
-    return null;
-  }
 }
 
 function getRequiredRecordingSec(detail: PracticeDetailDto | null) {
@@ -1421,6 +1467,10 @@ function formatRange(startSec: number | null, endSec: number | null) {
     return '구간 미정';
   }
   return `${formatSeconds(startSec ?? 0)} - ${endSec === null ? '?' : formatSeconds(endSec)}`;
+}
+
+function formatDateOnly(value: string) {
+  return new Date(value).toLocaleDateString('ko-KR');
 }
 
 function formatSeconds(value: number) {
@@ -1493,7 +1543,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   closedSubmissionList: {
-    gap: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  submissionSectionLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 4,
   },
   closedSubmissionItem: {
     minHeight: 72,
@@ -1986,6 +2045,57 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  remotePlayerRefreshButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submissionTile: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  submissionTileActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  submissionTileIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submissionTileIconActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  submissionTileTitle: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  submissionTilePosition: {
+    color: theme.colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  submissionTileMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 13,
   },
   submissionBody: {
     flex: 1,

@@ -1,0 +1,1008 @@
+밴드 관리 앱 DB 공부 노트
+========================
+
+이 문서는 이 앱이 DB를 어떻게 사용하는지 공부하기 위한 설명이다.
+기준은 "사용자가 앱에서 어떤 행동을 함 -> 서버 API가 호출됨 -> 서버가 어떤 DB 테이블을 조회/저장/수정함 -> 결과를 앱에 돌려줌" 흐름이다.
+
+
+1. 전체 구조
+------------
+
+이 앱은 크게 모바일 앱과 서버로 나뉜다.
+
+- 모바일 앱: apps/mobile
+- 서버: apps/server
+- DB 연결: apps/server/src/database/typeorm.config.ts
+
+서버는 NestJS를 사용하고, DB는 PostgreSQL로 설정되어 있다.
+TypeORM이라는 도구를 사용해서 코드의 Entity 클래스가 DB 테이블과 연결된다.
+
+기본 DB 이름은 band_management이다.
+설정 파일에는 synchronize: true가 켜져 있다.
+즉, 개발 환경에서는 TypeORM 엔티티 구조를 보고 DB 테이블을 자동으로 맞추는 방식이다.
+
+큰 관계를 단순화하면 아래와 같다.
+
+users
+  -> band_members
+       -> bands
+            -> song rounds / song candidates / song votes
+            -> practice assignments / submissions
+            -> schedule slots / availabilities / proposals
+            -> studios / studio candidates / studio votes
+
+이 앱에서 가장 중요한 중심 테이블은 세 개다.
+
+1. users
+   앱 사용자 계정 정보
+
+2. bands
+   밴드 자체 정보
+
+3. band_members
+   어떤 사용자가 어떤 밴드에 속해 있는지 연결하는 테이블
+
+대부분의 기능은 로그인한 사용자가 특정 밴드의 멤버인지 먼저 확인한 뒤 실행된다.
+
+
+2. auth란 무엇인가
+------------------
+
+auth는 authentication의 줄임말이다.
+한국어로는 "인증"이다.
+
+쉽게 말하면 auth는 "너 누구야?"를 확인하는 기능이다.
+
+예를 들어 로그인에서는 다음 일을 한다.
+
+1. 사용자가 이메일과 비밀번호를 입력한다.
+2. 서버가 users 테이블에서 해당 이메일을 찾는다.
+3. 입력한 비밀번호가 DB의 비밀번호 해시와 맞는지 확인한다.
+4. 맞으면 로그인 성공 처리한다.
+5. 서버가 JWT 토큰을 발급한다.
+
+이 앱에서는 apps/server/src/auth 폴더가 auth 기능을 담당한다.
+
+주요 기능은 다음과 같다.
+
+- 회원가입: POST /auth/signup
+- 로그인: POST /auth/login
+- 현재 로그인한 사용자 조회: GET /auth/me
+- 푸시 토큰 저장: POST /auth/push-token
+
+
+3. JWT란 무엇인가
+-----------------
+
+JWT는 JSON Web Token의 줄임말이다.
+쉽게 말하면 "로그인 증명서" 또는 "출입증"이다.
+
+사용자가 로그인에 성공하면 서버가 JWT를 만들어서 앱에 준다.
+앱은 이 JWT를 저장해두었다가 이후 API 요청마다 서버에 같이 보낸다.
+
+흐름은 이렇다.
+
+1. 사용자가 이메일/비밀번호로 로그인한다.
+2. 서버가 users 테이블에서 사용자를 확인한다.
+3. 비밀번호가 맞으면 서버가 JWT를 발급한다.
+4. 모바일 앱이 JWT를 AsyncStorage에 저장한다.
+5. 이후 요청마다 Authorization 헤더에 JWT를 붙인다.
+6. 서버는 JWT를 보고 이 요청이 어떤 사용자에게서 온 것인지 판단한다.
+
+예를 들어 밴드 목록을 요청할 때는 이런 식이다.
+
+GET /bands
+Authorization: Bearer JWT토큰
+
+여기서 Authorization: Bearer ...는 "이 토큰을 가진 사용자입니다"라고 서버에 보여주는 방식이다.
+
+중요한 점:
+
+- JWT는 비밀번호가 아니다.
+- JWT 안에는 userId 같은 사용자 식별 정보가 들어 있다.
+- 서버가 서명한 토큰이기 때문에 서버는 이 토큰이 조작되었는지 확인할 수 있다.
+- 로그인 후 매번 이메일/비밀번호를 보내지 않아도 된다.
+
+비유하면:
+
+- auth: 입구에서 신분 확인하는 절차
+- JWT: 신분 확인 후 받은 출입증
+- users 테이블: 실제 회원 명부
+- band_members 테이블: 이 사람이 어떤 밴드에 들어갈 수 있는지 적힌 명단
+
+
+4. 로그인 흐름과 users 테이블
+----------------------------
+
+로그인은 거의 전부 users 테이블을 사용한다.
+
+users 테이블의 주요 컬럼:
+
+- id: 사용자 고유 ID
+- email: 로그인 이메일, unique
+- password_hash: 암호화된 비밀번호
+- name: 사용자 이름
+- expo_push_token: 푸시 알림 토큰
+- push_platform: iOS/Android 같은 플랫폼
+- created_at: 생성 시간
+- updated_at: 수정 시간
+
+로그인 흐름:
+
+1. 모바일 앱에서 사용자가 이메일과 비밀번호를 입력한다.
+2. 모바일 앱이 POST /auth/login API를 호출한다.
+3. 서버의 AuthController가 요청을 받는다.
+4. AuthService.login()이 실행된다.
+5. UsersService.findByEmail(email)이 users 테이블에서 이메일을 찾는다.
+6. 사용자가 없으면 로그인 실패.
+7. 사용자가 있으면 bcrypt.compare()로 입력 비밀번호와 password_hash를 비교한다.
+8. 비밀번호가 틀리면 로그인 실패.
+9. 비밀번호가 맞으면 JWT accessToken을 발급한다.
+10. 서버가 accessToken과 user 정보를 앱에 반환한다.
+11. 앱은 accessToken을 AsyncStorage에 저장한다.
+12. 이후 API 요청마다 Authorization: Bearer accessToken 헤더를 붙인다.
+
+여기서 DB에는 원본 비밀번호가 저장되지 않는다.
+password_hash라는 암호화된 값만 저장된다.
+그래서 서버도 사용자의 원래 비밀번호를 알 수 없다.
+
+
+5. 회원가입 흐름
+---------------
+
+회원가입도 users 테이블을 사용한다.
+
+흐름:
+
+1. 사용자가 이름, 이메일, 비밀번호를 입력한다.
+2. 모바일 앱이 POST /auth/signup API를 호출한다.
+3. 서버가 users 테이블에서 같은 이메일이 이미 있는지 확인한다.
+4. 이미 있으면 회원가입 실패.
+5. 없으면 bcrypt.hash()로 비밀번호를 해시로 만든다.
+6. users 테이블에 email, name, password_hash를 저장한다.
+7. 저장 후 바로 JWT를 발급한다.
+8. 앱은 받은 JWT를 저장하고 로그인 상태가 된다.
+
+즉, 회원가입은 "사용자 생성 + 자동 로그인" 구조다.
+
+
+6. 현재 사용자 확인 흐름: /auth/me
+---------------------------------
+
+앱이 실행될 때 이미 저장된 JWT가 있으면 /auth/me를 호출한다.
+
+흐름:
+
+1. 앱이 AsyncStorage에서 JWT를 꺼낸다.
+2. JWT가 있으면 GET /auth/me를 호출한다.
+3. 요청 헤더에 Authorization: Bearer JWT를 붙인다.
+4. 서버의 JwtAuthGuard가 JWT를 검사한다.
+5. JWT가 유효하면 JWT 안의 userId를 꺼낸다.
+6. users 테이블에서 해당 userId의 사용자를 찾는다.
+7. 사용자 정보를 앱에 반환한다.
+8. JWT가 잘못되었거나 만료되었으면 앱은 저장된 토큰을 지우고 로그아웃 상태가 된다.
+
+
+7. 밴드 생성 흐름
+----------------
+
+밴드 생성은 bands, band_members, band_song_rounds를 사용한다.
+
+흐름:
+
+1. 사용자가 밴드 이름, 포지션, 썸네일 등을 입력한다.
+2. 앱이 POST /bands API를 호출한다.
+3. 서버가 JWT로 현재 사용자를 확인한다.
+4. users 테이블에서 현재 사용자 정보를 가져온다.
+5. bands 테이블에 새 밴드를 저장한다.
+   - name
+   - thumbnail_url
+   - invite_code
+   - owner
+6. band_members 테이블에 만든 사람을 leader로 저장한다.
+   - band
+   - user
+   - role = leader
+   - position_type
+   - volume_points = 리더 시작 포인트
+7. band_song_rounds 테이블에 기본 곡 선정 라운드를 만든다.
+   - band
+   - status = posted
+   - createdByUser
+8. 생성된 밴드 정보를 앱에 반환한다.
+
+중요한 점:
+
+bands만 만들면 끝이 아니다.
+band_members에도 만든 사람을 넣어야 한다.
+그래야 서버가 이 사용자를 "이 밴드의 멤버"라고 판단할 수 있다.
+
+
+8. 밴드 가입 흐름
+----------------
+
+밴드 가입은 bands와 band_members를 사용한다.
+
+흐름:
+
+1. 사용자가 초대코드를 입력한다.
+2. 앱이 POST /bands/join API를 호출한다.
+3. 서버가 bands 테이블에서 invite_code가 일치하는 밴드를 찾는다.
+4. 없으면 실패.
+5. band_members에서 이 유저가 이미 그 밴드에 가입했는지 확인한다.
+6. 이미 가입되어 있으면 실패.
+7. 아니면 band_members에 새 행을 저장한다.
+   - band
+   - user
+   - role = member
+   - position_type
+   - volume_points = 멤버 시작 포인트
+8. 가입한 밴드 정보를 앱에 반환한다.
+
+band_members에는 같은 유저가 같은 밴드에 중복 가입하지 못하도록 unique 제약이 있다.
+
+
+9. 내 밴드 목록 조회
+-------------------
+
+내 밴드 목록은 bands에서 바로 찾지 않고 band_members에서 찾는다.
+
+흐름:
+
+1. 앱이 GET /bands API를 호출한다.
+2. 서버가 JWT로 userId를 확인한다.
+3. band_members에서 userId가 현재 사용자와 같은 행을 찾는다.
+4. 각 membership에 연결된 band 정보를 가져온다.
+5. 각 밴드의 멤버 수를 band_members에서 센다.
+6. 앱에 밴드 목록을 반환한다.
+
+왜 bands에서 바로 찾지 않을까?
+
+사용자와 밴드는 다대다 관계이기 때문이다.
+한 사용자는 여러 밴드에 들어갈 수 있고, 한 밴드에는 여러 사용자가 들어갈 수 있다.
+그래서 중간 연결 테이블인 band_members가 필요하다.
+
+
+10. 밴드 상세 조회
+-----------------
+
+밴드 상세 화면은 여러 테이블을 동시에 본다.
+
+흐름:
+
+1. 앱이 GET /bands/:bandId API를 호출한다.
+2. 서버가 band_members에서 이 사용자가 해당 밴드 멤버인지 확인한다.
+3. bands에서 밴드 기본 정보를 가져온다.
+4. band_members에서 멤버 수, 내 역할, 내 포인트를 확인한다.
+5. band_song_rounds에서 최신 곡 선정 라운드를 가져온다.
+6. 완료된 곡 라운드가 있으면 song candidates와 song catalog 정보를 같이 가져온다.
+7. practice_assignments에서 이 밴드의 연습 과제를 가져온다.
+8. schedule_slots, schedule_proposals, studio_candidates 등을 확인해서 할 일 목록을 만든다.
+9. 앱에 밴드 홈 화면 데이터를 반환한다.
+
+밴드 상세는 "한 테이블"만 보는 화면이 아니라 밴드와 관련된 여러 기능의 요약을 모으는 화면이다.
+
+
+11. 합주곡 후보 추가 흐름
+------------------------
+
+합주곡 후보 추가는 song_catalog, band_song_rounds, band_song_candidates를 사용한다.
+
+관련 테이블:
+
+- song_catalog: 곡 자체 정보
+- band_song_rounds: 밴드별 곡 선정 라운드
+- band_song_candidates: 라운드에 올라온 후보곡
+
+흐름:
+
+1. 사용자가 곡 제목, 아티스트, YouTube URL, 난이도, 필요한 악기를 입력한다.
+2. 앱이 POST /bands/:bandId/song-candidates API를 호출한다.
+3. 서버가 band_members에서 이 사용자가 밴드 멤버인지 확인한다.
+4. 현재 진행 중인 band_song_rounds를 찾는다.
+5. 진행 중인 라운드가 없으면 새 라운드를 만들거나 posted 라운드를 voting으로 바꾼다.
+6. 같은 제목과 아티스트의 후보가 이미 있는지 확인한다.
+7. YouTube URL에서 videoId를 추출한다.
+8. song_catalog에 곡 정보를 저장한다.
+   - title
+   - artist
+   - youtube_video_id
+   - difficulty
+   - required_instruments
+9. band_song_candidates에 후보 정보를 저장한다.
+   - round
+   - songCatalog
+   - createdByUser
+10. 저장된 후보곡을 앱에 반환한다.
+
+song_catalog는 곡 원본 정보이고, band_song_candidates는 "이 밴드의 이 라운드에 올라온 후보"라는 의미다.
+
+
+12. 합주곡 투표 흐름
+------------------
+
+합주곡 투표는 song_votes를 사용한다.
+
+관련 테이블:
+
+- band_song_rounds
+- band_song_candidates
+- song_votes
+- band_members
+
+흐름:
+
+1. 사용자가 후보곡에 투표한다.
+2. 앱이 POST /bands/:bandId/song-votes API를 호출한다.
+3. 서버가 band_members에서 이 사용자가 밴드 멤버인지 확인한다.
+4. band_song_candidates에서 candidateId에 해당하는 후보를 찾는다.
+5. 그 후보가 이 밴드의 후보인지 확인한다.
+6. 후보가 속한 라운드의 status가 voting인지 확인한다.
+7. 이 사용자가 이 라운드에서 이미 몇 곡에 투표했는지 song_votes에서 센다.
+8. 최대 투표 수를 넘었으면 실패.
+9. 같은 후보에 이미 투표했는지 확인한다.
+10. 없으면 song_votes에 저장한다.
+    - candidate
+    - user
+11. 투표 결과를 앱에 반환한다.
+
+song_votes에는 같은 사용자가 같은 후보에 중복 투표하지 못하게 unique 제약이 있다.
+
+
+13. 합주곡 투표 취소 흐름
+------------------------
+
+흐름:
+
+1. 사용자가 투표를 취소한다.
+2. 앱이 DELETE /bands/:bandId/song-votes/:candidateId API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. song_votes에서 userId와 candidateId가 일치하는 투표를 찾는다.
+5. 그 투표의 후보가 이 밴드의 현재 라운드에 속하는지 확인한다.
+6. 라운드 상태가 voting인지 확인한다.
+7. song_votes 행을 삭제한다.
+8. 삭제 성공 결과를 앱에 반환한다.
+
+
+14. 합주곡 확정 흐름
+------------------
+
+리더가 곡을 확정하면 band_song_rounds가 수정된다.
+
+흐름:
+
+1. 리더가 확정 버튼을 누른다.
+2. 앱이 POST /bands/:bandId/song-round/finalize API를 호출한다.
+3. 서버가 band_members에서 이 사용자가 리더인지 확인한다.
+4. 현재 진행 중인 band_song_rounds를 찾는다.
+5. 그 라운드의 모든 band_song_candidates를 가져온다.
+6. 각 후보에 연결된 song_votes를 가져온다.
+7. 투표한 유저들의 band_members.volume_points를 확인한다.
+8. 후보별 점수를 계산한다.
+   - 투표자들의 volume_points 합
+   - 가장 높은 투표자 포인트
+   - 투표 수
+9. 점수가 가장 높은 후보를 고른다.
+10. band_song_rounds.final_candidate_id에 winning candidate를 저장한다.
+11. band_song_rounds.status를 done으로 바꾼다.
+12. 확정된 라운드를 앱에 반환한다.
+
+이 앱은 단순히 표 개수만 보는 게 아니라 멤버의 volume_points도 반영한다.
+그래서 포인트가 높은 멤버의 투표가 더 큰 영향력을 가질 수 있다.
+
+
+15. 연습 과제 생성 흐름
+----------------------
+
+연습 과제는 practice_assignments에 저장된다.
+
+관련 테이블:
+
+- practice_assignments
+- band_song_candidates
+- band_members
+
+흐름:
+
+1. 사용자가 연습 과제 제목, 설명, 구간, 마감일을 입력한다.
+2. 특정 합주곡과 연결할 수도 있다.
+3. 앱이 POST /bands/:bandId/practice-assignments API를 호출한다.
+4. 서버가 band_members에서 이 사용자가 멤버인지 확인한다.
+5. songCandidateId가 있으면 band_song_candidates에서 해당 후보곡을 찾는다.
+6. 그 후보곡이 이 밴드의 후보인지 확인한다.
+7. practice_assignments에 저장한다.
+   - band
+   - songCandidate
+   - title
+   - description
+   - startSec
+   - endSec
+   - dueAt
+   - status = open
+   - createdByUser
+8. 생성된 과제를 앱에 반환한다.
+
+
+16. 연습 과제 목록 조회
+----------------------
+
+흐름:
+
+1. 앱이 GET /bands/:bandId/practice-assignments API를 호출한다.
+2. 서버가 band_members에서 멤버인지 확인한다.
+3. practice_assignments에서 해당 밴드의 과제를 모두 가져온다.
+4. 각 과제에 연결된 practice_submissions도 같이 가져온다.
+5. 현재 사용자가 제출했는지 확인한다.
+6. 마감이 지난 과제라면 미제출 감점 처리를 시도한다.
+7. 과제 목록을 앱에 반환한다.
+
+
+17. 연습 제출 흐름
+-----------------
+
+연습 제출은 practice_submissions에 저장되고, 포인트 변경도 발생할 수 있다.
+
+관련 테이블:
+
+- practice_assignments
+- practice_submissions
+- band_members
+- point_logs
+
+흐름:
+
+1. 사용자가 녹음 파일을 제출한다.
+2. 앱이 POST /practice-assignments/:assignmentId/submission API를 호출한다.
+3. 서버가 practice_assignments에서 assignmentId에 해당하는 과제를 찾는다.
+4. 과제가 없으면 실패.
+5. band_members에서 이 사용자가 해당 과제의 밴드 멤버인지 확인한다.
+6. 업로드된 오디오 파일의 길이를 확인한다.
+7. 과제에 startSec/endSec가 있으면 필요한 녹음 길이를 계산한다.
+8. 녹음 길이가 너무 짧으면 업로드 파일을 삭제하고 실패 처리한다.
+9. practice_submissions에서 이 사용자가 이미 이 과제에 제출했는지 확인한다.
+10. 없으면 새 제출로 저장하고, 있으면 기존 제출을 업데이트한다.
+    - assignment
+    - user
+    - audio_url
+    - duration_sec
+    - sync_offset_ms
+    - status = submitted
+11. 첫 제출이고 마감 전이면 PointsService.addPracticePoint()를 호출한다.
+12. band_members.volume_points가 1 증가한다.
+13. point_logs에 practice_on_time 기록이 저장된다.
+14. 제출 정보를 앱에 반환한다.
+
+중요한 점:
+
+practice_submissions에는 assignment + user unique 제약이 있다.
+즉, 한 사용자는 한 과제에 제출 기록을 하나만 가진다.
+다시 제출하면 새 행이 계속 쌓이는 게 아니라 기존 행이 업데이트된다.
+
+
+18. 연습 미제출 감점 흐름
+------------------------
+
+마감이 지났는데 제출하지 않은 멤버는 포인트가 깎일 수 있다.
+
+흐름:
+
+1. 과제 목록 조회, 과제 상세 조회, 과제 마감 처리 중 미제출 확인 로직이 실행된다.
+2. practice_assignments.due_at이 현재 시간보다 이전인지 확인한다.
+3. practice_submissions에 해당 사용자의 제출 기록이 있는지 확인한다.
+4. 제출했으면 감점하지 않는다.
+5. 제출하지 않았으면 band_members에서 해당 멤버를 찾는다.
+6. 과제 마감일이 멤버 가입일보다 이전이면 감점하지 않는다.
+7. PointsService.deductPracticePoint()를 호출한다.
+8. band_members.volume_points가 1 감소한다.
+9. point_logs에 practice_missed 기록이 저장된다.
+
+point_logs는 포인트 변경 이력을 남기는 테이블이다.
+포인트가 왜 올라갔고 왜 내려갔는지 추적할 수 있다.
+
+
+19. 연습 믹스 생성 흐름
+----------------------
+
+연습 제출 파일들을 하나의 믹스 파일로 만드는 기능이다.
+
+흐름:
+
+1. 사용자가 믹스 생성을 요청한다.
+2. 앱이 POST /practice-assignments/:assignmentId/mix API를 호출한다.
+3. 서버가 practice_assignments에서 과제를 찾는다.
+4. band_members에서 멤버인지 확인한다.
+5. 마감 전이면 리더만 믹스를 만들 수 있다.
+6. practice_submissions에서 제출 파일들을 가져온다.
+7. 서버 파일 시스템에서 실제 오디오 파일들이 존재하는지 확인한다.
+8. ffmpeg로 제출 음원들을 합친다.
+9. 생성된 믹스 파일 URL을 practice_assignments.mix_audio_url에 저장한다.
+10. practice_assignments.mix_generated_at에 생성 시간을 저장한다.
+11. 믹스 URL을 앱에 반환한다.
+
+
+20. 일정 후보 생성 흐름
+----------------------
+
+일정 후보는 schedule_slots에 저장되고, 만든 사람은 자동으로 가능 표시된다.
+
+관련 테이블:
+
+- schedule_slots
+- schedule_availabilities
+
+흐름:
+
+1. 사용자가 날짜, 시작시간, 종료시간을 입력한다.
+2. 앱이 POST /bands/:bandId/schedule-slots API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. 같은 날짜/시간의 schedule_slots가 이미 있는지 확인한다.
+5. 없으면 schedule_slots에 저장한다.
+   - band
+   - date
+   - start_time
+   - end_time
+   - createdByUser
+6. 만든 사람은 그 시간에 가능하다고 자동 처리한다.
+7. schedule_availabilities에 yes로 저장한다.
+   - slot
+   - user
+   - availability = yes
+8. 생성된 시간 후보를 앱에 반환한다.
+
+
+21. 일정 가능/불가능 선택 흐름
+-----------------------------
+
+관련 테이블:
+
+- schedule_slots
+- schedule_availabilities
+
+흐름:
+
+1. 사용자가 특정 일정 후보에 yes 또는 no를 선택한다.
+2. 앱이 POST /bands/:bandId/schedule-availabilities API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. schedule_slots에서 slotId에 해당하는 시간 후보를 찾는다.
+5. 그 시간 후보가 이 밴드의 것인지 확인한다.
+6. schedule_availabilities에서 기존 내 응답이 있는지 확인한다.
+7. 있으면 기존 행을 업데이트한다.
+8. 없으면 새 행을 저장한다.
+9. 저장된 응답을 앱에 반환한다.
+
+schedule_availabilities에는 slot + user unique 제약이 있다.
+그래서 한 사용자는 한 시간 후보에 하나의 응답만 가진다.
+
+
+22. 일정 요약 조회 흐름
+----------------------
+
+흐름:
+
+1. 앱이 GET /bands/:bandId/schedule-summary API를 호출한다.
+2. 서버가 band_members에서 멤버인지 확인한다.
+3. band_members에서 이 밴드의 전체 멤버 목록을 가져온다.
+4. schedule_slots에서 시간 후보들을 가져온다.
+5. 각 slot마다 schedule_availabilities를 조회한다.
+6. 누가 불가능한지, 몇 명이 가능한지 계산한다.
+7. 모두 가능한 시간인지 판단한다.
+8. 가능한 인원이 많은 순으로 정렬한다.
+9. 일정 요약을 앱에 반환한다.
+
+
+23. 최종 일정 제안 흐름
+----------------------
+
+최종 일정 제안은 schedule_proposals에 저장된다.
+
+관련 테이블:
+
+- schedule_proposals
+- schedule_proposal_votes
+
+흐름:
+
+1. 사용자가 특정 시간으로 최종 제안을 만든다.
+2. 앱이 POST /bands/:bandId/schedule-proposal API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. 기존 active proposal이 있으면 active = false로 종료 처리한다.
+5. schedule_proposals에 새 제안을 저장한다.
+   - band
+   - createdByUser
+   - date
+   - startTime
+   - endTime
+   - active = true
+   - confirmed = false
+6. 밴드 멤버들에게 알림을 보낸다.
+7. 생성된 제안을 앱에 반환한다.
+
+
+24. 최종 일정 투표 흐름
+----------------------
+
+흐름:
+
+1. 사용자가 제안된 일정에 yes 또는 no를 누른다.
+2. 앱이 POST /bands/:bandId/schedule-proposal-vote API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. schedule_proposals에서 proposalId에 해당하는 제안을 찾는다.
+5. 그 제안이 이 밴드의 것이고 active 상태인지 확인한다.
+6. schedule_proposal_votes에서 기존 내 투표가 있는지 확인한다.
+7. 있으면 업데이트하고, 없으면 새로 저장한다.
+8. 전체 멤버 수와 yes 투표 수를 비교한다.
+9. 모든 멤버가 yes라면 자동 확정한다.
+   - schedule_proposals.active = false
+   - schedule_proposals.confirmed = true
+   - schedule_proposals.ended_at = 현재 시간
+10. 투표 결과를 앱에 반환한다.
+
+schedule_proposal_votes에는 proposal + user unique 제약이 있다.
+
+
+25. 최종 일정 수동 확정 흐름
+---------------------------
+
+리더가 최종 일정 투표를 마감할 수 있다.
+
+흐름:
+
+1. 리더가 최종 일정 확정을 누른다.
+2. 앱이 POST /bands/:bandId/schedule-proposal/finalize API를 호출한다.
+3. 서버가 band_members에서 리더인지 확인한다.
+4. active 상태인 schedule_proposals를 찾는다.
+5. schedule_proposal_votes를 조회한다.
+6. yesCount가 전체 멤버 수와 같으면 confirmed = true.
+7. 아니면 confirmed = false.
+8. active = false, ended_at = 현재 시간으로 저장한다.
+9. 결과를 앱에 반환한다.
+
+
+26. 합주실 목록 조회 흐름
+------------------------
+
+합주실 목록은 studios 테이블을 사용한다.
+멤버 위치는 band_members에 저장되어 있다.
+
+관련 테이블:
+
+- studios
+- band_members
+
+흐름:
+
+1. 앱이 GET /bands/:bandId/studios API를 호출한다.
+2. 서버가 band_members에서 멤버인지 확인한다.
+3. 앱에서 기본 제공하는 안산 합주실 정보가 studios에 저장되어 있는지 확인한다.
+4. 없거나 갱신할 필요가 있으면 studios에 저장/업데이트한다.
+5. studios에서 안산 지역 합주실 목록을 가져온다.
+6. band_members에서 밴드 멤버들의 집 위치 좌표를 가져온다.
+7. 각 합주실과 멤버 위치 사이의 거리를 계산한다.
+8. 평균 거리가 가까운 순으로 정렬한다.
+9. 합주실 목록을 앱에 반환한다.
+
+studios 테이블 주요 컬럼:
+
+- id
+- name
+- region
+- address
+- latitude
+- longitude
+- phone
+- external_url
+- source_url
+- hourly_price
+- price_note
+- amenities_note
+
+
+27. 내 합주실 기준 위치 저장 흐름
+-------------------------------
+
+위치 정보는 별도 user_profile 테이블이 아니라 band_members에 저장된다.
+
+관련 컬럼:
+
+- home_location_label
+- home_latitude
+- home_longitude
+
+흐름:
+
+1. 사용자가 본인의 출발 위치를 선택한다.
+2. 앱이 POST /bands/:bandId/studio-location API를 호출한다.
+3. 서버가 band_members에서 이 사용자의 membership을 찾는다.
+4. membership에 위치 정보를 저장한다.
+   - home_location_label
+   - home_latitude
+   - home_longitude
+5. 저장된 위치를 앱에 반환한다.
+
+이 위치는 "사용자 계정 전체의 주소"라기보다는 "이 밴드에서 합주실 추천에 사용할 내 위치"에 가깝다.
+
+
+28. 합주실 후보 등록 흐름
+------------------------
+
+관련 테이블:
+
+- studios
+- band_studio_candidates
+
+흐름:
+
+1. 사용자가 합주실 목록에서 후보를 선택한다.
+2. 앱이 POST /bands/:bandId/studio-candidates API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. studios에서 선택한 studioId를 찾는다.
+5. 이미 확정된 후보가 있으면 정리한다.
+6. band_studio_candidates에서 같은 밴드에 같은 studio가 이미 후보로 있는지 확인한다.
+7. 이미 있으면 실패.
+8. 없으면 band_studio_candidates에 저장한다.
+   - band
+   - studio
+   - createdByUser
+   - note
+   - status = open
+9. 밴드 멤버들에게 알림을 보낸다.
+10. 생성된 후보를 앱에 반환한다.
+
+band_studio_candidates에는 band + studio unique 제약이 있다.
+같은 밴드에 같은 합주실을 후보로 중복 등록할 수 없다.
+
+
+29. 합주실 투표 흐름
+------------------
+
+관련 테이블:
+
+- band_studio_candidates
+- studio_votes
+
+흐름:
+
+1. 사용자가 합주실 후보 하나에 투표한다.
+2. 앱이 POST /bands/:bandId/studio-votes API를 호출한다.
+3. 서버가 band_members에서 멤버인지 확인한다.
+4. band_studio_candidates에서 candidateId에 해당하는 후보를 찾는다.
+5. 그 후보가 이 밴드의 후보인지 확인한다.
+6. studio_votes에서 이 사용자가 이 밴드의 다른 합주실 후보에 이미 투표했는지 찾는다.
+7. 기존 투표가 있으면 삭제한다.
+8. studio_votes에 새 투표를 저장한다.
+   - candidate
+   - user
+9. 투표 결과를 앱에 반환한다.
+
+합주곡 투표와 다른 점:
+
+- 합주곡은 여러 곡에 투표할 수 있다.
+- 합주실은 한 밴드에서 하나만 고르는 방식이다.
+- 그래서 새 합주실에 투표하면 기존 합주실 투표를 지운다.
+
+
+30. 합주실 확정 흐름
+------------------
+
+관련 테이블:
+
+- band_studio_candidates
+- studio_votes
+- studios
+
+흐름:
+
+1. 리더가 합주실 확정을 누른다.
+2. 앱이 POST /bands/:bandId/studio-candidates/finalize API를 호출한다.
+3. 서버가 band_members에서 리더인지 확인한다.
+4. band_studio_candidates에서 이 밴드의 후보들을 모두 가져온다.
+5. 각 후보에 연결된 studio_votes 개수를 센다.
+6. 가장 많은 표를 받은 후보를 고른다.
+7. 표 수가 같으면 studios.hourly_price가 낮은 곳을 우선한다.
+8. 가격도 같으면 먼저 등록된 후보를 우선한다.
+9. 승자 후보의 status를 confirmed로 바꾼다.
+10. 나머지 후보는 삭제한다.
+11. 확정된 후보를 앱에 반환한다.
+
+
+31. 포인트 시스템 흐름
+---------------------
+
+포인트는 band_members.volume_points에 현재 값이 저장되고, point_logs에 변경 기록이 저장된다.
+
+관련 테이블:
+
+- band_members
+- point_logs
+
+포인트 증가:
+
+1. 사용자가 연습 과제를 마감 전 처음 제출한다.
+2. PointsService.addPracticePoint()가 호출된다.
+3. band_members에서 해당 밴드의 해당 유저 멤버십을 찾는다.
+4. 같은 과제에 대해 이미 practice_on_time 로그가 있는지 확인한다.
+5. 없으면 volume_points를 1 증가시킨다.
+6. point_logs에 기록한다.
+   - bandMember
+   - changeAmount = 1
+   - reason = practice_on_time
+   - relatedType = practice_assignment
+   - relatedId = assignmentId
+
+포인트 감소:
+
+1. 연습 과제 마감 후 사용자가 제출하지 않았음이 확인된다.
+2. PointsService.deductPracticePoint()가 호출된다.
+3. band_members에서 멤버십을 찾는다.
+4. 같은 과제에 대해 이미 practice_missed 로그가 있는지 확인한다.
+5. 없으면 volume_points를 1 감소시킨다.
+6. 단, 0 아래로 내려가지 않게 Math.max(0, ...) 처리한다.
+7. point_logs에 기록한다.
+
+point_logs가 필요한 이유:
+
+- 현재 포인트만 보면 왜 포인트가 바뀌었는지 알 수 없다.
+- point_logs를 보면 어떤 과제 때문에, 어떤 이유로, 얼마나 변했는지 추적할 수 있다.
+
+
+32. 푸시 알림 토큰 저장 흐름
+---------------------------
+
+로그인 후 앱은 푸시 알림 토큰을 저장할 수 있다.
+
+관련 테이블:
+
+- users
+
+흐름:
+
+1. 앱이 푸시 알림 권한을 받고 Expo push token을 얻는다.
+2. 앱이 POST /auth/push-token API를 호출한다.
+3. 서버가 JWT로 현재 사용자를 확인한다.
+4. users 테이블에서 해당 사용자를 찾는다.
+5. expo_push_token과 push_platform을 저장한다.
+6. 저장 완료를 앱에 반환한다.
+
+이 토큰은 곡 투표 시작, 일정 투표 시작, 합주실 투표 시작 같은 알림을 보낼 때 사용된다.
+
+
+33. 전체 테이블 요약
+-------------------
+
+users
+사용자 계정 정보. 로그인, 회원가입, 푸시 토큰 저장에 사용된다.
+
+bands
+밴드 자체 정보. 이름, 썸네일, 초대코드, 리더 정보를 가진다.
+
+band_members
+사용자와 밴드를 연결한다. 역할, 포지션, 볼륨 포인트, 합주실 추천용 위치도 가진다.
+
+song_catalog
+곡 자체 정보. 제목, 아티스트, 유튜브 영상 ID, 난이도, 필요한 악기 정보를 가진다.
+
+band_song_rounds
+밴드별 합주곡 선정 라운드. posted, voting, done 상태를 가진다.
+
+band_song_candidates
+특정 라운드에 올라온 후보곡. song_catalog와 연결된다.
+
+song_votes
+사용자가 어떤 곡 후보에 투표했는지 저장한다.
+
+practice_assignments
+연습 과제. 제목, 설명, 구간, 마감일, 상태, 믹스 파일 URL을 가진다.
+
+practice_submissions
+연습 과제에 대한 사용자별 제출 파일. 오디오 URL, 길이, 제출 시간을 가진다.
+
+schedule_slots
+가능한 합주 시간 후보. 날짜, 시작시간, 종료시간을 가진다.
+
+schedule_availabilities
+각 멤버가 각 시간 후보에 가능한지 불가능한지 저장한다.
+
+schedule_proposals
+최종 합주 시간 제안. active, confirmed 상태를 가진다.
+
+schedule_proposal_votes
+최종 일정 제안에 대한 멤버별 yes/no 투표.
+
+studios
+합주실 원본 정보. 이름, 주소, 좌표, 가격, 링크 등을 가진다.
+
+band_studio_candidates
+밴드에서 후보로 올린 합주실. open 또는 confirmed 상태를 가진다.
+
+studio_votes
+합주실 후보에 대한 멤버별 투표.
+
+point_logs
+포인트 변경 기록. 연습 제출 성공 또는 미제출 감점 이유를 저장한다.
+
+
+34. 핵심 패턴 정리
+-----------------
+
+이 앱의 DB 흐름은 대부분 아래 패턴을 따른다.
+
+1. JWT로 현재 사용자를 확인한다.
+2. band_members로 이 사용자가 해당 밴드 멤버인지 확인한다.
+3. 기능별 메인 테이블을 조회한다.
+4. 중복 여부나 권한을 확인한다.
+5. 새 데이터를 저장하거나 기존 데이터를 수정한다.
+6. 필요한 경우 투표 수, 포인트, 거리, 제출 여부 등을 계산한다.
+7. 앱 화면에 필요한 형태로 데이터를 가공해서 반환한다.
+
+가장 중요한 개념은 band_members다.
+
+users는 "이 사람이 누구인지"를 알려준다.
+bands는 "밴드가 무엇인지"를 알려준다.
+band_members는 "이 사람이 이 밴드에서 어떤 역할인지"를 알려준다.
+
+그래서 로그인 이후 밴드 기능을 사용할 때는 거의 항상 band_members를 먼저 거친다.
+
+
+35. 기능별 DB 사용 한 줄 요약
+----------------------------
+
+로그인:
+users에서 이메일 찾고 password_hash 비교 후 JWT 발급.
+
+회원가입:
+users에 새 사용자 저장 후 JWT 발급.
+
+밴드 생성:
+bands 생성, band_members에 리더 등록, band_song_rounds 기본 생성.
+
+밴드 가입:
+bands.invite_code로 밴드 찾고 band_members에 멤버 추가.
+
+밴드 목록:
+band_members에서 내 membership을 찾고 연결된 bands 반환.
+
+곡 후보 추가:
+song_catalog에 곡 저장 후 band_song_candidates에 후보 등록.
+
+곡 투표:
+song_votes에 user와 candidate 연결 저장.
+
+곡 확정:
+song_votes와 band_members.volume_points를 집계해서 band_song_rounds.final_candidate_id 저장.
+
+연습 과제 생성:
+practice_assignments에 과제 저장.
+
+연습 제출:
+practice_submissions에 파일 제출 저장, 마감 전 첫 제출이면 band_members.volume_points 증가와 point_logs 기록.
+
+연습 미제출:
+마감 후 제출 없으면 band_members.volume_points 감소와 point_logs 기록.
+
+일정 후보:
+schedule_slots에 시간 저장, schedule_availabilities에 만든 사람 yes 저장.
+
+일정 가능 여부:
+schedule_availabilities에 yes/no 저장 또는 업데이트.
+
+최종 일정 제안:
+schedule_proposals에 active 제안 저장.
+
+최종 일정 투표:
+schedule_proposal_votes에 yes/no 저장, 모두 yes면 confirmed.
+
+합주실 목록:
+studios에서 합주실 조회, band_members의 위치로 거리 계산.
+
+내 위치 저장:
+band_members에 home_location_label, home_latitude, home_longitude 저장.
+
+합주실 후보:
+band_studio_candidates에 후보 저장.
+
+합주실 투표:
+studio_votes에 투표 저장. 기존 투표는 삭제하고 새 투표만 유지.
+
+합주실 확정:
+studio_votes 개수, studios 가격, 등록 순서를 기준으로 winner를 정하고 band_studio_candidates.status를 confirmed로 변경.
+
