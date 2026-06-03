@@ -8,7 +8,7 @@ import { StudioCandidateDto, StudioLocationDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, PrimaryButton, StatusBadge } from '../../components/UI';
+import { ActionCardButton, EmptyState, Field, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -23,6 +23,7 @@ const DEFAULT_REGION: Region = {
   latitudeDelta: 0.06,
   longitudeDelta: 0.06,
 };
+const LOCATION_TIMEOUT_MS = 8000;
 
 export function StudioScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
@@ -58,6 +59,13 @@ export function StudioScreen({ route, navigation }: Props) {
   const cardGap = 12;
   const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
 
+  const updateDraftCoordinate = useCallback((coordinate: Coordinate) => {
+    const nextRegion = toRegion(coordinate);
+    setDraftCoordinate(coordinate);
+    setMapRegion(nextRegion);
+    mapRef.current?.animateToRegion(nextRegion, 350);
+  }, []);
+
   const load = useCallback(async () => {
     const [nextCandidates, nextLocation] = await Promise.all([
       api.get<StudioCandidateDto[]>(`/bands/${bandId}/studio-candidates`),
@@ -67,8 +75,7 @@ export function StudioScreen({ route, navigation }: Props) {
     setLocation(nextLocation);
     if (nextLocation.latitude !== null && nextLocation.longitude !== null) {
       const coordinate = { latitude: nextLocation.latitude, longitude: nextLocation.longitude };
-      setDraftCoordinate(coordinate);
-      setMapRegion(toRegion(coordinate));
+      updateDraftCoordinate(coordinate);
       setAddressQuery(nextLocation.label ?? '');
       setEditingLocation(false);
     } else {
@@ -78,7 +85,7 @@ export function StudioScreen({ route, navigation }: Props) {
       }
       setEditingLocation(true);
     }
-  }, [bandId]);
+  }, [bandId, updateDraftCoordinate]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', load);
@@ -118,13 +125,17 @@ export function StudioScreen({ route, navigation }: Props) {
         Alert.alert('위치 권한 필요', '현재 위치를 찾으려면 위치 권한을 허용해 주세요. 지도에서 직접 찍어도 저장할 수 있어요.');
         return;
       }
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('위치 서비스 필요', '기기의 위치 서비스를 켠 뒤 다시 시도해 주세요.');
+        return;
+      }
+      const current = await getCurrentPositionWithFallback();
       const coordinate = {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
-      setDraftCoordinate(coordinate);
-      setMapRegion(toRegion(coordinate));
+      updateDraftCoordinate(coordinate);
     } catch (error) {
       Alert.alert('위치 찾기 실패', error instanceof Error ? error.message : '현재 위치를 찾지 못했어요.');
     } finally {
@@ -181,7 +192,7 @@ export function StudioScreen({ route, navigation }: Props) {
   };
 
   const onMapPress = (event: MapPressEvent) => {
-    setDraftCoordinate(event.nativeEvent.coordinate);
+    updateDraftCoordinate(event.nativeEvent.coordinate);
   };
 
   const vote = async (candidateId: string) => {
@@ -326,10 +337,10 @@ export function StudioScreen({ route, navigation }: Props) {
           <StatusBadge label="확정된 합주실" tone="success" />
           <Text style={styles.confirmedTitle}>{confirmed.studio.name}</Text>
           <Text style={styles.metaText}>{formatAddress(confirmed.studio.address)}</Text>
-          <PrimaryButton
-            label="합주실 변경"
+          <ActionCardButton
+            title="합주실 변경"
+            icon="location-outline"
             onPress={() => navigation.navigate('CreateStudioCandidate', { bandId })}
-            style={styles.secondaryAction}
           />
         </View>
       ) : null}
@@ -347,12 +358,12 @@ export function StudioScreen({ route, navigation }: Props) {
             onAddCandidate={() => navigation.navigate('CreateStudioCandidate', { bandId })}
           />
           {isLeader ? (
-            <PrimaryButton
-              label="합주실 확정하기"
+            <ActionCardButton
+              title="합주실 확정하기"
+              icon="checkmark-circle-outline"
               onPress={finalize}
               loading={finalizing}
               disabled={candidates.length === 0 || finalizing}
-              style={styles.secondaryAction}
             />
           ) : null}
         </View>
@@ -464,6 +475,7 @@ function StudioCard({
             <Text style={styles.cardTitle} numberOfLines={2}>{studio.name}</Text>
             {candidate.recommendationRank === 1 ? <StatusBadge label="추천 1순위" tone="success" /> : null}
           </View>
+          <Text style={styles.submitterText} numberOfLines={1}>올린 사람: {candidate.createdByName}</Text>
         </View>
         {candidate.status === 'confirmed' ? <StatusBadge label="확정" tone="success" /> : null}
       </View>
@@ -526,6 +538,23 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       <Text style={styles.legendText}>{label}</Text>
     </View>
   );
+}
+
+async function getCurrentPositionWithFallback() {
+  try {
+    return await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('현재 위치를 찾는 데 시간이 오래 걸리고 있어요.')), LOCATION_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60 * 1000, requiredAccuracy: 2000 });
+    if (lastKnown) {
+      return lastKnown;
+    }
+    throw error;
+  }
 }
 
 function toRegion(coordinate: Coordinate): Region {
@@ -757,6 +786,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 16,
+  },
+  submitterText: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
   },
   infoGrid: {
     flexDirection: 'row',

@@ -77,6 +77,7 @@ export class SongsService {
         voteCount: candidate.votes?.length ?? 0,
         didVote: candidate.votes?.some((vote) => vote.user.id === userId) ?? false,
         createdByUserId: candidate.createdByUser.id,
+        createdByName: candidate.createdByUser.name,
         missingInstruments: this.findMissingInstruments(
           candidate.songCatalog.requiredInstruments ?? [],
           availableInstruments,

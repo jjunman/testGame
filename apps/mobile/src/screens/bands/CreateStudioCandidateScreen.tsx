@@ -85,6 +85,9 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
 
   const locatedStudios = studios.filter(hasCoordinate);
   const selectedStudio = studios.find((studio) => studio.id === selectedStudioId) ?? null;
+  const mapStudios = [...locatedStudios].sort((a, b) => {
+    return Number(a.id === selectedStudioId) - Number(b.id === selectedStudioId);
+  });
   const studioCardWidth = Math.max(260, width - 64);
   const studioCardGap = 12;
   const onStudioScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -126,16 +129,20 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
         ) : (
           <>
             <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION}>
-              {locatedStudios.map((studio) => (
+              {mapStudios.map((studio) => {
+                const selected = studio.id === selectedStudioId;
+                return (
                 <Marker
-                  key={`${studio.id}-${studio.id === selectedStudioId ? 'selected' : 'idle'}`}
+                  key={`${studio.id}-${selected ? 'selected' : 'idle'}`}
                   coordinate={{ latitude: studio.latitude!, longitude: studio.longitude! }}
                   title={studio.name}
                   description={studio.address ?? undefined}
-                  pinColor={studio.id === selectedStudioId ? '#ef4444' : '#7b8496'}
+                  pinColor={selected ? '#ef4444' : '#7b8496'}
+                  zIndex={selected ? 10 : 1}
                   onPress={() => selectStudio(studio)}
                 />
-              ))}
+                );
+              })}
             </MapView>
             {selectedStudio ? <Text style={styles.selectedText}>선택됨: {selectedStudio.name}</Text> : null}
             <ScrollView

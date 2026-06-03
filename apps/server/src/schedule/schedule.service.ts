@@ -36,6 +36,7 @@ export class ScheduleService {
     await this.bandsService.requireMembership(userId, bandId);
     const slots = await this.slotsRepository.find({
       where: { band: { id: bandId } },
+      relations: ['createdByUser'],
       order: { date: 'ASC', startTime: 'ASC' },
     });
 
@@ -48,6 +49,8 @@ export class ScheduleService {
           date: slot.date,
           startTime: slot.startTime,
           endTime: slot.endTime,
+          createdByUserId: slot.createdByUser.id,
+          createdByName: slot.createdByUser.name,
           yesCount: items.filter((item) => item.availability === ScheduleAvailabilityType.YES).length,
           noCount: items.filter((item) => item.availability === ScheduleAvailabilityType.NO).length,
           myAvailability: mine?.availability ?? null,
@@ -267,7 +270,7 @@ export class ScheduleService {
     const members = await this.bandsService.getMembers(userId, bandId);
     const proposal = await this.proposalsRepository.findOne({
       where: { band: { id: bandId } },
-      relations: ['votes', 'votes.user'],
+      relations: ['createdByUser', 'votes', 'votes.user'],
       order: { createdAt: 'DESC' },
     });
 
@@ -299,6 +302,8 @@ export class ScheduleService {
       date: proposal.date,
       startTime: proposal.startTime,
       endTime: proposal.endTime,
+      createdByUserId: proposal.createdByUser.id,
+      createdByName: proposal.createdByUser.name,
       active: proposal.active,
       yesCount,
       noCount,

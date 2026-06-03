@@ -5,7 +5,7 @@ import { ScheduleProposalDto, ScheduleSlotDto, ScheduleSummaryDto } from '@band/
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
+import { ActionCardButton, HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -102,7 +102,11 @@ export function ScheduleScreen({ route, navigation }: Props) {
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
       <HeroBanner title="우리 일정" subtitle="합주 일정을 맞춰봐요" align="center" />
 
-      <PrimaryButton label="합주 시간 제안" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} />
+      <ActionCardButton
+        title="합주 시간 제안"
+        icon="calendar-outline"
+        onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
+      />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>찬반투표</Text>
@@ -112,8 +116,13 @@ export function ScheduleScreen({ route, navigation }: Props) {
             <Text style={styles.voteTitle}>
               {formatScheduleLabel(confirmedProposal.date, confirmedProposal.startTime, confirmedProposal.endTime)}
             </Text>
+            <Text style={styles.voteSubmitter}>올린 사람: {confirmedProposal.createdByName}</Text>
             <Text style={styles.voteMessage}>모두가 찬성해서 이 시간으로 합주가 확정됐어요.</Text>
-                      <PrimaryButton label="일정 변경" onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })} style={styles.secondaryAction} />
+            <ActionCardButton
+              title="일정 변경"
+              icon="create-outline"
+              onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
+            />
           </View>
         ) : null}
         {!activeProposal && !confirmedProposal ? (
@@ -124,6 +133,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
             <Text style={styles.voteTitle}>
               {formatScheduleLabel(activeProposal.date, activeProposal.startTime, activeProposal.endTime)}
             </Text>
+            <Text style={styles.voteSubmitter}>올린 사람: {activeProposal.createdByName}</Text>
             <Text style={styles.voteMessage}>{activeProposal.message}</Text>
             <Text style={styles.voteMeta}>찬성 {activeProposal.yesCount}명 · 반대 {activeProposal.noCount}명</Text>
             <Text style={styles.voteMeta}>
@@ -410,6 +420,11 @@ const styles = StyleSheet.create({
   voteMessage: {
     color: theme.colors.text,
     fontWeight: '700',
+  },
+  voteSubmitter: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
   },
   voteMeta: {
     color: theme.colors.textMuted,

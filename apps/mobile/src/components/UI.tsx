@@ -11,6 +11,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { fallbackBandImage, theme } from '../constants/theme';
 
 export function HeroBanner({
@@ -114,6 +115,48 @@ export function PrimaryButton({
   return (
     <Pressable onPress={onPress} disabled={disabled || loading} style={[styles.button, disabled && styles.buttonDisabled, style]}>
       {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{label}</Text>}
+    </Pressable>
+  );
+}
+
+export function ActionCardButton({
+  title,
+  subtitle,
+  icon,
+  onPress,
+  loading,
+  disabled,
+  style,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      style={({ pressed }) => [
+        styles.actionCard,
+        pressed && !disabled && !loading && styles.actionCardPressed,
+        (disabled || loading) && styles.actionCardDisabled,
+        style,
+      ]}
+    >
+      <View style={styles.actionIconBox}>
+        {loading ? <ActivityIndicator color={theme.colors.primaryDark} /> : <Ionicons name={icon} size={22} color={theme.colors.primaryDark} />}
+      </View>
+      <View style={styles.actionTextBlock}>
+        <Text style={styles.actionTitle} numberOfLines={1}>{title}</Text>
+        {subtitle ? <Text style={styles.actionSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
+      </View>
+      <View style={styles.actionArrowBox}>
+        <Ionicons name="chevron-forward" size={19} color={theme.colors.primaryDark} />
+      </View>
     </Pressable>
   );
 }
@@ -331,6 +374,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
     fontSize: 14,
+  },
+  actionCard: {
+    minHeight: 66,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: '#d8d2ff',
+    backgroundColor: theme.colors.primarySoft,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  actionCardPressed: {
+    backgroundColor: '#e8e3ff',
+    borderColor: theme.colors.primary,
+  },
+  actionCardDisabled: {
+    opacity: 0.5,
+  },
+  actionIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#d8d2ff',
+  },
+  actionTextBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  actionTitle: {
+    color: theme.colors.primaryDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  actionSubtitle: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionArrowBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryButton: {
     alignItems: 'center',

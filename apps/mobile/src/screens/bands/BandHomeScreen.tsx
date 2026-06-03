@@ -211,7 +211,10 @@ function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
   const deadlineLabel = todoDeadlineLabel(todo);
 
   return (
-    <Pressable style={styles.primaryTodoCard} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.primaryTodoCard, pressed && styles.primaryTodoCardPressed]}
+      onPress={onPress}
+    >
       <View style={styles.todoIcon}>
         <Ionicons name={iconName} size={22} color={theme.colors.textMuted} />
       </View>
@@ -231,7 +234,10 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
   const iconName = todoIconName(todo);
 
   return (
-    <Pressable style={styles.compactTodoItem} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.compactTodoItem, pressed && styles.compactTodoItemPressed]}
+      onPress={onPress}
+    >
       <View style={styles.compactTodoIcon}>
         <Ionicons name={iconName} size={18} color={theme.colors.textMuted} />
       </View>
@@ -453,6 +459,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
     backgroundColor: '#fbfaff',
   },
+  primaryTodoCardPressed: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primaryDark,
+    transform: [{ scale: 0.985 }],
+  },
   todoCarousel: {
     alignItems: 'center',
   },
@@ -489,6 +500,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 11,
+  },
+  compactTodoItemPressed: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+    transform: [{ scale: 0.99 }],
   },
   compactTodoIcon: {
     width: 24,

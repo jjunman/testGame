@@ -60,6 +60,7 @@ export type SongCandidateDto = {
   voteCount: number;
   didVote: boolean;
   createdByUserId: string;
+  createdByName: string;
   missingInstruments: string[];
   warningMessage?: string | null;
 };
@@ -100,6 +101,8 @@ export type ScheduleSlotDto = {
   date: string;
   startTime: string;
   endTime: string;
+  createdByUserId: string;
+  createdByName: string;
   yesCount: number;
   noCount: number;
   myAvailability: ScheduleAvailabilityType | null;
@@ -121,6 +124,8 @@ export type ScheduleProposalDto = {
   date: string;
   startTime: string;
   endTime: string;
+  createdByUserId: string;
+  createdByName: string;
   active: boolean;
   yesCount: number;
   noCount: number;

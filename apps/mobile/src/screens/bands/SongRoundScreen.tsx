@@ -81,6 +81,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   const isLeader = round?.myRole === 'leader';
   const canAddCandidate = true;
   const visibleCandidates = isDone ? [] : candidates;
+  const hasSubmittedCandidate = candidates.some((candidate) => candidate.createdByUserId === user?.id);
   const myVoteCount = candidates.filter((candidate) => candidate.didVote).length;
 
   useEffect(() => {
@@ -94,6 +95,14 @@ export function SongRoundScreen({ route, navigation }: Props) {
     setExpandedSongCardId(null);
     setEditingSongCardId(null);
     await load();
+  };
+
+  const addCandidate = () => {
+    if (hasSubmittedCandidate) {
+      Alert.alert('후보곡 제한', '한 명당 한 곡만 올릴 수 있습니다.');
+      return;
+    }
+    navigation.navigate('AddSongCandidate', { bandId });
   };
 
 
@@ -288,7 +297,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
             onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
             onDelete={deleteCandidate}
             canAddCandidate={canAddCandidate}
-            onAddCandidate={() => navigation.navigate('AddSongCandidate', { bandId })}
+            onAddCandidate={addCandidate}
           />
 
           {isVoting ? (
@@ -621,6 +630,7 @@ function SongVoteCarousel({
                   ) : null}
                 </View>
                 <Text style={styles.songCardArtist} numberOfLines={1}>{candidate.artist}</Text>
+                <Text style={styles.songCardSubmitter} numberOfLines={1}>올린 사람: {candidate.createdByName}</Text>
                 {candidate.warningMessage ? <Text style={styles.songCardWarning}>{candidate.warningMessage}</Text> : null}
                 <PrimaryButton
                   label={candidate.didVote ? '이 곡 투표 취소' : '이 곡 투표하기'}
@@ -792,6 +802,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: '900',
+    textAlign: 'center',
   },
   addSongCaption: {
     color: theme.colors.textMuted,
@@ -867,6 +878,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 1,
+  },
+  songCardSubmitter: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
   },
   songCardWarning: {
     color: '#d1475d',
