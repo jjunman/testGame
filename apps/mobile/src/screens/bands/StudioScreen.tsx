@@ -59,12 +59,17 @@ export function StudioScreen({ route, navigation }: Props) {
   const cardGap = 12;
   const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
 
-  const updateDraftCoordinate = useCallback((coordinate: Coordinate) => {
+  const updateDraftCoordinate = useCallback((coordinate: Coordinate, preserveZoom = false) => {
+    if (preserveZoom) {
+      setDraftCoordinate(coordinate);
+      return;
+    }
+
     const nextRegion = toRegion(coordinate);
     setDraftCoordinate(coordinate);
     setMapRegion(nextRegion);
     mapRef.current?.animateToRegion(nextRegion, 350);
-  }, []);
+  }, [mapRegion.latitudeDelta, mapRegion.longitudeDelta]);
 
   const load = useCallback(async () => {
     const [nextCandidates, nextLocation] = await Promise.all([
@@ -103,7 +108,7 @@ export function StudioScreen({ route, navigation }: Props) {
   }, [activeTab, indicatorProgress]);
 
   useEffect(() => {
-    if (activeTab !== 'location' || !draftCoordinate || !confirmedStudioCoordinate) {
+    if (activeTab !== 'location' || editingLocation || !draftCoordinate || !confirmedStudioCoordinate) {
       return;
     }
 
@@ -115,7 +120,7 @@ export function StudioScreen({ route, navigation }: Props) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [activeTab, confirmedStudioCoordinate, draftCoordinate]);
+  }, [activeTab, confirmedStudioCoordinate, draftCoordinate, editingLocation]);
 
   const findCurrentLocation = async () => {
     setLocating(true);
@@ -192,7 +197,7 @@ export function StudioScreen({ route, navigation }: Props) {
   };
 
   const onMapPress = (event: MapPressEvent) => {
-    updateDraftCoordinate(event.nativeEvent.coordinate);
+    updateDraftCoordinate(event.nativeEvent.coordinate, true);
   };
 
   const vote = async (candidateId: string) => {
@@ -264,14 +269,16 @@ export function StudioScreen({ route, navigation }: Props) {
       <View style={[styles.locationCard, hasSavedLocation && !editingLocation && styles.locationCardCompact]}>
         <View style={styles.locationHeader}>
           <Text style={styles.sectionTitle}>내 집 위치 정하기</Text>
-          <StatusBadge label={location?.latitude !== null && location?.longitude !== null ? '저장됨' : '미입력'} tone={location?.latitude !== null && location?.longitude !== null ? 'success' : 'warning'} />
+          {hasSavedLocation && !editingLocation ? (
+            <Pressable style={styles.locationEditButton} onPress={() => setEditingLocation(true)}>
+              <Ionicons name="create-outline" size={15} color={theme.colors.text} />
+              <Text style={styles.locationEditText}>수정</Text>
+            </Pressable>
+          ) : null}
         </View>
         {hasSavedLocation && !editingLocation ? (
           <>
             <Text style={styles.metaText} numberOfLines={1}>{location?.label || (savedLocationCoordinate ? formatCoordinate(savedLocationCoordinate) : '')}</Text>
-            <Pressable style={styles.locationEditButton} onPress={() => setEditingLocation(true)}>
-              <Text style={styles.locationEditText}>주소 변경하기</Text>
-            </Pressable>
           </>
         ) : (
           <>
@@ -299,7 +306,7 @@ export function StudioScreen({ route, navigation }: Props) {
               coordinate={draftCoordinate}
               draggable={editingLocation}
               title="내 집 위치"
-              onDragEnd={(event) => setDraftCoordinate(event.nativeEvent.coordinate)}
+              onDragEnd={(event) => updateDraftCoordinate(event.nativeEvent.coordinate, true)}
             />
           ) : null}
           {confirmedStudioCoordinate ? (
@@ -717,13 +724,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   locationEditButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 2,
+    marginTop: 3,
+    minHeight: 32,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
   },
   locationEditText: {
-    color: theme.colors.textMuted,
+    color: theme.colors.text,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   confirmedCard: {
     borderRadius: theme.radius.md,

@@ -81,7 +81,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   const isLeader = round?.myRole === 'leader';
   const canAddCandidate = true;
   const visibleCandidates = isDone ? [] : candidates;
-  const hasSubmittedCandidate = candidates.some((candidate) => candidate.createdByUserId === user?.id);
+  const hasSubmittedCandidateInOpenRound = !isDone && candidates.some((candidate) => candidate.createdByUserId === user?.id);
   const myVoteCount = candidates.filter((candidate) => candidate.didVote).length;
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   };
 
   const addCandidate = () => {
-    if (hasSubmittedCandidate) {
+    if (hasSubmittedCandidateInOpenRound) {
       Alert.alert('후보곡 제한', '한 명당 한 곡만 올릴 수 있습니다.');
       return;
     }
@@ -297,6 +297,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
             onVote={(candidate) => void toggleVote(candidate.id, candidate.didVote)}
             onDelete={deleteCandidate}
             canAddCandidate={canAddCandidate}
+            addCandidateDisabled={hasSubmittedCandidateInOpenRound}
             onAddCandidate={addCandidate}
           />
 
@@ -514,6 +515,7 @@ function SongVoteCarousel({
   onVote,
   onDelete,
   canAddCandidate,
+  addCandidateDisabled,
   onAddCandidate,
 }: {
   candidates: SongCandidateDto[];
@@ -529,6 +531,7 @@ function SongVoteCarousel({
   onVote: (candidate: SongCandidateDto) => void;
   onDelete: (candidate: SongCandidateDto) => void;
   canAddCandidate: boolean;
+  addCandidateDisabled: boolean;
   onAddCandidate: () => void;
 }) {
   const totalItems = candidates.length + (canAddCandidate ? 1 : 0);
@@ -645,14 +648,19 @@ function SongVoteCarousel({
         })}
         {canAddCandidate ? (
           <Pressable
-            style={[styles.songVoteCard, styles.addSongCard, { width: cardWidth }]}
+            style={[
+              styles.songVoteCard,
+              styles.addSongCard,
+              addCandidateDisabled && styles.addSongCardDisabled,
+              { width: cardWidth },
+            ]}
             onPress={onAddCandidate}
           >
-            <View style={styles.addSongIcon}>
-              <Ionicons name="add" size={30} color={theme.colors.primary} />
+            <View style={[styles.addSongIcon, addCandidateDisabled && styles.addSongIconDisabled]}>
+              <Ionicons name="add" size={30} color={addCandidateDisabled ? theme.colors.textMuted : theme.colors.primary} />
             </View>
-            <Text style={styles.addSongTitle}>후보곡 추가</Text>
-            <Text style={styles.addSongCaption}>곡 제목, 가수, 유튜브 링크를 입력해 주세요</Text>
+            <Text style={[styles.addSongTitle, addCandidateDisabled && styles.addSongTitleDisabled]}>후보곡 추가</Text>
+            <Text style={[styles.addSongCaption, addCandidateDisabled && styles.addSongCaptionDisabled]}>곡 제목, 가수, 유튜브 링크를 입력해 주세요</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -790,6 +798,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: theme.colors.surfaceMuted,
   },
+  addSongCardDisabled: {
+    backgroundColor: '#f1f3f5',
+    borderColor: '#cfd5dd',
+    opacity: 0.72,
+  },
   addSongIcon: {
     width: 58,
     height: 58,
@@ -798,11 +811,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme.colors.primarySoft,
   },
+  addSongIconDisabled: {
+    backgroundColor: '#e2e6eb',
+  },
   addSongTitle: {
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  addSongTitleDisabled: {
+    color: theme.colors.textMuted,
   },
   addSongCaption: {
     color: theme.colors.textMuted,
@@ -810,6 +829,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 18,
     textAlign: 'center',
+  },
+  addSongCaptionDisabled: {
+    color: '#8d96a3',
   },
   youtubePanel: {
     backgroundColor: '#111',

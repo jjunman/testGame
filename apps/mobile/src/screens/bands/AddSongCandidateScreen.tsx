@@ -30,7 +30,10 @@ export function AddSongCandidateScreen({ route, navigation }: Props) {
         if (!isMounted) {
           return;
         }
-        setAlreadySubmitted(Boolean(round?.candidates.some((candidate) => candidate.createdByUserId === user?.id)));
+        const hasSubmittedInOpenRound =
+          round?.status !== 'done' &&
+          round?.candidates.some((candidate) => candidate.createdByUserId === user?.id);
+        setAlreadySubmitted(Boolean(hasSubmittedInOpenRound));
       })
       .catch(() => undefined);
 
