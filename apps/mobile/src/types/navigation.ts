@@ -15,7 +15,7 @@ export type BandsStackParamList = {
   SongRound: { bandId: string; initialTab?: 'vote' | 'library' };
   AddSongCandidate: { bandId: string };
   PracticeAssignments: { bandId: string };
-  CreatePracticeAssignment: { bandId: string };
+  CreatePracticeAssignment: { bandId: string; songCandidateId?: string };
   PracticeAssignmentDetail: { bandId: string; assignmentId: string };
   Schedule: { bandId: string };
   ScheduleEdit: { bandId: string; period: 'morning' | 'afternoon' };

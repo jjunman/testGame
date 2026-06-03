@@ -18,7 +18,7 @@ import { BandHomeDto, BandSongCardDto, SongCandidateDto, SongRoundDto } from '@b
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
+import { EmptyState, Field, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -208,14 +208,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   };
 
   const openSongCard = (card: BandSongCardDto) => {
-    if (card.practiceAssignmentId) {
-      navigation.navigate('PracticeAssignmentDetail', {
-        bandId,
-        assignmentId: card.practiceAssignmentId,
-      });
-      return;
-    }
-    navigation.navigate('CreatePracticeAssignment', { bandId });
+    navigation.navigate('CreatePracticeAssignment', { bandId, songCandidateId: card.id });
   };
 
   const beginEditSongCard = (card: BandSongCardDto) => {
@@ -262,13 +255,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
       fixedFooter={<BandInnerNav bandId={bandId} active={activeTab === 'vote' ? 'vote' : 'song'} navigation={navigation} />}
       scrollEnabled={activeTab !== 'vote'}
     >
-      {activeTab === 'library' ? (
-        <HeroBanner
-          title="곡과 연습"
-          subtitle="확정곡과 연습 과제를 한곳에서 관리해요."
-        />
-      ) : null}
-
       {activeTab === 'vote' ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -330,12 +316,9 @@ export function SongRoundScreen({ route, navigation }: Props) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionTitle}>곡과 연습</Text>
-              <Text style={styles.sectionCaption}>확정된 합주곡과 연결된 연습 과제를 확인해요.</Text>
+              <Text style={styles.sectionTitle}>확정곡 목록</Text>
+              <Text style={styles.sectionCaption}>목록을 눌러 연습을 시작할 수 있어요.</Text>
             </View>
-            <Pressable style={styles.secondaryAction} onPress={() => navigation.navigate('CreatePracticeAssignment', { bandId })}>
-              <Text style={styles.secondaryActionText}>연습 만들기</Text>
-            </Pressable>
           </View>
           {songCards.length === 0 ? (
             <EmptyState title="아직 곡이 없어요" description="합주곡 투표를 끝내면 확정곡과 연습 흐름이 여기에 정리돼요." />
@@ -423,7 +406,7 @@ function SongLibraryCard({
 
   return (
     <View style={[styles.songCardShell, practiceClosed && styles.songCardShellClosed]}>
-      <Pressable style={styles.songListItem} onPress={onPress}>
+      <Pressable style={({ pressed }) => [styles.songListItem, pressed && styles.songListItemPressed]} onPress={onPress}>
         <ImageBackground source={{ uri: card.thumbnailUrl ?? undefined }} imageStyle={styles.songCoverImage} style={styles.songCoverSmall}>
           <View style={styles.songCoverOverlay} />
           <Text style={styles.songCoverText}>{card.title.slice(0, 2)}</Text>
@@ -447,23 +430,17 @@ function SongLibraryCard({
                   <Pressable style={styles.inlineMenuItem} onPress={onEdit}>
                     <Text style={styles.inlineMenuText}>수정</Text>
                   </Pressable>
-                  <Pressable style={styles.inlineMenuItem} onPress={onDelete}>
+                  <Pressable style={[styles.inlineMenuItem, styles.inlineMenuLastItem]} onPress={onDelete}>
                     <Text style={[styles.inlineMenuText, styles.inlineMenuDanger]}>삭제</Text>
-                  </Pressable>
-                  <Pressable style={[styles.inlineMenuItem, styles.inlineMenuLastItem]} onPress={onClose}>
-                    <Text style={styles.inlineMenuText}>닫기</Text>
                   </Pressable>
                 </View>
               ) : null}
             </View>
           </View>
           <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
-          <Text style={styles.songHint} numberOfLines={1}>
-            {practiceClosed ? '연습 완료' : card.practiceDueAt ? formatDueLabel(card.practiceDueAt) : '눌러서 연습 과제 만들기'}
-          </Text>
         </View>
       </Pressable>
-      {practiceAssignments.length > 1 ? (
+      {practiceAssignments.length > 0 ? (
         <View style={styles.practiceList}>
           {practiceAssignments.map((assignment) => (
             <Pressable
@@ -1027,6 +1004,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 9,
   },
+  songListItemPressed: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
   songListBody: {
     flex: 1,
     gap: 4,
@@ -1043,7 +1023,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: 5,
     minHeight: 54,
-    width: 54,
+    width: 36,
     position: 'relative',
   },
   songMenuButton: {
@@ -1060,10 +1040,10 @@ const styles = StyleSheet.create({
   inlineMenu: {
     position: 'absolute',
     top: 34,
-    right: 3,
+    right: 0,
     zIndex: 20,
     elevation: 8,
-    width: 48,
+    width: 58,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -1189,11 +1169,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
-  },
-  songHint: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
   },
   modalBackdrop: {
     flex: 1,
