@@ -6,7 +6,7 @@ import MapView, { Marker, Region } from 'react-native-maps';
 import { StudioDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, HeroBanner, Label, PrimaryButton, SectionCard } from '../../components/UI';
+import { EmptyState, Field, Label, PrimaryButton } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -115,10 +115,19 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <HeroBanner title="합주실 후보 추가" subtitle="앱에서 제공하는 안산 합주실 목록에서 후보를 골라요." />
-
-      <SectionCard title="앱 제공 합주실">
-        <PrimaryButton label="목록 새로고침" onPress={loadStudios} loading={loading} />
+      <View style={styles.content}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>합주실 후보</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="합주실 후보 목록 새로고침"
+            disabled={loading}
+            onPress={loadStudios}
+            style={[styles.refreshButton, loading && styles.refreshButtonDisabled]}
+          >
+            <Ionicons name={loading ? 'hourglass-outline' : 'refresh'} size={19} color={theme.colors.primaryDark} />
+          </Pressable>
+        </View>
         {studios.length > 0 ? (
           <Text style={styles.countText}>
             {`제공 중인 합주실 ${studios.length}곳`}
@@ -188,13 +197,13 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
             </View>
           </>
         )}
-      </SectionCard>
 
-      <SectionCard title="후보 메모">
-        <Label>부원들에게 남길 메모</Label>
-        <Field value={note} onChangeText={setNote} placeholder="예: 가격이 저렴하고 중앙역이랑 가까워요." multiline />
-        <PrimaryButton label="후보 추가하기" onPress={submit} loading={submitting} disabled={!selectedStudioId || submitting} />
-      </SectionCard>
+        <View style={styles.candidateForm}>
+          <Label>부원들에게 남길 메모</Label>
+          <Field value={note} onChangeText={setNote} placeholder="예: 가격이 저렴하고 중앙역이랑 가까워요." multiline />
+          <PrimaryButton label="후보 추가하기" onPress={submit} loading={submitting} disabled={!selectedStudioId || submitting} />
+        </View>
+      </View>
     </Screen>
   );
 }
@@ -263,6 +272,34 @@ function toRegion(studio: StudioDto): Region {
 }
 
 const styles = StyleSheet.create({
+  content: {
+    gap: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionTitle: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  refreshButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
+  },
   studioList: {
     marginTop: 12,
     alignItems: 'center',
@@ -317,6 +354,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
     minWidth: 46,
+  },
+  candidateForm: {
+    gap: 10,
+    marginTop: 4,
   },
   studioOption: {
     borderRadius: 14,

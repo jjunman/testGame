@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, BandMemberSummary } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { PrimaryButton, TextButton } from '../../components/UI';
+import { TextButton } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -95,7 +95,7 @@ export function BandMembersScreen({ route, navigation }: Props) {
 
   const confirmBandAction = () => {
     if (isLeader) {
-      Alert.alert('밴드 삭제', '리더에게는 밴드 삭제하기만 보여요. 정말 삭제할까요?', [
+      Alert.alert('밴드 삭제', '밴드 삭제하기는 리더에게만 보여요. 정말 삭제할까요?', [
         { text: '취소', style: 'cancel' },
         {
           text: '밴드 삭제하기',
@@ -122,17 +122,6 @@ export function BandMembersScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={route.params.bandId} active="home" navigation={navigation} />}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>멤버</Text>
-          <Text style={styles.headerSubtitle}>새 멤버도 기존 기록과 현재 할 일을 함께 확인해요.</Text>
-        </View>
-        <View style={styles.headerBadge}>
-          <Ionicons name="people-outline" size={15} color={theme.colors.primaryDark} />
-          <Text style={styles.headerBadgeText}>{members.length}명</Text>
-        </View>
-      </View>
-
       {bandDetail ? (
         <View style={styles.bandInfoCard}>
           <ImageBackground
@@ -159,7 +148,6 @@ export function BandMembersScreen({ route, navigation }: Props) {
 
       {myMembership ? (
         <View style={styles.myCard}>
-          <View style={styles.myCardAccent} />
           <View style={styles.myTop}>
             <View style={styles.memberAvatar}>
               <Text style={styles.memberInitial}>{myMembership.name.slice(0, 1)}</Text>
@@ -267,10 +255,16 @@ function MemberRow({
         <Text style={styles.memberMeta} numberOfLines={1}>
           {member.positionLabel} · 가입 {formatJoinDate(member.joinedAt)}
         </Text>
-        {canTransfer ? (
-          <PrimaryButton label="리더 권한 넘기기" onPress={onTransfer} loading={loading} style={styles.transferButton} />
-        ) : null}
       </View>
+      {canTransfer ? (
+        <Pressable onPress={onTransfer} disabled={loading} style={[styles.transferButton, loading && styles.transferButtonDisabled]}>
+          {loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.transferButtonText}>리더 권한 넘기기</Text>
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -304,52 +298,17 @@ function formatJoinDate(value: string) {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 14,
-    marginBottom: 2,
-  },
-  headerText: {
-    flex: 1,
-    gap: 4,
-  },
-  headerTitle: {
-    color: theme.colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  headerSubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  headerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  headerBadgeText: {
-    color: theme.colors.primaryDark,
-    fontSize: 12,
-    fontWeight: '900',
-  },
   bandInfoCard: {
     minHeight: 104,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#ddd6ff',
-    backgroundColor: theme.colors.primarySoft,
-    padding: 12,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    overflow: 'hidden',
   },
   bandThumb: {
     width: 60,
@@ -416,14 +375,6 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 18,
     overflow: 'hidden',
-  },
-  myCardAccent: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: theme.colors.primary,
   },
   myTop: {
     flexDirection: 'row',
@@ -547,6 +498,7 @@ const styles = StyleSheet.create({
   },
   memberRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 13,
     paddingHorizontal: 16,
     paddingVertical: 15,
@@ -568,6 +520,7 @@ const styles = StyleSheet.create({
   },
   memberBody: {
     flex: 1,
+    minWidth: 0,
     gap: 6,
   },
   memberNameRow: {
@@ -588,11 +541,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   transferButton: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     minHeight: 34,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     borderRadius: theme.radius.sm,
+  },
+  transferButtonDisabled: {
+    opacity: 0.55,
+  },
+  transferButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   emptyRoster: {
     alignItems: 'center',

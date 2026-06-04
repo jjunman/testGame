@@ -21,6 +21,9 @@ const DEFAULT_EXPECTED_HOURS = 2;
 const ANSAN_STUDIO_SOURCE_URLS = [
   'https://omnispiano.com/service/rooms/1286/%EC%BD%94%EC%A7%80%EC%97%B0%EC%8A%B5%EC%8B%A4/',
 ];
+const DEPRECATED_ANSAN_STUDIO_SOURCE_URLS = new Set([
+  'https://studiofy.kr/studio-profile/f2b5216a-6347-4c60-94b1-b410874739d5/',
+]);
 const APP_PROVIDED_ANSAN_STUDIOS = [
   {
     name: '코지연습실',
@@ -202,18 +205,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     priceNote: '가격 업체 문의. 최신 요금은 외부 링크에서 확인해 주세요.',
     amenitiesNote: '24시간 영업, 음악 연습실',
   },
-  {
-    name: 'HENZ뮤직스튜디오 안산고잔점',
-    address: '경기도 안산시 단원구 광덕2로 185-18',
-    latitude: 37.3097,
-    longitude: 126.8307,
-    phone: null,
-    externalUrl: 'https://studiofy.kr/studio-profile/f2b5216a-6347-4c60-94b1-b410874739d5/',
-    sourceUrl: 'https://studiofy.kr/studio-profile/f2b5216a-6347-4c60-94b1-b410874739d5/',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '중앙역 인근 음악 연습실',
-  },
 ] satisfies Array<Partial<Studio> & { name: string; sourceUrl: string }>;
 
 @Injectable()
@@ -249,6 +240,7 @@ export class StudiosService {
     const distanceStats = this.buildDistanceStats(candidates, members);
 
     return candidates
+      .filter((candidate) => !this.isDeprecatedStudio(candidate.studio))
       .map((candidate) => this.toCandidateDto(candidate, userId, memberCount, expectedHours, distanceStats.get(candidate.id)))
       .sort((a, b) => {
         if (Number(b.status === 'confirmed') !== Number(a.status === 'confirmed')) {
@@ -280,6 +272,7 @@ export class StudiosService {
     const distanceStats = this.buildStudioDistanceStats(studios, members, membership);
 
     return studios
+      .filter((studio) => !this.isDeprecatedStudio(studio))
       .map((studio) => this.toStudioDto(studio, distanceStats.get(studio.id)))
       .sort((a, b) => {
         if (a.distanceAverageKm !== null && b.distanceAverageKm !== null && a.distanceAverageKm !== b.distanceAverageKm) {
@@ -304,7 +297,7 @@ export class StudiosService {
   async saveLocation(userId: string, bandId: string, dto: SaveStudioLocationDto) {
     const membership = await this.bandsService.requireMembership(userId, bandId);
 
-    membership.homeLocationLabel = this.clean(dto.label) ?? '지도에서 선택한 위치';
+    membership.homeLocationLabel = this.clean(dto.label);
     membership.homeLatitude = dto.latitude;
     membership.homeLongitude = dto.longitude;
     await this.membersRepository.save(membership);
@@ -606,6 +599,10 @@ export class StudiosService {
         );
       }),
     );
+  }
+
+  private isDeprecatedStudio(studio: Studio) {
+    return studio.sourceUrl !== null && DEPRECATED_ANSAN_STUDIO_SOURCE_URLS.has(studio.sourceUrl);
   }
 
   private buildDistanceStats(candidates: StudioCandidate[], members: BandMember[]) {

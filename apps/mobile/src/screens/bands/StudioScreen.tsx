@@ -140,6 +140,7 @@ export function StudioScreen({ route, navigation }: Props) {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
+      setAddressQuery('');
       updateDraftCoordinate(coordinate);
     } catch (error) {
       Alert.alert('위치 찾기 실패', error instanceof Error ? error.message : '현재 위치를 찾지 못했어요.');
@@ -185,7 +186,7 @@ export function StudioScreen({ route, navigation }: Props) {
     try {
       setLocation(await api.post<StudioLocationDto>(`/bands/${bandId}/studio-location`, {
         ...draftCoordinate,
-        label: addressQuery.trim() || '지도에서 선택한 위치',
+        label: clean(addressQuery),
       }));
       setCandidates(await api.get<StudioCandidateDto[]>(`/bands/${bandId}/studio-candidates`));
       setEditingLocation(false);
@@ -266,7 +267,7 @@ export function StudioScreen({ route, navigation }: Props) {
       </Pressable>
 
       {activeTab === 'location' ? (
-      <View style={[styles.locationCard, hasSavedLocation && !editingLocation && styles.locationCardCompact]}>
+      <View style={[styles.tabContent, styles.locationCard, hasSavedLocation && !editingLocation && styles.locationCardCompact]}>
         <View style={styles.locationHeader}>
           <Text style={styles.sectionTitle}>내 집 위치 정하기</Text>
           {hasSavedLocation && !editingLocation ? (
@@ -282,7 +283,7 @@ export function StudioScreen({ route, navigation }: Props) {
           </>
         ) : (
           <>
-            <Text style={styles.metaText}>현재 위치, 주소 검색, 지도 탭 중 편한 방식으로 핀을 잡아 주세요. 추천 계산에는 좌표만 사용합니다.</Text>
+            <Text style={styles.metaText}>현재 위치, 주소 검색, 지도 탭 중 편한 방식으로 핀을 잡아 주세요.</Text>
         <View style={styles.addressSearch}>
           <Field
             value={addressQuery}
@@ -340,7 +341,7 @@ export function StudioScreen({ route, navigation }: Props) {
       {activeTab === 'vote' ? (
       <>
       {confirmed ? (
-        <View style={styles.confirmedCard}>
+        <View style={[styles.tabContent, styles.confirmedCard]}>
           <StatusBadge label="확정된 합주실" tone="success" />
           <Text style={styles.confirmedTitle}>{confirmed.studio.name}</Text>
           <Text style={styles.metaText}>{formatAddress(confirmed.studio.address)}</Text>
@@ -352,7 +353,7 @@ export function StudioScreen({ route, navigation }: Props) {
         </View>
       ) : null}
         {!confirmed ? (
-        <View style={styles.candidateSection}>
+        <View style={[styles.tabContent, styles.candidateSection]}>
           <Text style={styles.sectionTitle}>합주실 후보</Text>
           <StudioCandidateCarousel
             candidates={candidates}
@@ -584,6 +585,11 @@ function formatAddress(value: string | null) {
   return value ?? '주소 미입력';
 }
 
+function clean(value: string) {
+  const next = value.trim();
+  return next ? next : undefined;
+}
+
 function formatCoordinate(coordinate: Coordinate) {
   return `위도 ${coordinate.latitude.toFixed(5)} · 경도 ${coordinate.longitude.toFixed(5)}`;
 }
@@ -622,6 +628,9 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: theme.colors.text,
   },
+  tabContent: {
+    marginTop: 12,
+  },
   actions: {
     gap: 10,
   },
@@ -659,11 +668,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   locationCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 16,
     gap: 14,
   },
   locationCardCompact: {
@@ -743,11 +747,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   confirmedCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    padding: 16,
     gap: 8,
   },
   confirmedTitle: {
