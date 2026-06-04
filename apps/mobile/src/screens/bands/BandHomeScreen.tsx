@@ -127,22 +127,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryTop}>
-          <View style={styles.summaryText}>
-            <Text style={styles.bandName} numberOfLines={1}>{detail.name}</Text>
-            <Text style={styles.bandMeta} numberOfLines={1}>
-              {detail.myMembership.positionLabel || '파트 미정'} · {detail.myMembership.role === 'leader' ? '리더' : '멤버'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.summaryStats}>
-          <SummaryStat label="멤버 수" value={formatCount(detail.memberCount, '명', 1)} />
-          <SummaryStat label="내 할 일" value={formatCount(todos.length, '개')} />
-          <SummaryStat label="초대코드" value={detail.inviteCode} />
-        </View>
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>내 할 일</Text>
         {todos.length > 0 ? (
@@ -190,20 +174,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
       </View>
     </Screen>
   );
-}
-
-function SummaryStat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <View style={styles.summaryStat}>
-      <Text style={styles.summaryStatLabel}>{label}</Text>
-      <Text style={styles.summaryStatValue} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
-
-function formatCount(value: number | null | undefined, unit: string, fallback = 0) {
-  const count = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-  return `${count}${unit}`;
 }
 
 function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
@@ -391,57 +361,6 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 10,
-  },
-  summaryCard: {
-    backgroundColor: theme.colors.primarySoft,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: '#ddd6ff',
-    padding: 14,
-    gap: 12,
-  },
-  summaryTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  summaryText: {
-    flex: 1,
-    gap: 4,
-  },
-  bandName: {
-    color: theme.colors.text,
-    fontSize: 23,
-    fontWeight: '900',
-  },
-  bandMeta: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  summaryStat: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    gap: 3,
-  },
-  summaryStatLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  summaryStatValue: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '900',
   },
   sectionTitle: {
     color: theme.colors.text,

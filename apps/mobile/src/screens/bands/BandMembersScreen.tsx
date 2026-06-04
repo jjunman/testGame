@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BandMemberSummary } from '@band/shared-types';
-import { api } from '../../api/client';
+import { BandHomeDto, BandMemberSummary } from '@band/shared-types';
+import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
 import { PrimaryButton, TextButton } from '../../components/UI';
-import { theme } from '../../constants/theme';
+import { fallbackBandImage, theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -16,12 +16,20 @@ type Props = NativeStackScreenProps<BandsStackParamList, 'BandMembers'>;
 export function BandMembersScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const [members, setMembers] = useState<BandMemberSummary[]>([]);
+  const [bandDetail, setBandDetail] = useState<BandHomeDto | null>(null);
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
   const [bandActionLoading, setBandActionLoading] = useState(false);
 
   const load = useCallback(async () => {
-    const result = await api.get<BandMemberSummary[]>(`/bands/${route.params.bandId}/members`);
-    setMembers(result);
+    const [nextMembers, nextBandDetail] = await Promise.all([
+      api.get<BandMemberSummary[]>(`/bands/${route.params.bandId}/members`),
+      api.get<BandHomeDto>(`/bands/${route.params.bandId}`),
+    ]);
+    setMembers(nextMembers);
+    setBandDetail({
+      ...nextBandDetail,
+      thumbnailUrl: toApiAssetUrl(nextBandDetail.thumbnailUrl),
+    });
   }, [route.params.bandId]);
 
   useEffect(() => {
@@ -125,6 +133,30 @@ export function BandMembersScreen({ route, navigation }: Props) {
         </View>
       </View>
 
+      {bandDetail ? (
+        <View style={styles.bandInfoCard}>
+          <ImageBackground
+            source={{ uri: bandDetail.thumbnailUrl || fallbackBandImage }}
+            imageStyle={styles.bandThumbImage}
+            style={styles.bandThumb}
+          >
+            <View style={styles.bandThumbOverlay} />
+            <Ionicons name="musical-notes-outline" size={22} color="#fff" />
+          </ImageBackground>
+          <View style={styles.bandInfoBody}>
+            <Text style={styles.bandInfoLabel}>밴드 정보</Text>
+            <Text style={styles.bandInfoName} numberOfLines={1}>{bandDetail.name}</Text>
+            <Text style={styles.bandInfoMeta} numberOfLines={1}>
+              {(bandDetail.myMembership.positionLabel || '파트 미정')} · {bandDetail.myMembership.role === 'leader' ? '리더' : '멤버'}
+            </Text>
+          </View>
+          <View style={styles.bandInfoStats}>
+            <InfoPill label="멤버" value={`${bandDetail.memberCount}명`} />
+            <InfoPill label="초대코드" value={bandDetail.inviteCode} />
+          </View>
+        </View>
+      ) : null}
+
       {myMembership ? (
         <View style={styles.myCard}>
           <View style={styles.myCardAccent} />
@@ -182,6 +214,15 @@ export function BandMembersScreen({ route, navigation }: Props) {
         />
       ) : null}
     </Screen>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoPill}>
+      <Text style={styles.infoPillLabel}>{label}</Text>
+      <Text style={styles.infoPillValue} numberOfLines={1}>{value}</Text>
+    </View>
   );
 }
 
@@ -296,6 +337,74 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  bandInfoCard: {
+    minHeight: 104,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: '#ddd6ff',
+    backgroundColor: theme.colors.primarySoft,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bandThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bandThumbImage: {
+    borderRadius: theme.radius.sm,
+  },
+  bandThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  bandInfoBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  bandInfoLabel: {
+    color: theme.colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  bandInfoName: {
+    color: theme.colors.text,
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  bandInfoMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  bandInfoStats: {
+    width: 88,
+    gap: 7,
+  },
+  infoPill: {
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    gap: 2,
+  },
+  infoPillLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  infoPillValue: {
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: '900',
   },
