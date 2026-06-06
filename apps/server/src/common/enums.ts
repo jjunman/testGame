@@ -38,12 +38,3 @@ export enum ScheduleAvailabilityType {
   YES = 'yes',
   NO = 'no',
 }
-
-export enum PointLogReason {
-  PRACTICE_ON_TIME = 'practice_on_time',
-  PRACTICE_MISSED = 'practice_missed',
-}
-
-export enum PointLogRelatedType {
-  PRACTICE_ASSIGNMENT = 'practice_assignment',
-}

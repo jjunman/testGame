@@ -1,7 +1,6 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { Band } from '../bands/band.entity';
 import { BandMember } from '../bands/band-member.entity';
-import { PointLog } from '../points/point-log.entity';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { PracticeSubmission } from '../practice/practice-submission.entity';
 import { ScheduleAvailability } from '../schedule/schedule-availability.entity';
@@ -43,6 +42,5 @@ export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
     Studio,
     StudioCandidate,
     StudioVote,
-    PointLog,
   ],
 });

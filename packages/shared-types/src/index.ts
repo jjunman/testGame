@@ -44,7 +44,6 @@ export type BandMemberSummary = {
   name: string;
   role: MemberRole;
   positionLabel: string;
-  volumePoints: number;
   joinedAt: string;
 };
 
@@ -231,7 +230,6 @@ export type BandHomeDto = {
   myMembership: {
     role: MemberRole;
     positionLabel: string;
-    volumePoints: number;
   };
   activeSongRound: {
     id: string;

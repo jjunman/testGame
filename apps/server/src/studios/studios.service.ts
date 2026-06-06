@@ -22,57 +22,18 @@ const ANSAN_STUDIO_SOURCE_URLS = [
   'https://omnispiano.com/service/rooms/1286/%EC%BD%94%EC%A7%80%EC%97%B0%EC%8A%B5%EC%8B%A4/',
 ];
 const DEPRECATED_ANSAN_STUDIO_SOURCE_URLS = new Set([
+  'https://omnispiano.com/service/rooms/1286/%EC%BD%94%EC%A7%80%EC%97%B0%EC%8A%B5%EC%8B%A4/',
+  'https://omnispiano.com/service/rooms/395/%EB%B3%B8%ED%94%BC%EC%95%84%EB%85%B8-%EC%9E%85%EC%8B%9C-%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4-%EC%97%B0%EC%8A%B5%EC%8B%A4/',
+  'https://omnispiano.com/service/rooms/714/%EC%9C%A0%EC%95%A4%EB%AF%B8%ED%94%BC%EC%95%84%EB%85%B8/',
+  'https://omnispiano.com/service/rooms/1340/%ED%91%B8%EB%A5%B8%EB%B3%84-%ED%94%BC%EC%95%84%EB%85%B8%EC%97%B0%EC%8A%B5%EC%8B%A4/',
   'https://studiofy.kr/studio-profile/f2b5216a-6347-4c60-94b1-b410874739d5/',
+  'https://studiofy.kr/studio-profile/dd982a0b-4a6c-47d5-ba4d-456be37661eb/',
+  'https://studiofy.kr/studio-profile/c4643dd6-dce0-408c-832a-ad0020e8fa2d/',
+  'https://studiofy.kr/studio-profile/f24f033d-4c19-481f-9ca1-258b9887d688/',
+  'https://busk.co.kr/practice_rooms.php?id=254&mode=view',
+  'https://busk.co.kr/practice_rooms.php?id=247&mode=view&name=IN+STUDIO+%EC%95%88%EC%82%B0%EC%A0%90',
 ]);
 const APP_PROVIDED_ANSAN_STUDIOS = [
-  {
-    name: '코지연습실',
-    address: '경기도 안산시 단원구 고잔동 631-1 3층 301호',
-    latitude: 37.3187,
-    longitude: 126.8295,
-    phone: '01020945177',
-    externalUrl: 'https://omnispiano.com/service/rooms/1286/%EC%BD%94%EC%A7%80%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    sourceUrl: 'https://omnispiano.com/service/rooms/1286/%EC%BD%94%EC%A7%80%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    hourlyPrice: 10000,
-    priceNote: '옴니스피아노 기준 10,000원/시간. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '합주, 악기 연습, 안무, 음향시설, 냉난방, 휴게실',
-  },
-  {
-    name: '본피아노 입시 스튜디오 연습실',
-    address: '경기 안산시 단원구 고잔동 727-3',
-    latitude: 37.3138,
-    longitude: 126.8285,
-    phone: '010-3601-6553',
-    externalUrl: 'https://omnispiano.com/service/rooms/395/%EB%B3%B8%ED%94%BC%EC%95%84%EB%85%B8-%EC%9E%85%EC%8B%9C-%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4-%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    sourceUrl: 'https://omnispiano.com/service/rooms/395/%EB%B3%B8%ED%94%BC%EC%95%84%EB%85%B8-%EC%9E%85%EC%8B%9C-%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4-%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    hourlyPrice: 6000,
-    priceNote: '업라이트 피아노방 6,000원/시간부터. 룸별 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: 'WIFI, 정수기, 도어락, 냉난방, 주차, 앙상블, 레슨',
-  },
-  {
-    name: '유앤미피아노',
-    address: '경기도 안산시 상록구 성포동 747 3층 유앤미피아노',
-    latitude: 37.3185,
-    longitude: 126.8494,
-    phone: null,
-    externalUrl: 'https://omnispiano.com/service/rooms/714/%EC%9C%A0%EC%95%A4%EB%AF%B8%ED%94%BC%EC%95%84%EB%85%B8/',
-    sourceUrl: 'https://omnispiano.com/service/rooms/714/%EC%9C%A0%EC%95%A4%EB%AF%B8%ED%94%BC%EC%95%84%EB%85%B8/',
-    hourlyPrice: 5000,
-    priceNote: '업라이트 피아노방 5,000원/시간. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: 'WIFI, 냉난방, 프린터, 주차',
-  },
-  {
-    name: '푸른별 피아노연습실',
-    address: '경기도 안산시 상록구 사동 1410-2 2층',
-    latitude: 37.2952,
-    longitude: 126.8523,
-    phone: '01088659301',
-    externalUrl: 'https://omnispiano.com/service/rooms/1340/%ED%91%B8%EB%A5%B8%EB%B3%84-%ED%94%BC%EC%95%84%EB%85%B8%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    sourceUrl: 'https://omnispiano.com/service/rooms/1340/%ED%91%B8%EB%A5%B8%EB%B3%84-%ED%94%BC%EC%95%84%EB%85%B8%EC%97%B0%EC%8A%B5%EC%8B%A4/',
-    hourlyPrice: null,
-    priceNote: '등록된 가격 없음. 이용 전 요금 확인이 필요합니다.',
-    amenitiesNote: '피아노 연습실, 앙상블, 레슨, 주차, 냉난방, CCTV',
-  },
   {
     name: '아트콤마스튜디오 합주실호수점',
     address: '경기 안산시 단원구 광덕서로 44 B1층 102호',
@@ -81,8 +42,8 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     phone: '0507-1380-2815',
     externalUrl: 'https://busk.co.kr/practice_rooms.php?id=246&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%ED%95%A9%EC%A3%BC%EC%8B%A4%ED%98%B8%EC%88%98%EC%A0%90',
     sourceUrl: 'https://busk.co.kr/practice_rooms.php?id=246&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%ED%95%A9%EC%A3%BC%EC%8B%A4%ED%98%B8%EC%88%98%EC%A0%90',
-    hourlyPrice: null,
-    priceNote: '가격 업체 문의. 당근 등록 글에는 오픈이벤트 시간당 20,000원 정보가 있어 최신 요금 확인이 필요합니다.',
+    hourlyPrice: 20000,
+    priceNote: null,
     amenitiesNote: '24시간 영업, 합주실',
   },
   {
@@ -122,42 +83,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     amenitiesNote: '한대앞역 인근 음악 연습실',
   },
   {
-    name: 'SYM음악연습실',
-    address: '경기도 안산시 상록구 항가울로 282-1',
-    latitude: 37.3053,
-    longitude: 126.8567,
-    phone: null,
-    externalUrl: 'https://studiofy.kr/studio-profile/dd982a0b-4a6c-47d5-ba4d-456be37661eb/',
-    sourceUrl: 'https://studiofy.kr/studio-profile/dd982a0b-4a6c-47d5-ba4d-456be37661eb/',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '한대앞역 인근 음악 연습실',
-  },
-  {
-    name: '안산예대연습실',
-    address: '경기도 안산시 단원구 다리간2길 55 석정빌딩 2층',
-    latitude: 37.3162,
-    longitude: 126.8239,
-    phone: null,
-    externalUrl: 'https://studiofy.kr/studio-profile/c4643dd6-dce0-408c-832a-ad0020e8fa2d/',
-    sourceUrl: 'https://studiofy.kr/studio-profile/c4643dd6-dce0-408c-832a-ad0020e8fa2d/',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '고잔역 인근 음악 연습실',
-  },
-  {
-    name: '뮤작스튜디오 음악연습실',
-    address: '경기도 안산시 상록구 화랑로 501 예술프라자 301호',
-    latitude: 37.3229,
-    longitude: 126.8486,
-    phone: null,
-    externalUrl: 'https://studiofy.kr/studio-profile/f24f033d-4c19-481f-9ca1-258b9887d688/',
-    sourceUrl: 'https://studiofy.kr/studio-profile/f24f033d-4c19-481f-9ca1-258b9887d688/',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '중앙역 인근 음악 연습실',
-  },
-  {
     name: '에스엠 음악연습실/합주실/드럼연습실/밴드연습실',
     address: '경기도 안산시 단원구 민속공원로 80 301호, 401호',
     latitude: 37.3219,
@@ -165,8 +90,8 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     phone: null,
     externalUrl: 'https://studiofy.kr/studio-profile/5aad3758-4751-4c24-879a-d07ab365a1de',
     sourceUrl: 'https://studiofy.kr/studio-profile/5aad3758-4751-4c24-879a-d07ab365a1de',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
+    hourlyPrice: 22000,
+    priceNote: null,
     amenitiesNote: '중앙역 인근, 드럼 연습, 합주실',
   },
   {
@@ -177,34 +102,10 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     phone: null,
     externalUrl: 'https://studiofy.kr/studio-profile/02bbc7f7-0c13-40f4-9d5c-8602103a0c62/',
     sourceUrl: 'https://studiofy.kr/studio-profile/02bbc7f7-0c13-40f4-9d5c-8602103a0c62/',
-    hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
+    hourlyPrice: 20000,
+    priceNote: null,
     amenitiesNote: '사리역 인근, 드럼 연습',
-  },
-  {
-    name: '드럼 스페이스 안산',
-    address: '경기 안산시 단원구 예술대학로 82 B124호',
-    latitude: 37.3187,
-    longitude: 126.8295,
-    phone: '0507-1493-0987',
-    externalUrl: 'https://busk.co.kr/practice_rooms.php?id=254&mode=view',
-    sourceUrl: 'https://busk.co.kr/practice_rooms.php?id=254&mode=view',
-    hourlyPrice: null,
-    priceNote: '가격 업체 문의. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '24시간 영업, 드럼 연습실',
-  },
-  {
-    name: 'IN STUDIO 안산점',
-    address: '경기 안산시 단원구 고잔2길 9 3층 304호',
-    latitude: 37.3187,
-    longitude: 126.8295,
-    phone: '0507-1411-3909',
-    externalUrl: 'https://busk.co.kr/practice_rooms.php?id=247&mode=view&name=IN+STUDIO+%EC%95%88%EC%82%B0%EC%A0%90',
-    sourceUrl: 'https://busk.co.kr/practice_rooms.php?id=247&mode=view&name=IN+STUDIO+%EC%95%88%EC%82%B0%EC%A0%90',
-    hourlyPrice: null,
-    priceNote: '가격 업체 문의. 최신 요금은 외부 링크에서 확인해 주세요.',
-    amenitiesNote: '24시간 영업, 음악 연습실',
-  },
+  }
 ] satisfies Array<Partial<Studio> & { name: string; sourceUrl: string }>;
 
 @Injectable()
@@ -388,11 +289,6 @@ export class StudiosService {
       const voteDiff = (b.votes?.length ?? 0) - (a.votes?.length ?? 0);
       if (voteDiff !== 0) {
         return voteDiff;
-      }
-      const aPrice = a.studio.hourlyPrice ?? Number.MAX_SAFE_INTEGER;
-      const bPrice = b.studio.hourlyPrice ?? Number.MAX_SAFE_INTEGER;
-      if (aPrice !== bPrice) {
-        return aPrice - bPrice;
       }
       return a.createdAt.getTime() - b.createdAt.getTime();
     })[0];

@@ -352,39 +352,26 @@ export class SongsService {
 
   async finalize(userId: string, bandId: string) {
     await this.bandsService.requireLeader(userId, bandId);
-    const members = await this.bandsService.getMembers(userId, bandId);
-    const memberByUserId = new Map(members.map((member) => [member.userId, member]));
     const round = await this.getActiveRoundOrThrow(bandId);
     const candidates = await this.candidatesRepository.find({
       where: { round: { id: round.id } },
       relations: ['votes', 'votes.user'],
+      order: { createdAt: 'ASC' },
     });
     if (candidates.length === 0) {
       throw new BadRequestException('확정할 곡 후보가 없습니다.');
     }
 
-    const ranked = await Promise.all(
-      candidates.map(async (candidate) => {
-        const voters = (candidate.votes ?? [])
-          .map((vote) => memberByUserId.get(vote.user.id))
-          .filter((member): member is NonNullable<typeof member> => Boolean(member));
-        return {
-          candidate,
-          voteCount: voters.length,
-          pointSum: voters.reduce((sum, member) => sum + member.volumePoints, 0),
-          highestVoterPoint: voters.reduce((max, member) => Math.max(max, member.volumePoints), 0),
-        };
-      }),
-    );
+    const ranked = candidates.map((candidate) => ({
+      candidate,
+      voteCount: candidate.votes?.length ?? 0,
+    }));
 
     ranked.sort((a, b) => {
-      if (b.pointSum !== a.pointSum) {
-        return b.pointSum - a.pointSum;
+      if (b.voteCount !== a.voteCount) {
+        return b.voteCount - a.voteCount;
       }
-      if (b.highestVoterPoint !== a.highestVoterPoint) {
-        return b.highestVoterPoint - a.highestVoterPoint;
-      }
-      return b.voteCount - a.voteCount;
+      return a.candidate.createdAt.getTime() - b.candidate.createdAt.getTime();
     });
 
     round.finalCandidate = ranked[0].candidate;

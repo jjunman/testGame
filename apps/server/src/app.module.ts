@@ -9,7 +9,6 @@ import { SongsModule } from './songs/songs.module';
 import { PracticeModule } from './practice/practice.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { StudiosModule } from './studios/studios.module';
-import { PointsModule } from './points/points.module';
 import { typeOrmConfig } from './database/typeorm.config';
 
 @Module({
@@ -30,7 +29,6 @@ import { typeOrmConfig } from './database/typeorm.config';
     PracticeModule,
     ScheduleModule,
     StudiosModule,
-    PointsModule,
   ],
 })
 export class AppModule {}

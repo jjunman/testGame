@@ -31,9 +31,6 @@ export class BandMember {
   @Column({ name: 'custom_position', type: 'varchar', nullable: true })
   customPosition: string | null;
 
-  @Column({ name: 'volume_points', default: 20 })
-  volumePoints: number;
-
   @Column({ name: 'home_location_label', type: 'varchar', nullable: true })
   homeLocationLabel: string | null;
 

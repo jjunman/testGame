@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,12 +39,6 @@ export function BandMembersScreen({ route, navigation }: Props) {
   const myMembership = members.find((member) => member.userId === user?.id);
   const otherMembers = members.filter((member) => member.userId !== user?.id);
   const isLeader = myMembership?.role === 'leader';
-  const averagePoints = useMemo(() => {
-    if (members.length === 0) {
-      return 0;
-    }
-    return Math.round(members.reduce((sum, member) => sum + member.volumePoints, 0) / members.length);
-  }, [members]);
 
   const transferLeader = async (targetUserId: string, memberName: string) => {
     Alert.alert('리더 권한 변경', `${memberName} 님에게 리더 권한을 넘길까요?`, [
@@ -160,18 +154,15 @@ export function BandMembersScreen({ route, navigation }: Props) {
             </View>
           </View>
           <View style={styles.myStats}>
-            <MiniStat icon="musical-notes-outline" label="내 포인트" value={`${myMembership.volumePoints}점`} />
-            <MiniStat icon="stats-chart-outline" label="밴드 평균" value={`${averagePoints}점`} />
             <MiniStat icon="calendar-outline" label="가입" value={formatJoinDate(myMembership.joinedAt)} />
           </View>
-          <PointsGauge value={myMembership.volumePoints} />
         </View>
       ) : null}
 
       <View style={styles.rosterSection}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>멤버 목록</Text>
-          <Text style={styles.averageText}>평균 {averagePoints}점</Text>
+          <Text style={styles.averageText}>{members.length}명</Text>
         </View>
         <View style={styles.rosterList}>
           {otherMembers.map((member) => (
@@ -265,27 +256,6 @@ function MemberRow({
           )}
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-function PointsGauge({ value }: { value: number }) {
-  const safeValue = Math.max(0, Math.min(100, value));
-
-  return (
-    <View style={styles.pointsWrap}>
-      <View style={styles.pointsHeader}>
-        <Text style={styles.pointsLabel}>볼륨 포인트</Text>
-        <Text style={styles.pointsValue}>{safeValue}점</Text>
-      </View>
-      <View style={styles.pointsScale}>
-        <Text style={styles.pointsScaleText}>0</Text>
-        <Text style={styles.pointsScaleText}>50</Text>
-        <Text style={styles.pointsScaleText}>100</Text>
-      </View>
-      <View style={styles.pointsTrack}>
-        <View style={[styles.pointsFill, { width: `${safeValue}%` }]} />
-      </View>
     </View>
   );
 }
@@ -430,45 +400,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 13,
     fontWeight: '900',
-  },
-  pointsWrap: {
-    gap: 8,
-  },
-  pointsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  pointsLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  pointsValue: {
-    color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  pointsScale: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  pointsScaleText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  pointsTrack: {
-    height: 12,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surfaceMuted,
-    overflow: 'hidden',
-  },
-  pointsFill: {
-    height: '100%',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
   },
   rosterSection: {
     gap: 14,

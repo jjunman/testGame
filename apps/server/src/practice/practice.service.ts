@@ -12,10 +12,8 @@ import * as path from 'path';
 import { promisify } from 'util';
 import ffmpegPath from 'ffmpeg-static';
 import { Repository } from 'typeorm';
-import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
 import { PositionType, PracticeAssignmentStatus, PracticeSubmissionStatus } from '../common/enums';
-import { PointsService } from '../points/points.service';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { UsersService } from '../users/users.service';
 import { CreatePracticeAssignmentDto } from './dto';
@@ -33,12 +31,9 @@ export class PracticeService {
     private readonly submissionsRepository: Repository<PracticeSubmission>,
     @InjectRepository(SongCandidate)
     private readonly candidatesRepository: Repository<SongCandidate>,
-    @InjectRepository(BandMember)
-    private readonly membersRepository: Repository<BandMember>,
     private readonly bandsService: BandsService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
-    private readonly pointsService: PointsService,
   ) {}
 
   async listAssignments(userId: string, bandId: string) {
@@ -48,8 +43,6 @@ export class PracticeService {
       relations: ['band', 'submissions', 'submissions.user', 'songCandidate', 'songCandidate.songCatalog'],
       order: { dueAt: 'ASC' },
     });
-
-    await Promise.all(items.map((assignment) => this.settleMissedPracticePoint(userId, assignment)));
 
     return items.map((assignment) => ({
       id: assignment.id,
@@ -104,28 +97,20 @@ export class PracticeService {
 
     const membership = await this.bandsService.requireMembership(userId, assignment.band.id);
     const closed = assignment.dueAt.getTime() < Date.now();
-    await this.settleMissedPracticePoint(userId, assignment);
     const mySubmission = assignment.submissions?.find((item) => item.user.id === userId) ?? null;
-    const pointStatus = await this.pointsService.getPracticePointStatus(assignment.band.id, userId, assignmentId);
     const members = await this.bandsService.getMembers(userId, assignment.band.id);
-    await Promise.all(members.map((member) => this.settleMissedPracticePoint(member.userId, assignment)));
-    const memberStatuses = await Promise.all(
-      members.map(async (member) => {
-        const submission = assignment.submissions?.find((item) => item.user.id === member.userId) ?? null;
-        const memberPointStatus = await this.pointsService.getPracticePointStatus(assignment.band.id, member.userId, assignmentId);
+    const memberStatuses = members.map((member) => {
+      const submission = assignment.submissions?.find((item) => item.user.id === member.userId) ?? null;
 
-        return {
-          userId: member.userId,
-          name: member.name,
-          role: member.role,
-          positionLabel: member.positionLabel,
-          submitted: Boolean(submission),
-          submittedAt: submission?.submittedAt.toISOString() ?? null,
-          pointChange: memberPointStatus.changeAmount,
-          currentVolumePoints: memberPointStatus.currentVolumePoints,
-        };
-      }),
-    );
+      return {
+        userId: member.userId,
+        name: member.name,
+        role: member.role,
+        positionLabel: member.positionLabel,
+        submitted: Boolean(submission),
+        submittedAt: submission?.submittedAt.toISOString() ?? null,
+      };
+    });
 
     return {
       id: assignment.id,
@@ -156,7 +141,6 @@ export class PracticeService {
       isClosed: closed,
       mixAudioUrl: assignment.mixAudioUrl,
       mixGeneratedAt: assignment.mixGeneratedAt?.toISOString() ?? null,
-      pointStatus,
       memberStatuses: membership.role === 'leader' || closed ? memberStatuses : [],
     };
   }
@@ -191,7 +175,6 @@ export class PracticeService {
     const existing = await this.submissionsRepository.findOne({
       where: { assignment: { id: assignmentId }, user: { id: userId } },
     });
-    const firstSubmission = !existing;
 
     const saved = await this.submissionsRepository.save(
       this.submissionsRepository.create({
@@ -204,10 +187,6 @@ export class PracticeService {
         status: PracticeSubmissionStatus.SUBMITTED,
       }),
     );
-
-    if (firstSubmission && assignment.dueAt.getTime() >= Date.now()) {
-      await this.pointsService.addPracticePoint(assignment.band.id, userId, assignmentId);
-    }
 
     return saved;
   }
@@ -225,9 +204,6 @@ export class PracticeService {
     assignment.dueAt = new Date(Date.now() - 1000);
     assignment.status = PracticeAssignmentStatus.CLOSED;
     await this.assignmentsRepository.save(assignment);
-
-    const members = await this.bandsService.getMembers(userId, assignment.band.id);
-    await Promise.all(members.map((member) => this.settleMissedPracticePoint(member.userId, assignment)));
 
     return this.getAssignmentDetail(userId, assignmentId);
   }
@@ -351,25 +327,6 @@ export class PracticeService {
       mixGeneratedAt: assignment.mixGeneratedAt.toISOString(),
       submissionCount: submissions.length,
     };
-  }
-
-  private async settleMissedPracticePoint(userId: string, assignment: PracticeAssignment) {
-    const closed = assignment.dueAt.getTime() < Date.now();
-    const hasSubmitted = assignment.submissions?.some((item) => item.user.id === userId) ?? false;
-
-    if (!closed || hasSubmitted || !assignment.band?.id) {
-      return;
-    }
-
-    const membership = await this.membersRepository.findOne({
-      where: { band: { id: assignment.band.id }, user: { id: userId } },
-    });
-
-    if (!membership || assignment.dueAt.getTime() < membership.joinedAt.getTime()) {
-      return;
-    }
-
-    await this.pointsService.deductPracticePoint(assignment.band.id, userId, assignment.id);
   }
 
   private getRequiredRecordingSec(assignment: PracticeAssignment) {

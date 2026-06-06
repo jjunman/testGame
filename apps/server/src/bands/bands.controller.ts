@@ -126,16 +126,6 @@ export class BandsController {
     return this.bandsService.getMembers(user.userId, bandId);
   }
 
-  @Get(':bandId/points')
-  points(
-    @CurrentUser() user: { userId: string },
-    @Param('bandId') bandId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    res.locals.message = '볼륨 포인트를 불러왔습니다.';
-    return this.bandsService.getPoints(user.userId, bandId);
-  }
-
   @Get(':bandId/todos')
   todos(
     @CurrentUser() user: { userId: string },

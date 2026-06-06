@@ -41,7 +41,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
         myMembership: result.myMembership ?? {
           role: 'member',
           positionLabel: '',
-          volumePoints: 0,
         },
         todos: Array.isArray(result.todos) ? result.todos : [],
         voteSummary: result.voteSummary ?? { song: 'none', schedule: 'none', studio: 'none' },

@@ -37,12 +37,6 @@ type PracticeDetailDto = {
     submittedAt: string;
   } | null;
   isClosed: boolean;
-  pointStatus: {
-    currentVolumePoints: number | null;
-    applied: boolean;
-    changeAmount: number;
-    reason: string | null;
-  };
   memberStatuses: Array<{
     userId: string;
     name: string;
@@ -50,8 +44,6 @@ type PracticeDetailDto = {
     positionLabel: string;
     submitted: boolean;
     submittedAt: string | null;
-    pointChange: number;
-    currentVolumePoints: number | null;
   }>;
   mixAudioUrl: string | null;
   mixGeneratedAt: string | null;
@@ -80,7 +72,7 @@ type DraftRecording = {
 type PracticeMode = 'main' | 'practice' | 'submit' | 'submissions';
 
 const MAX_DRAFTS = 5;
-const RECORDING_COUNTDOWN_SECONDS = 5;
+const RECORDING_COUNTDOWN_SECONDS = 7;
 const AUDIO_LOAD_TIMEOUT_MS = 12000;
 
 export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
@@ -219,11 +211,15 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   };
 
   const startRecording = async () => {
-    Alert.alert('녹음 안내', '이어폰을 꼭 착용해 주세요. 5초 뒤 녹음이 시작됩니다.');
+    const confirmed = await showRecordingReadyAlert();
+    if (!confirmed) {
+      return false;
+    }
+
     const permission = await Audio.requestPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('권한 필요', '녹음을 하려면 마이크 권한이 필요해요.');
-      return;
+      return false;
     }
 
     setCountdown(RECORDING_COUNTDOWN_SECONDS);
@@ -244,6 +240,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
         return current - 1;
       });
     }, 1000);
+    return true;
   };
 
   const stopRecording = async () => {
@@ -514,7 +511,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           recording={recording}
           stopSignal={recordingStopSignal}
           countdown={countdown}
-          onStartRecording={() => void startRecording()}
+          onStartRecording={startRecording}
           onStopRecording={() => void stopRecording()}
           onCancel={() => void cancelRecording()}
           onSubmit={() => setMode('submit')}
@@ -730,9 +727,6 @@ function MainPanel({
       <Text style={styles.description}>{detail.description ?? '리더가 정한 구간을 듣고 녹음본을 제출해 주세요.'}</Text>
       <InfoRow label="연습 구간" value={formatRange(detail.startSec, detail.endSec)} />
       <InfoRow label="제출 상태" value={detail.mySubmission ? '제출 완료' : '제출 필요'} />
-      {detail.pointStatus.applied ? (
-        <InfoRow label="볼륨 포인트" value={`${detail.pointStatus.changeAmount >= 0 ? '+' : ''}${detail.pointStatus.changeAmount}점`} />
-      ) : null}
       <ActionRow icon="checkbox-outline" label="연습하러 가기" onPress={onPractice} />
       <ActionRow icon="play-circle-outline" label="녹음본 듣기" onPress={onSubmissions} />
       {!detail.isClosed ? (
@@ -764,7 +758,7 @@ function PracticePanel({
   recording: boolean;
   stopSignal: number;
   countdown: number | null;
-  onStartRecording: () => void;
+  onStartRecording: () => Promise<boolean>;
   onStopRecording: () => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -815,10 +809,15 @@ function PracticePanel({
     }
   }, [stopSignal]);
 
-  const handleRecordPress = () => {
+  const handleRecordPress = async () => {
     if (recording) {
       stopSourcePlayback();
       onStopRecording();
+      return;
+    }
+
+    const recordingStarted = await onStartRecording();
+    if (!recordingStarted) {
       return;
     }
 
@@ -827,17 +826,18 @@ function PracticePanel({
       clearSourceStopTimer();
       const segmentStartSec = Math.max(0, detail.startSec ?? 0);
       const segmentEndSec = detail.endSec !== null && detail.endSec > segmentStartSec ? detail.endSec : null;
-      const preRollSec = Math.min(RECORDING_COUNTDOWN_SECONDS, segmentStartSec);
-      const sourceStartDelayMs = (RECORDING_COUNTDOWN_SECONDS - preRollSec) * 1000;
-      const sourceStartSec = segmentStartSec - preRollSec;
-      playerRef.current?.seekTo?.(sourceStartSec, true);
+      const { sourceStartDelayMs, sourceStartSec } = getSourcePlaybackPlan(segmentStartSec, RECORDING_COUNTDOWN_SECONDS);
 
       if (sourceStartDelayMs === 0) {
+        playerRef.current?.seekTo?.(sourceStartSec, true);
         setSourcePlaying(true);
       } else {
+        playerRef.current?.pauseVideo?.();
+        playerRef.current?.getInternalPlayer?.()?.pauseVideo?.();
         setSourcePlaying(false);
         sourceStartTimerRef.current = setTimeout(() => {
           sourceStartTimerRef.current = null;
+          playerRef.current?.seekTo?.(sourceStartSec, true);
           setSourcePlaying(true);
         }, sourceStartDelayMs);
       }
@@ -851,7 +851,6 @@ function PracticePanel({
         }, stopDelayMs);
       }
     }
-    onStartRecording();
   };
 
   const handleCancelPress = () => {
@@ -922,24 +921,28 @@ function RecorderDeck({
       ? '연주가 끝나면 가운데 버튼을 눌러 저장해요.'
       : preparing
         ? '원곡은 재생 중이고 아직 녹음되지 않아요.'
-        : '누르면 원곡이 5초 전부터 재생되고, 카운트다운 뒤 녹음돼요.';
+        : '누르면 원곡이 7초 전부터 재생되고, 카운트다운 뒤 녹음돼요.';
 
   return (
     <View style={styles.recorderCard}>
       <View style={styles.recorderTopRow}>
         <Text style={styles.recorderStatus}>{status}</Text>
-        <Text style={styles.recorderTimer}>{preparing ? `00:0${countdown}` : recording ? 'REC' : '00:00'}</Text>
       </View>
       <Pressable
-        onPress={onRecord}
+        onPress={() => void onRecord()}
         disabled={disabled || preparing}
         style={[
           styles.recordButton,
           recording && styles.recordButtonStop,
+          preparing && styles.recordButtonCountingDown,
           (disabled || preparing) && styles.recordButtonDisabled,
         ]}
       >
-        <View style={[styles.recordButtonCore, recording && styles.recordButtonCoreStop]} />
+        {preparing ? (
+          <Text style={styles.recordCountdownText}>{countdown}</Text>
+        ) : (
+          <View style={[styles.recordButtonCore, recording && styles.recordButtonCoreStop]} />
+        )}
       </Pressable>
       <Text style={styles.recorderHint}>{hint}</Text>
       {recording || preparing ? (
@@ -1154,7 +1157,6 @@ function SubmissionsPanel({
             <View key={member.userId} style={styles.memberCard}>
               <Text style={styles.memberName}>{member.name}</Text>
               <StatusBadge label={member.submitted ? '제출 완료' : '미제출'} tone={member.submitted ? 'success' : 'danger'} />
-              <Text style={styles.memberPoint}>포인트 {member.pointChange >= 0 ? `+${member.pointChange}` : member.pointChange}</Text>
             </View>
           ))}
         </View>
@@ -1442,6 +1444,36 @@ function normalizeWaveform(samples?: number[]) {
     const average = chunk.reduce((sum, value) => sum + value, 0) / chunk.length;
     return Math.max(0.08, Math.min(1, average));
   });
+}
+
+function showRecordingReadyAlert() {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(value);
+    };
+
+    Alert.alert(
+      '녹음 안내',
+      '이어폰을 꼭 착용해 주세요. 확인을 누르면 7초 뒤 녹음이 시작됩니다.',
+      [{ text: '확인', onPress: () => settle(true) }],
+      { cancelable: true, onDismiss: () => settle(false) },
+    );
+  });
+}
+
+function getSourcePlaybackPlan(segmentStartSec: number, countdownSec: number) {
+  const safeSegmentStartSec = Math.max(0, segmentStartSec);
+  const availablePreRollSec = Math.min(countdownSec, safeSegmentStartSec);
+
+  return {
+    sourceStartSec: safeSegmentStartSec - availablePreRollSec,
+    sourceStartDelayMs: (countdownSec - availablePreRollSec) * 1000,
+  };
 }
 
 function FakeTimeline({ startSec, endSec }: { startSec: number | null; endSec: number | null }) {
@@ -1900,11 +1932,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  recorderTimer: {
-    color: theme.colors.danger,
-    fontSize: 14,
-    fontWeight: '900',
-  },
   recordButton: {
     width: 86,
     height: 86,
@@ -1919,8 +1946,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primaryDark,
     backgroundColor: theme.colors.surfaceMuted,
   },
+  recordButtonCountingDown: {
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.colors.danger,
+  },
   recordButtonDisabled: {
-    opacity: 0.55,
+    opacity: 0.78,
   },
   recordButtonCore: {
     width: 52,
@@ -1933,6 +1964,11 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 8,
     backgroundColor: theme.colors.primaryDark,
+  },
+  recordCountdownText: {
+    color: '#fff',
+    fontSize: 34,
+    fontWeight: '900',
   },
   recorderHint: {
     color: theme.colors.textMuted,
@@ -2184,10 +2220,5 @@ const styles = StyleSheet.create({
   memberName: {
     color: theme.colors.text,
     fontWeight: '900',
-  },
-  memberPoint: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
   },
 });

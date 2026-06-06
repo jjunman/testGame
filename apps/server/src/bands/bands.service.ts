@@ -6,7 +6,6 @@
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { LEADER_START_POINTS, MEMBER_START_POINTS } from '../common/constants';
 import { MemberRole, PositionType, PracticeAssignmentStatus, SongRoundStatus } from '../common/enums';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { ScheduleAvailability } from '../schedule/schedule-availability.entity';
@@ -66,7 +65,6 @@ export class BandsService {
         role: MemberRole.LEADER,
         positionType: dto.positionType,
         customPosition: dto.customPosition ?? null,
-        volumePoints: LEADER_START_POINTS,
       }),
     );
 
@@ -102,7 +100,6 @@ export class BandsService {
         role: MemberRole.MEMBER,
         positionType: dto.positionType,
         customPosition: dto.customPosition ?? null,
-        volumePoints: MEMBER_START_POINTS,
       }),
     );
 
@@ -268,7 +265,6 @@ export class BandsService {
       myMembership: {
         role: membership.role,
         positionLabel: this.positionLabel(membership.positionType, membership.customPosition),
-        volumePoints: membership.volumePoints,
       },
       activeSongRound: latestRound
         ? {
@@ -301,13 +297,8 @@ export class BandsService {
       name: member.user.name,
       role: member.role,
       positionLabel: this.positionLabel(member.positionType, member.customPosition),
-      volumePoints: member.volumePoints,
       joinedAt: member.joinedAt.toISOString(),
     }));
-  }
-
-  async getPoints(userId: string, bandId: string) {
-    return this.getMembers(userId, bandId);
   }
 
   async getTodos(userId: string, bandId: string) {

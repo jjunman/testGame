@@ -137,7 +137,7 @@
 
   <rect class="card" x="120" y="1930" width="360" height="108" rx="20"/>
   <text class="node-title" x="206" y="1968">녹음과 제출</text>
-  <text class="node-text" x="152" y="1998">5초 전부터 유튜브 재생</text>
+  <text class="node-text" x="152" y="1998">7초 전부터 유튜브 재생</text>
   <text class="node-text" x="152" y="2024">끝까지 녹음해야 저장</text>
 
   <!-- Schedule column -->
@@ -193,17 +193,17 @@
   <!-- Members column -->
   <rect class="primary" x="1380" y="1070" width="260" height="80" rx="20"/>
   <text class="node-title" x="1438" y="1105">유저 탭</text>
-  <text class="node-text" x="1410" y="1132">멤버 / 포인트</text>
+  <text class="node-text" x="1410" y="1132">멤버</text>
 
   <rect class="card" x="1380" y="1190" width="260" height="108" rx="20"/>
   <text class="node-title" x="1420" y="1228">내 정보</text>
   <text class="node-text" x="1410" y="1258">포지션</text>
-  <text class="node-text" x="1410" y="1284">볼륨 포인트</text>
+  <text class="node-text" x="1410" y="1284">역할</text>
 
   <rect class="card" x="1380" y="1338" width="260" height="108" rx="20"/>
   <text class="node-title" x="1410" y="1376">멤버 목록</text>
   <text class="node-text" x="1410" y="1406">이름, 포지션</text>
-  <text class="node-text" x="1410" y="1432">포인트 확인</text>
+  <text class="node-text" x="1410" y="1432">역할 확인</text>
 
   <rect class="muted" x="1380" y="1486" width="260" height="108" rx="20"/>
   <text class="node-title" x="1412" y="1524">관리 행동</text>
@@ -236,7 +236,7 @@
 
   <!-- Points and system rules -->
   <rect class="section" x="80" y="2130" width="1640" height="120" rx="28"/>
-  <text class="section-title" x="120" y="2180">4. 볼륨 포인트 규칙</text>
+  <text class="section-title" x="120" y="2180">4. 역할 규칙</text>
   <text class="node-text" x="120" y="2218">모든 부원은 기본 20점, 리더는 25점으로 시작합니다. 연습을 제시간에 제출하면 상승하고, 미제출하면 하락합니다.</text>
-  <text class="node-text" x="980" y="2218">동점 상황에서는 볼륨 포인트가 높은 멤버의 선택이 우선됩니다.</text>
+  <text class="node-text" x="980" y="2218">동점 상황에서는 역할가 높은 멤버의 선택이 우선됩니다.</text>
 </svg>
