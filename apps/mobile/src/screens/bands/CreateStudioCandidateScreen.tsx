@@ -88,7 +88,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const mapStudios = [...locatedStudios].sort((a, b) => {
     return Number(a.id === selectedStudioId) - Number(b.id === selectedStudioId);
   });
-  const studioCardWidth = Math.max(260, width - 64);
+  const studioCardWidth = width - 32;
   const studioCardGap = 12;
   const onStudioScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (studioCardWidth + studioCardGap));

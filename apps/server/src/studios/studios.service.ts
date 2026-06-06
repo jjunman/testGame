@@ -43,7 +43,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://busk.co.kr/practice_rooms.php?id=246&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%ED%95%A9%EC%A3%BC%EC%8B%A4%ED%98%B8%EC%88%98%EC%A0%90',
     sourceUrl: 'https://busk.co.kr/practice_rooms.php?id=246&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%ED%95%A9%EC%A3%BC%EC%8B%A4%ED%98%B8%EC%88%98%EC%A0%90',
     hourlyPrice: 20000,
-    priceNote: null,
   },
   {
     name: '아트콤마스튜디오 서울예대점',
@@ -54,7 +53,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://busk.co.kr/practice_rooms.php?id=252&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%EC%84%9C%EC%9A%B8%EC%98%88%EB%8C%80%EC%A0%90',
     sourceUrl: 'https://busk.co.kr/practice_rooms.php?id=252&mode=view&name=%EC%95%84%ED%8A%B8%EC%BD%A4%EB%A7%88%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4+%EC%84%9C%EC%9A%B8%EC%98%88%EB%8C%80%EC%A0%90',
     hourlyPrice: null,
-    priceNote: '가격 업체 문의. 최신 요금은 외부 링크에서 확인해 주세요.',
   },
   {
     name: '아트콤마스튜디오 신길점',
@@ -65,7 +63,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://studiofy.kr/studio-profile/fb8b3475-7445-466b-aa89-4d7098d4bb6c/',
     sourceUrl: 'https://studiofy.kr/studio-profile/fb8b3475-7445-466b-aa89-4d7098d4bb6c/',
     hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
   },
   {
     name: '아트콤마스튜디오 한양대점',
@@ -76,7 +73,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://studiofy.kr/studio-profile/5bae1030-cb91-4ae3-85f2-621439e9e082/',
     sourceUrl: 'https://studiofy.kr/studio-profile/5bae1030-cb91-4ae3-85f2-621439e9e082/',
     hourlyPrice: null,
-    priceNote: '가격 확인 필요. 최신 요금은 외부 링크에서 확인해 주세요.',
   },
   {
     name: '에스엠 음악연습실/합주실/드럼연습실/밴드연습실',
@@ -87,7 +83,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://studiofy.kr/studio-profile/5aad3758-4751-4c24-879a-d07ab365a1de',
     sourceUrl: 'https://studiofy.kr/studio-profile/5aad3758-4751-4c24-879a-d07ab365a1de',
     hourlyPrice: 22000,
-    priceNote: null,
   },
   {
     name: '당나귀음악연습실',
@@ -98,7 +93,6 @@ const APP_PROVIDED_ANSAN_STUDIOS = [
     externalUrl: 'https://studiofy.kr/studio-profile/02bbc7f7-0c13-40f4-9d5c-8602103a0c62/',
     sourceUrl: 'https://studiofy.kr/studio-profile/02bbc7f7-0c13-40f4-9d5c-8602103a0c62/',
     hourlyPrice: 20000,
-    priceNote: null,
   }
 ] satisfies Array<Partial<Studio> & { name: string; sourceUrl: string }>;
 
@@ -406,7 +400,6 @@ export class StudiosService {
       sourceUrl: studio.sourceUrl,
       scrapedAt: studio.scrapedAt?.toISOString() ?? null,
       hourlyPrice: studio.hourlyPrice,
-      priceNote: studio.priceNote,
       latitude: studio.latitude,
       longitude: studio.longitude,
       distanceAverageKm: distance?.average ?? null,
@@ -419,7 +412,6 @@ export class StudiosService {
     const name = this.matchText(text, /#\s*([^\n]+)/) ?? '안산 합주실';
     const address = this.matchText(text, /주소\s+([^\n]+)/);
     const phone = this.matchText(text, /전화번호\s+([0-9-]+)/);
-    const priceNote = this.matchText(text, /(요금[^\n]*|가격[^\n]*|[0-9,]+원[^\n]*)/);
     return {
       name,
       region: ANSAN_REGION,
@@ -428,8 +420,7 @@ export class StudiosService {
       phone,
       externalUrl: sourceUrl,
       sourceUrl,
-      hourlyPrice: this.parseHourlyPrice(priceNote ?? text),
-      priceNote,
+      hourlyPrice: this.parseHourlyPrice(text),
     };
   }
 

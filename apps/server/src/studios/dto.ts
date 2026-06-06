@@ -48,10 +48,6 @@ export class CreateStudioCandidateDto {
 
   @IsOptional()
   @IsString()
-  priceNote?: string;
-
-  @IsOptional()
-  @IsString()
   note?: string;
 
 }

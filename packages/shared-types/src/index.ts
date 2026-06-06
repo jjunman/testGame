@@ -146,7 +146,6 @@ export type StudioDto = {
   sourceUrl: string | null;
   scrapedAt: string | null;
   hourlyPrice: number | null;
-  priceNote: string | null;
   distanceAverageKm: number | null;
   myDistanceKm: number | null;
 };

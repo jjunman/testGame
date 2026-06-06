@@ -41,9 +41,6 @@ export class Studio {
   @Column({ name: 'hourly_price', type: 'int', nullable: true })
   hourlyPrice: number | null;
 
-  @Column({ name: 'price_note', type: 'text', nullable: true })
-  priceNote: string | null;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
