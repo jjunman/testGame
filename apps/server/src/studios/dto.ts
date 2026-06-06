@@ -52,10 +52,6 @@ export class CreateStudioCandidateDto {
 
   @IsOptional()
   @IsString()
-  amenitiesNote?: string;
-
-  @IsOptional()
-  @IsString()
   note?: string;
 
 }
