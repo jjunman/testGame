@@ -148,15 +148,13 @@ export function ActionCardButton({
       ]}
     >
       <View style={styles.actionIconBox}>
-        {loading ? <ActivityIndicator color={theme.colors.primaryDark} /> : <Ionicons name={icon} size={22} color={theme.colors.primaryDark} />}
+        {loading ? <ActivityIndicator color={theme.colors.primaryDark} /> : <Ionicons name={icon} size={20} color={theme.colors.primaryDark} />}
       </View>
       <View style={styles.actionTextBlock}>
         <Text style={styles.actionTitle} numberOfLines={1}>{title}</Text>
         {subtitle ? <Text style={styles.actionSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
-      <View style={styles.actionArrowBox}>
-        <Ionicons name="chevron-forward" size={19} color={theme.colors.primaryDark} />
-      </View>
+      <Ionicons name="chevron-forward" size={17} color={theme.colors.textMuted} />
     </Pressable>
   );
 }
@@ -233,7 +231,7 @@ export function OptionRow({
   return (
     <Pressable onPress={onPress} style={[styles.optionRow, selected && styles.optionRowSelected]}>
       <View style={styles.optionCheck}>
-        <Text style={[styles.optionCheckText, selected && styles.optionCheckTextSelected]}>{selected ? '?' : ''}</Text>
+        {selected ? <Ionicons name="checkmark" size={15} color={theme.colors.primaryDark} /> : null}
       </View>
       <View style={styles.optionBody}>
         <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{title}</Text>
@@ -322,7 +320,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    padding: 13,
+    padding: 14,
     gap: 10,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -376,33 +374,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   actionCard: {
-    minHeight: 66,
+    minHeight: 60,
     borderRadius: theme.radius.md,
-    borderWidth: 1.5,
-    borderColor: '#d8d2ff',
-    backgroundColor: theme.colors.primarySoft,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: 10,
   },
   actionCardPressed: {
-    backgroundColor: '#e8e3ff',
+    backgroundColor: theme.colors.primarySoft,
     borderColor: theme.colors.primary,
   },
   actionCardDisabled: {
     opacity: 0.5,
   },
   actionIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.surface,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d8d2ff',
   },
   actionTextBlock: {
     flex: 1,
@@ -410,22 +406,14 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   actionTitle: {
-    color: theme.colors.primaryDark,
+    color: theme.colors.text,
     fontSize: 15,
     fontWeight: '900',
   },
   actionSubtitle: {
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
-  },
-  actionArrowBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   secondaryButton: {
     alignItems: 'center',
@@ -499,7 +487,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   optionRowSelected: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
     borderColor: theme.colors.primary,
   },
   optionCheck: {
@@ -512,14 +500,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#fff',
   },
-  optionCheckText: {
-    color: theme.colors.primary,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  optionCheckTextSelected: {
-    color: theme.colors.primaryDark,
-  },
   optionBody: {
     flex: 1,
     gap: 3,
@@ -530,14 +510,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   optionTitleSelected: {
-    color: '#fff',
+    color: theme.colors.text,
   },
   optionSubtitle: {
     color: theme.colors.textMuted,
     fontSize: 12,
   },
   optionSubtitleSelected: {
-    color: 'rgba(255,255,255,0.82)',
+    color: theme.colors.textMuted,
   },
   empty: {
     borderRadius: theme.radius.md,

@@ -21,6 +21,7 @@ import { ScheduleScreen } from '../screens/bands/ScheduleScreen';
 import { ScheduleEditScreen } from '../screens/bands/ScheduleEditScreen';
 import { CreateScheduleSlotScreen } from '../screens/bands/CreateScheduleSlotScreen';
 import { StudioScreen } from '../screens/bands/StudioScreen';
+import { SettlementScreen } from '../screens/bands/SettlementScreen';
 import { CreateStudioCandidateScreen } from '../screens/bands/CreateStudioCandidateScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { AuthStackParamList, BandsStackParamList } from '../types/navigation';
@@ -63,6 +64,7 @@ function BandsNavigator() {
       <BandsStack.Screen name="ScheduleEdit" component={ScheduleEditScreen} options={{ title: '시간 맞추기' }} />
       <BandsStack.Screen name="CreateScheduleSlot" component={CreateScheduleSlotScreen} options={{ title: '합주 시간 제안' }} />
       <BandsStack.Screen name="Studios" component={StudioScreen} options={{ title: '합주실 정하기', animation: 'none' }} />
+      <BandsStack.Screen name="Settlement" component={SettlementScreen} options={{ title: '정산', animation: 'none' }} />
       <BandsStack.Screen name="CreateStudioCandidate" component={CreateStudioCandidateScreen} options={{ title: '합주실 후보 추가' }} />
     </BandsStack.Navigator>
   );

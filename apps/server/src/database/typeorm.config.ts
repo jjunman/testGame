@@ -10,6 +10,7 @@ import { ScheduleSlot } from '../schedule/schedule-slot.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { StudioVote } from '../studios/studio-vote.entity';
 import { Studio } from '../studios/studio.entity';
+import { Settlement } from '../settlement/settlement.entity';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { SongCatalog } from '../songs/song-catalog.entity';
 import { SongRound } from '../songs/song-round.entity';
@@ -42,5 +43,6 @@ export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
     Studio,
     StudioCandidate,
     StudioVote,
+    Settlement,
   ],
 });

@@ -21,5 +21,6 @@ export type BandsStackParamList = {
   ScheduleEdit: { bandId: string; period?: 'morning' | 'afternoon'; initialDayIndex?: number };
   CreateScheduleSlot: { bandId: string };
   Studios: { bandId: string };
+  Settlement: { bandId: string };
   CreateStudioCandidate: { bandId: string };
 };

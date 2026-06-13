@@ -189,6 +189,23 @@ export type StudioLocationDto = {
   longitude: number | null;
 };
 
+export type SettlementDto = {
+  selectedStudioId: string | null;
+  customTotalPrice: number | null;
+  expectedHours: number;
+  scheduleLocked: boolean;
+  confirmedSchedule: {
+    id: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    expectedHours: number;
+  } | null;
+  participantUserIds: string[];
+  paidUserIds: string[];
+  updatedAt: string;
+};
+
 export type TodoItemDto = {
   type: TodoType;
   title: string;

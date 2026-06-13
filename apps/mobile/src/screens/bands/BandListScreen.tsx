@@ -81,7 +81,6 @@ export function BandListScreen({ navigation }: Props) {
           );
         })}
         <Pressable style={styles.addBandCard} onPress={() => navigation.navigate('BandAdd')}>
-          <View style={styles.addBandGlow} />
           <View style={styles.addBandRow}>
             <View style={styles.addBandIcon}>
               <Ionicons name="add" size={26} color="#fff" />
@@ -157,33 +156,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   addBandCard: {
-    minHeight: 132,
+    minHeight: 78,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#d9d5ff',
-    backgroundColor: '#f8f7ff',
-    padding: 18,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 14,
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  addBandGlow: {
-    position: 'absolute',
-    right: -34,
-    top: -42,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: theme.colors.primarySoft,
   },
   addBandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 13,
   },
   addBandIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.primary,

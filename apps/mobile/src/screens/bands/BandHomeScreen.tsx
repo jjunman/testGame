@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, PracticeAssignmentDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
@@ -16,10 +16,8 @@ type Props = NativeStackScreenProps<BandsStackParamList, 'BandHome'>;
 export function BandHomeScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const { setCurrentBand } = useCurrentBand();
-  const { width } = useWindowDimensions();
   const [detail, setDetail] = useState<BandHomeDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeTodoIndex, setActiveTodoIndex] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -87,13 +85,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
     });
   }, [bandId, detail?.myMembership.profileImageUrl, navigation]);
 
-  useEffect(() => {
-    const todoCount = detail?.todos?.length ?? 0;
-    if (activeTodoIndex >= todoCount) {
-      setActiveTodoIndex(Math.max(0, todoCount - 1));
-    }
-  }, [activeTodoIndex, detail?.todos?.length]);
-
   if (!detail) {
     return (
       <Screen>
@@ -111,12 +102,8 @@ export function BandHomeScreen({ route, navigation }: Props) {
   }
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
-  const todoCardGap = 12;
-  const todoCardWidth = Math.max(260, width - 32 - todoCardGap);
-  const onTodoScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / (todoCardWidth + todoCardGap));
-    setActiveTodoIndex(Math.max(0, Math.min(todos.length - 1, nextIndex)));
-  };
+  const primaryTodo = todos[0];
+  const moreTodos = todos.slice(1, 4);
 
   const openTodo = async (todo: TodoItemDto) => {
     if (todo.type === 'submit_practice') {
@@ -148,35 +135,30 @@ export function BandHomeScreen({ route, navigation }: Props) {
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>내 할 일</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>내 할 일</Text>
+          {todos.length > 1 ? <Text style={styles.sectionMeta}>{todos.length}개 남음</Text> : null}
+        </View>
         {todos.length > 0 ? (
-          <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              disableIntervalMomentum
-              snapToInterval={todoCardWidth + todoCardGap}
-              contentContainerStyle={styles.todoCarousel}
-              onMomentumScrollEnd={onTodoScrollEnd}
-            >
-              {todos.map((todo, index) => (
-                <View key={`${todo.type}-${todo.targetId ?? index}`} style={[styles.todoCardWrap, { width: todoCardWidth, marginRight: index === todos.length - 1 ? 0 : todoCardGap }]}>
-                  <PrimaryTodoCard todo={todo} onPress={() => void openTodo(todo)} />
-                </View>
-              ))}
-            </ScrollView>
-            {todos.length > 1 ? (
-              <Text style={styles.todoCarouselCount}>{`${activeTodoIndex + 1}/${todos.length}`}</Text>
+          <View style={styles.todoStack}>
+            <PrimaryTodoCard todo={primaryTodo} onPress={() => void openTodo(primaryTodo)} />
+            {moreTodos.length > 0 ? (
+              <View style={styles.compactTodoList}>
+                {moreTodos.map((todo, index) => (
+                  <CompactTodoItem key={`${todo.type}-${todo.targetId ?? index}`} todo={todo} onPress={() => void openTodo(todo)} />
+                ))}
+              </View>
             ) : null}
-          </>
+          </View>
         ) : (
           <EmptyState title="지금은 할 일이 없어요" description="투표나 연습 과제가 생기면 여기에서 바로 확인할 수 있어요." />
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>밴드 진행</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>밴드 진행</Text>
+        </View>
         <BandFlowTimeline
           detail={detail}
           onPress={(target) => {
@@ -362,16 +344,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.primary,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.colors.primaryDark,
-    shadowOpacity: 0.16,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
   },
   memberHeaderButtonPressed: {
     opacity: 0.78,
@@ -410,44 +387,48 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   section: {
+    gap: 9,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10,
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  sectionMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
     fontWeight: '800',
   },
+  todoStack: {
+    gap: 8,
+  },
   primaryTodoCard: {
-    minHeight: 104,
+    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: theme.radius.md,
-    padding: 15,
-    gap: 12,
+    padding: 14,
+    gap: 11,
     borderWidth: 1,
     borderColor: theme.colors.primary,
-    backgroundColor: '#fbfaff',
+    backgroundColor: theme.colors.surface,
   },
   primaryTodoCardPressed: {
     backgroundColor: theme.colors.primarySoft,
     borderColor: theme.colors.primaryDark,
     transform: [{ scale: 0.985 }],
   },
-  todoCarousel: {
-    alignItems: 'center',
-  },
-  todoCardWrap: {
-    flexShrink: 0,
-  },
-  todoCarouselCount: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
   todoIcon: {
-    width: 28,
-    height: 28,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -457,18 +438,18 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   compactTodoList: {
-    gap: 10,
+    gap: 7,
   },
   compactTodoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
   },
   compactTodoItemPressed: {
     backgroundColor: theme.colors.primarySoft,
@@ -510,10 +491,10 @@ const styles = StyleSheet.create({
   },
   voteTimelineCard: {
     borderRadius: theme.radius.md,
-    backgroundColor: '#fbfaff',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd6ff',
-    padding: 14,
+    borderColor: theme.colors.border,
+    padding: 13,
     gap: 12,
   },
   voteTimelineTitle: {

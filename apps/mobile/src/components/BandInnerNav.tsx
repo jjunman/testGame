@@ -5,7 +5,7 @@ import { theme } from '../constants/theme';
 
 type BandInnerNavProps = {
   bandId: string;
-  active: 'home' | 'song' | 'vote' | 'calendar' | 'studio';
+  active: 'home' | 'song' | 'vote' | 'calendar' | 'studio' | 'settlement';
   navigation: any;
 };
 
@@ -14,11 +14,12 @@ let lastActiveIndex = 0;
 export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) {
   const [navWidth, setNavWidth] = useState(0);
   const activeIndex = getActiveIndex(active);
-  const indicatorProgress = useRef(new Animated.Value(lastActiveIndex)).current;
-  const indicatorWidth = navWidth > 0 ? (navWidth - 10) / 5 : 0;
+  const indicatorProgress = useRef(new Animated.Value(Math.max(0, lastActiveIndex))).current;
+  const indicatorWidth = navWidth > 0 ? (navWidth - 10) / 6 : 0;
+  const showIndicator = activeIndex >= 0 && indicatorWidth > 0;
 
   useEffect(() => {
-    if (indicatorWidth === 0) {
+    if (!showIndicator) {
       return;
     }
 
@@ -30,11 +31,11 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       mass: 0.65,
     }).start();
     lastActiveIndex = activeIndex;
-  }, [activeIndex, indicatorProgress, indicatorWidth]);
+  }, [activeIndex, indicatorProgress, showIndicator]);
 
   return (
     <View style={styles.wrap} onLayout={(event) => setNavWidth(event.nativeEvent.layout.width)}>
-      {indicatorWidth > 0 ? (
+      {showIndicator ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -44,8 +45,8 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
               transform: [
                 {
                   translateX: indicatorProgress.interpolate({
-                    inputRange: [0, 1, 2, 3, 4],
-                    outputRange: [0, indicatorWidth, indicatorWidth * 2, indicatorWidth * 3, indicatorWidth * 4],
+                    inputRange: [0, 1, 2, 3, 4, 5],
+                    outputRange: [0, indicatorWidth, indicatorWidth * 2, indicatorWidth * 3, indicatorWidth * 4, indicatorWidth * 5],
                   }),
                 },
               ],
@@ -56,16 +57,16 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="홈"
         active={active === 'home'}
-        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={22} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={21} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
-        label="연습"
+        label="곡"
         active={active === 'song'}
         icon={
           <MaterialCommunityIcons
             name={active === 'song' ? 'music-note' : 'music-note-outline'}
-            size={22}
+            size={21}
             color={active === 'song' ? theme.colors.primary : inactiveColor}
           />
         }
@@ -74,13 +75,13 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="투표"
         active={active === 'vote'}
-        icon={<Ionicons name={active === 'vote' ? 'checkbox' : 'checkbox-outline'} size={22} color={active === 'vote' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'vote' ? 'checkbox' : 'checkbox-outline'} size={21} color={active === 'vote' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'vote' })}
       />
       <NavItem
         label="일정"
         active={active === 'calendar'}
-        icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={22} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={21} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('Schedule', { bandId })}
       />
       <NavItem
@@ -89,11 +90,17 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         icon={
           <MaterialCommunityIcons
             name={active === 'studio' ? 'map-marker' : 'map-marker-outline'}
-            size={22}
+            size={21}
             color={active === 'studio' ? theme.colors.primary : inactiveColor}
           />
         }
         onPress={() => navigation.navigate('Studios', { bandId })}
+      />
+      <NavItem
+        label="정산"
+        active={active === 'settlement'}
+        icon={<Ionicons name={active === 'settlement' ? 'card' : 'card-outline'} size={21} color={active === 'settlement' ? theme.colors.primary : inactiveColor} />}
+        onPress={() => navigation.navigate('Settlement', { bandId })}
       />
     </View>
   );
@@ -102,7 +109,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
 const inactiveColor = '#7c8491';
 
 function getActiveIndex(active: BandInnerNavProps['active']) {
-  return ['home', 'song', 'vote', 'calendar', 'studio'].indexOf(active);
+  return ['home', 'song', 'vote', 'calendar', 'studio', 'settlement'].indexOf(active);
 }
 
 function NavItem({
@@ -127,17 +134,17 @@ function NavItem({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    height: 64,
+    height: 62,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 5,
     shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowRadius: 10,
+    elevation: 2,
     overflow: 'hidden',
   },
   indicator: {
@@ -158,7 +165,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: inactiveColor,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
   },
   labelActive: {

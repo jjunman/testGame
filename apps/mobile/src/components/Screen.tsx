@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../constants/theme';
@@ -12,7 +12,8 @@ type ScreenProps = {
 
 export function Screen({ children, contentContainerStyle, fixedFooter, scrollEnabled = true }: ScreenProps) {
   const insets = useSafeAreaInsets();
-  const bottomSpacing = insets.bottom + 116;
+  const [footerHeight, setFooterHeight] = useState(90);
+  const bottomSpacing = fixedFooter ? insets.bottom + footerHeight + 26 : insets.bottom + 28;
 
   const body = (
     <View style={styles.backdrop}>
@@ -26,7 +27,11 @@ export function Screen({ children, contentContainerStyle, fixedFooter, scrollEna
       ) : (
         <View style={[styles.content, styles.fill, { paddingBottom: bottomSpacing }, contentContainerStyle]}>{children}</View>
       )}
-      {fixedFooter ? <View style={styles.fixedFooter}>{fixedFooter}</View> : null}
+      {fixedFooter ? (
+        <View style={styles.fixedFooter} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}>
+          {fixedFooter}
+        </View>
+      ) : null}
     </View>
   );
 
