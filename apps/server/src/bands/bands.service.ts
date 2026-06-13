@@ -265,6 +265,7 @@ export class BandsService {
       myMembership: {
         role: membership.role,
         positionLabel: this.positionLabel(membership.positionType, membership.customPosition),
+        profileImageUrl: membership.profileImageUrl,
       },
       activeSongRound: latestRound
         ? {
@@ -296,9 +297,25 @@ export class BandsService {
       userId: member.user.id,
       name: member.user.name,
       role: member.role,
+      profileImageUrl: member.profileImageUrl,
       positionLabel: this.positionLabel(member.positionType, member.customPosition),
       joinedAt: member.joinedAt.toISOString(),
     }));
+  }
+
+  async updateMyProfileImage(userId: string, bandId: string, profileImageUrl: string) {
+    const membership = await this.requireMembership(userId, bandId);
+    membership.profileImageUrl = profileImageUrl;
+    const member = await this.membersRepository.save(membership);
+
+    return {
+      userId: member.user.id,
+      name: member.user.name,
+      role: member.role,
+      profileImageUrl: member.profileImageUrl,
+      positionLabel: this.positionLabel(member.positionType, member.customPosition),
+      joinedAt: member.joinedAt.toISOString(),
+    };
   }
 
   async getTodos(userId: string, bandId: string) {

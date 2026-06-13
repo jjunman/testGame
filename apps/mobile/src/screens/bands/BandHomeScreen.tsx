@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, PracticeAssignmentDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
@@ -26,6 +26,17 @@ export function BandHomeScreen({ route, navigation }: Props) {
     try {
       const result = await api.get<BandHomeDto>(`/bands/${bandId}`);
       const thumbnailUrl = toApiAssetUrl(result.thumbnailUrl);
+      const profileImageUrl = toApiAssetUrl(result.myMembership?.profileImageUrl);
+      const myMembership = result.myMembership
+        ? {
+            ...result.myMembership,
+            profileImageUrl,
+          }
+        : {
+            role: 'member' as const,
+            positionLabel: '',
+            profileImageUrl: null,
+          };
       setCurrentBand({
         id: result.id,
         name: result.name,
@@ -38,10 +49,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
       setDetail({
         ...result,
         thumbnailUrl,
-        myMembership: result.myMembership ?? {
-          role: 'member',
-          positionLabel: '',
-        },
+        myMembership,
         todos: Array.isArray(result.todos) ? result.todos : [],
         voteSummary: result.voteSummary ?? { song: 'none', schedule: 'none', studio: 'none' },
         songCards: Array.isArray(result.songCards) ? result.songCards : [],
@@ -57,14 +65,27 @@ export function BandHomeScreen({ route, navigation }: Props) {
   }, [load, navigation]);
 
   useLayoutEffect(() => {
+    const profileImageUrl = detail?.myMembership.profileImageUrl;
     navigation.setOptions({
       headerRight: () => (
-        <Pressable style={styles.memberHeaderButton} onPress={() => navigation.navigate('BandMembers', { bandId })}>
-          <Ionicons name="people-outline" size={20} color={theme.colors.primaryDark} />
+        <Pressable
+          accessibilityLabel="밴드 정보 보기"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.memberHeaderButton, pressed && styles.memberHeaderButtonPressed]}
+          onPress={() => navigation.navigate('BandMembers', { bandId })}
+        >
+          {profileImageUrl ? (
+            <Image source={{ uri: profileImageUrl }} style={styles.memberHeaderImage} />
+          ) : (
+            <Ionicons name="people-outline" size={20} color={theme.colors.primaryDark} />
+          )}
+          <View style={styles.memberHeaderBadge}>
+            <Ionicons name="chevron-forward" size={10} color="#fff" />
+          </View>
         </Pressable>
       ),
     });
-  }, [bandId, navigation]);
+  }, [bandId, detail?.myMembership.profileImageUrl, navigation]);
 
   useEffect(() => {
     const todoCount = detail?.todos?.length ?? 0;
@@ -338,10 +359,40 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   memberHeaderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.primarySoft,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.colors.primaryDark,
+    shadowOpacity: 0.16,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  memberHeaderButtonPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.96 }],
+  },
+  memberHeaderImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    resizeMode: 'cover',
+  },
+  memberHeaderBadge: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -47,7 +47,7 @@ function BandsNavigator() {
   return (
     <BandsStack.Navigator screenOptions={stackOptions}>
       <BandsStack.Screen name="BandList" component={BandListScreen} options={{ title: '내 밴드' }} />
-      <BandsStack.Screen name="Profile" component={ProfileScreen} options={{ title: '유저' }} />
+      <BandsStack.Screen name="Profile" component={ProfileScreen} options={{ title: '유저', headerBackVisible: false }} />
       <BandsStack.Screen name="BandAdd" component={BandAddScreen} options={{ title: '밴드 추가하기' }} />
       <BandsStack.Screen name="JoinBand" component={JoinBandScreen} options={{ title: '초대코드 입력하기' }} />
       <BandsStack.Screen name="CreateBand" component={CreateBandScreen} options={{ title: '밴드 만들기' }} />

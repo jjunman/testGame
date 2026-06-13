@@ -40,6 +40,9 @@ export class BandMember {
   @Column({ name: 'home_longitude', type: 'float', nullable: true })
   homeLongitude: number | null;
 
+  @Column({ name: 'profile_image_url', type: 'varchar', nullable: true })
+  profileImageUrl: string | null;
+
   @CreateDateColumn({ name: 'joined_at' })
   joinedAt: Date;
 }

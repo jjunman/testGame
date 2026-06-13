@@ -1,8 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Audio } from 'expo-av';
-import type { AVPlaybackStatus } from 'expo-av/build/AV.types';
+import {
+  AudioModule,
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
+import type { AudioPlayer, AudioRecorder, AudioStatus, RecorderState } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -74,6 +80,7 @@ type PracticeMode = 'main' | 'practice' | 'submit' | 'submissions';
 const MAX_DRAFTS = 5;
 const RECORDING_COUNTDOWN_SECONDS = 7;
 const AUDIO_LOAD_TIMEOUT_MS = 12000;
+const AUDIO_PLAYER_OPTIONS = { keepAudioSessionActive: true };
 
 export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   const { assignmentId, bandId } = route.params;
@@ -89,7 +96,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   const [recording, setRecording] = useState(false);
   const [recordingStopSignal, setRecordingStopSignal] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const recordingRef = useRef<any>(null);
+  const recordingRef = useRef<AudioRecorder | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingAutoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,7 +151,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
         clearInterval(countdownTimerRef.current);
       }
       if (recordingRef.current) {
-        void recordingRef.current.stopAndUnloadAsync().catch(() => undefined);
+        void recordingRef.current.stop().catch(() => undefined);
       }
       if (meteringTimerRef.current) {
         clearInterval(meteringTimerRef.current);
@@ -176,26 +183,30 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   };
 
   const beginRecording = async () => {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
+    await setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+      interruptionMode: 'mixWithOthers',
     });
-    const nextRecording = new Audio.Recording();
+    const nextRecording = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
     await nextRecording.prepareToRecordAsync({
-      ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      ...RecordingPresets.HIGH_QUALITY,
       isMeteringEnabled: true,
     });
-    await nextRecording.startAsync();
+    nextRecording.record();
     const targetStartAt = recordingTargetStartAtRef.current;
     recordingSyncOffsetMsRef.current = targetStartAt === null ? 0 : Math.max(-1500, Math.min(1500, Date.now() - targetStartAt));
     recordingRef.current = nextRecording;
     waveformRef.current = [];
     meteringTimerRef.current = setInterval(() => {
-      void nextRecording.getStatusAsync().then((status: { metering?: number }) => {
+      try {
+        const status = nextRecording.getStatus();
         if (typeof status.metering === 'number') {
           waveformRef.current.push(meteringToWaveHeight(status.metering));
         }
-      }).catch(() => undefined);
+      } catch {
+        // Ignore transient status reads while the recorder is stopping.
+      }
     }, 180);
     setRecording(true);
 
@@ -216,7 +227,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       return false;
     }
 
-    const permission = await Audio.requestPermissionsAsync();
+    const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('권한 필요', '녹음을 하려면 마이크 권한이 필요해요.');
       return false;
@@ -257,10 +268,10 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
       recordingAutoStopTimerRef.current = null;
     }
 
-    const status = await recordingRef.current.getStatusAsync().catch(() => null);
+    const status = getRecordingStatusSafely(recordingRef.current);
     const durationSec = typeof status?.durationMillis === 'number' ? status.durationMillis / 1000 : null;
-    await recordingRef.current.stopAndUnloadAsync();
-    const uri = recordingRef.current.getURI();
+    await recordingRef.current.stop();
+    const uri = recordingRef.current.uri ?? status?.url ?? null;
     const waveform = waveformRef.current;
     const syncOffsetMs = recordingSyncOffsetMsRef.current;
     const requiredSec = getRequiredRecordingSec(detail);
@@ -292,7 +303,7 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
     setCountdown(null);
 
     if (recordingRef.current) {
-      await recordingRef.current.stopAndUnloadAsync().catch(() => undefined);
+      await recordingRef.current.stop().catch(() => undefined);
       recordingRef.current = null;
     }
     if (meteringTimerRef.current) {
@@ -1004,23 +1015,23 @@ function SubmitPanel({
 }
 
 function SelectedDraftPlayer({ draft }: { draft: DraftRecording | null }) {
-  const soundRef = useRef<Awaited<ReturnType<typeof Audio.Sound.createAsync>>['sound'] | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (soundRef.current) {
-        void soundRef.current.unloadAsync().catch(() => undefined);
-        soundRef.current = null;
+      if (playerRef.current) {
+        releaseAudioPlayer(playerRef.current);
+        playerRef.current = null;
       }
     };
   }, []);
 
   useEffect(() => {
     setPlaying(false);
-    if (soundRef.current) {
-      void soundRef.current.unloadAsync().catch(() => undefined);
-      soundRef.current = null;
+    if (playerRef.current) {
+      releaseAudioPlayer(playerRef.current);
+      playerRef.current = null;
     }
   }, [draft?.uri]);
 
@@ -1029,24 +1040,24 @@ function SelectedDraftPlayer({ draft }: { draft: DraftRecording | null }) {
       return;
     }
 
-    if (soundRef.current && playing) {
-      await soundRef.current.pauseAsync();
+    if (playerRef.current && playing) {
+      playerRef.current.pause();
       setPlaying(false);
       return;
     }
 
-    if (!soundRef.current) {
-      const { sound } = await Audio.Sound.createAsync({ uri: toApiAssetUrl(draft.uri) ?? draft.uri });
-      sound.setOnPlaybackStatusUpdate((status: { isLoaded: boolean; didJustFinish?: boolean }) => {
+    if (!playerRef.current) {
+      const player = createBandAudioPlayer(toApiAssetUrl(draft.uri) ?? draft.uri);
+      player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
         if (status.isLoaded && status.didJustFinish) {
           setPlaying(false);
-          void sound.setPositionAsync(0).catch(() => undefined);
+          void player.seekTo(0).catch(() => undefined);
         }
       });
-      soundRef.current = sound;
+      playerRef.current = player;
     }
 
-    await soundRef.current.playAsync();
+    playerRef.current.play();
     setPlaying(true);
   };
 
@@ -1184,32 +1195,31 @@ function RemoteAudioPlayer({
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
-  const soundRef = useRef<Awaited<ReturnType<typeof Audio.Sound.createAsync>>['sound'] | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (soundRef.current) {
-        void soundRef.current.unloadAsync().catch(() => undefined);
-        soundRef.current = null;
+      if (playerRef.current) {
+        releaseAudioPlayer(playerRef.current);
+        playerRef.current = null;
       }
     };
   }, []);
 
   useEffect(() => {
-    if (soundRef.current) {
-      void soundRef.current.unloadAsync().catch(() => undefined);
-      soundRef.current = null;
+    if (playerRef.current) {
+      releaseAudioPlayer(playerRef.current);
+      playerRef.current = null;
     }
     setPlaying(false);
     setLoading(false);
   }, [uri]);
 
   useEffect(() => {
-    if (activeAudioId !== audioId && soundRef.current && playing) {
-      void soundRef.current.stopAsync().catch(() => undefined);
-      void soundRef.current.setPositionAsync(0).catch(() => undefined);
+    if (activeAudioId !== audioId && playerRef.current && playing) {
+      void stopAudioPlayer(playerRef.current);
       setPlaying(false);
     }
   }, [activeAudioId, audioId, playing]);
@@ -1219,9 +1229,8 @@ function RemoteAudioPlayer({
       return;
     }
 
-    if (soundRef.current && playing) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.setPositionAsync(0);
+    if (playerRef.current && playing) {
+      await stopAudioPlayer(playerRef.current);
       setPlaying(false);
       onActiveAudioChange(null);
       return;
@@ -1229,23 +1238,23 @@ function RemoteAudioPlayer({
 
     setLoading(true);
     try {
-      if (!soundRef.current) {
+      if (!playerRef.current) {
         const audioUri = toApiAssetUrl(uri) ?? uri;
-        const { sound } = await withTimeout<Awaited<ReturnType<typeof Audio.Sound.createAsync>>>(
-          Audio.Sound.createAsync({ uri: audioUri }),
+        const player = await withTimeout<AudioPlayer>(
+          createReadyAudioPlayer(audioUri),
           AUDIO_LOAD_TIMEOUT_MS,
           '녹음본을 불러오지 못했어요. 서버 주소나 네트워크를 확인해 주세요.',
         );
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+        player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
           if (status.isLoaded && status.didJustFinish) {
             setPlaying(false);
-            void sound.setPositionAsync(0).catch(() => undefined);
+            void player.seekTo(0).catch(() => undefined);
           }
         });
-        soundRef.current = sound;
+        playerRef.current = player;
       }
       onActiveAudioChange(audioId);
-      await soundRef.current.playAsync();
+      playerRef.current.play();
       setPlaying(true);
     } catch (error) {
       Alert.alert('재생 실패', error instanceof Error ? error.message : '녹음본을 재생하지 못했어요.');
@@ -1292,32 +1301,31 @@ function SubmissionTilePlayer({
   positionLabel: string;
   dateLabel: string;
 }) {
-  const soundRef = useRef<Awaited<ReturnType<typeof Audio.Sound.createAsync>>['sound'] | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (soundRef.current) {
-        void soundRef.current.unloadAsync().catch(() => undefined);
-        soundRef.current = null;
+      if (playerRef.current) {
+        releaseAudioPlayer(playerRef.current);
+        playerRef.current = null;
       }
     };
   }, []);
 
   useEffect(() => {
-    if (soundRef.current) {
-      void soundRef.current.unloadAsync().catch(() => undefined);
-      soundRef.current = null;
+    if (playerRef.current) {
+      releaseAudioPlayer(playerRef.current);
+      playerRef.current = null;
     }
     setPlaying(false);
     setLoading(false);
   }, [uri]);
 
   useEffect(() => {
-    if (activeAudioId !== audioId && soundRef.current && playing) {
-      void soundRef.current.stopAsync().catch(() => undefined);
-      void soundRef.current.setPositionAsync(0).catch(() => undefined);
+    if (activeAudioId !== audioId && playerRef.current && playing) {
+      void stopAudioPlayer(playerRef.current);
       setPlaying(false);
     }
   }, [activeAudioId, audioId, playing]);
@@ -1327,9 +1335,8 @@ function SubmissionTilePlayer({
       return;
     }
 
-    if (soundRef.current && playing) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.setPositionAsync(0);
+    if (playerRef.current && playing) {
+      await stopAudioPlayer(playerRef.current);
       setPlaying(false);
       onActiveAudioChange(null);
       return;
@@ -1337,23 +1344,23 @@ function SubmissionTilePlayer({
 
     setLoading(true);
     try {
-      if (!soundRef.current) {
+      if (!playerRef.current) {
         const audioUri = toApiAssetUrl(uri) ?? uri;
-        const { sound } = await withTimeout<Awaited<ReturnType<typeof Audio.Sound.createAsync>>>(
-          Audio.Sound.createAsync({ uri: audioUri }),
+        const player = await withTimeout<AudioPlayer>(
+          createReadyAudioPlayer(audioUri),
           AUDIO_LOAD_TIMEOUT_MS,
           '녹음본을 불러오지 못했어요. 서버 주소와 네트워크를 확인해 주세요.',
         );
-        sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+        player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
           if (status.isLoaded && status.didJustFinish) {
             setPlaying(false);
-            void sound.setPositionAsync(0).catch(() => undefined);
+            void player.seekTo(0).catch(() => undefined);
           }
         });
-        soundRef.current = sound;
+        playerRef.current = player;
       }
       onActiveAudioChange(audioId);
-      await soundRef.current.playAsync();
+      playerRef.current.play();
       setPlaying(true);
     } catch (error) {
       Alert.alert('재생 실패', error instanceof Error ? error.message : '녹음본을 재생하지 못했어요.');
@@ -1406,6 +1413,70 @@ function AudioPreview({ title, emptyText }: { title: string; emptyText: string }
       <Text style={styles.audioHint}>{emptyText}</Text>
     </View>
   );
+}
+
+function createBandAudioPlayer(uri: string) {
+  return createAudioPlayer({ uri }, AUDIO_PLAYER_OPTIONS);
+}
+
+async function createReadyAudioPlayer(uri: string) {
+  const player = createBandAudioPlayer(uri);
+  try {
+    await waitForAudioPlayerReady(player);
+    return player;
+  } catch (error) {
+    releaseAudioPlayer(player);
+    throw error;
+  }
+}
+
+function waitForAudioPlayerReady(player: AudioPlayer) {
+  return new Promise<void>((resolve, reject) => {
+    if (player.isLoaded || player.currentStatus?.isLoaded) {
+      resolve();
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      reject(new Error('Audio file could not be loaded.'));
+    }, AUDIO_LOAD_TIMEOUT_MS);
+
+    const interval = setInterval(() => {
+      const status = player.currentStatus;
+      if (player.isLoaded || status?.isLoaded) {
+        clearInterval(interval);
+        clearTimeout(timeout);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+async function stopAudioPlayer(player: AudioPlayer) {
+  player.pause();
+  await player.seekTo(0).catch(() => undefined);
+}
+
+function releaseAudioPlayer(player: AudioPlayer) {
+  try {
+    player.pause();
+  } catch {
+    // Already released or unavailable.
+  }
+  try {
+    player.remove();
+  } catch {
+    // Already released or unavailable.
+  }
+}
+
+function getRecordingStatusSafely(recorder: AudioRecorder): RecorderState | null {
+  try {
+    return recorder.getStatus();
+  } catch {
+    return null;
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

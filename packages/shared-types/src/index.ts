@@ -43,6 +43,7 @@ export type BandMemberSummary = {
   userId: string;
   name: string;
   role: MemberRole;
+  profileImageUrl: string | null;
   positionLabel: string;
   joinedAt: string;
 };
@@ -105,6 +106,11 @@ export type ScheduleSlotDto = {
   yesCount: number;
   noCount: number;
   myAvailability: ScheduleAvailabilityType | null;
+  availableMembers: Array<{
+    userId: string;
+    name: string;
+    profileImageUrl: string | null;
+  }>;
 };
 
 export type ScheduleSummaryDto = {
@@ -228,6 +234,7 @@ export type BandHomeDto = {
   myMembership: {
     role: MemberRole;
     positionLabel: string;
+    profileImageUrl: string | null;
   };
   activeSongRound: {
     id: string;

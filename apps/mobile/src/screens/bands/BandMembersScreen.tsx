@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { BandHomeDto, BandMemberSummary } from '@band/shared-types';
@@ -18,6 +19,7 @@ export function BandMembersScreen({ route, navigation }: Props) {
   const [members, setMembers] = useState<BandMemberSummary[]>([]);
   const [bandDetail, setBandDetail] = useState<BandHomeDto | null>(null);
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
+  const [profileImageLoading, setProfileImageLoading] = useState(false);
   const [bandActionLoading, setBandActionLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -25,7 +27,10 @@ export function BandMembersScreen({ route, navigation }: Props) {
       api.get<BandMemberSummary[]>(`/bands/${route.params.bandId}/members`),
       api.get<BandHomeDto>(`/bands/${route.params.bandId}`),
     ]);
-    setMembers(nextMembers);
+    setMembers(nextMembers.map((member) => ({
+      ...member,
+      profileImageUrl: toApiAssetUrl(member.profileImageUrl),
+    })));
     setBandDetail({
       ...nextBandDetail,
       thumbnailUrl: toApiAssetUrl(nextBandDetail.thumbnailUrl),
@@ -39,6 +44,48 @@ export function BandMembersScreen({ route, navigation }: Props) {
   const myMembership = members.find((member) => member.userId === user?.id);
   const otherMembers = members.filter((member) => member.userId !== user?.id);
   const isLeader = myMembership?.role === 'leader';
+
+  const pickProfileImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('권한 필요', '프로필 사진을 고르려면 사진 보관함 접근 권한이 필요해요.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    const profileImage = {
+      uri: asset.uri,
+      name: asset.fileName ?? `profile-image.${asset.uri.split('.').pop() ?? 'jpg'}`,
+      type: asset.mimeType ?? 'image/jpeg',
+    };
+    const form = new FormData();
+    form.append('profileImage', profileImage as any);
+
+    setProfileImageLoading(true);
+    try {
+      const updatedMember = await api.patch<BandMemberSummary>(`/bands/${route.params.bandId}/members/me/profile-image`, form);
+      const normalizedMember = {
+        ...updatedMember,
+        profileImageUrl: toApiAssetUrl(updatedMember.profileImageUrl),
+      };
+      setMembers((current) => current.map((member) => (member.userId === normalizedMember.userId ? normalizedMember : member)));
+    } catch (error) {
+      Alert.alert('변경 실패', error instanceof Error ? error.message : '프로필 사진 변경에 실패했어요.');
+    } finally {
+      setProfileImageLoading(false);
+    }
+  };
 
   const transferLeader = async (targetUserId: string, memberName: string) => {
     Alert.alert('리더 권한 변경', `${memberName} 님에게 리더 권한을 넘길까요?`, [
@@ -143,9 +190,22 @@ export function BandMembersScreen({ route, navigation }: Props) {
       {myMembership ? (
         <View style={styles.myCard}>
           <View style={styles.myTop}>
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberInitial}>{myMembership.name.slice(0, 1)}</Text>
-            </View>
+            <Pressable
+              accessibilityLabel="프로필 사진 변경"
+              accessibilityRole="button"
+              onPress={pickProfileImage}
+              disabled={profileImageLoading}
+              style={({ pressed }) => [styles.memberAvatarButton, pressed && styles.memberAvatarButtonPressed]}
+            >
+              <MemberAvatar member={myMembership} size="large" />
+              <View style={styles.profileEditBadge}>
+                {profileImageLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="camera-outline" size={14} color="#fff" />
+                )}
+              </View>
+            </Pressable>
             <View style={styles.myText}>
               <Text style={styles.myName} numberOfLines={1}>{myMembership.name}</Text>
               <Text style={styles.myMeta} numberOfLines={1}>
@@ -223,6 +283,22 @@ function MiniStat({
   );
 }
 
+function MemberAvatar({ member, size }: { member: BandMemberSummary; size: 'large' | 'small' }) {
+  const large = size === 'large';
+  const avatarStyle = large ? styles.memberAvatar : styles.memberAvatarSmall;
+  const initialStyle = large ? styles.memberInitial : styles.memberInitialSmall;
+
+  return (
+    <View style={avatarStyle}>
+      {member.profileImageUrl ? (
+        <Image source={{ uri: member.profileImageUrl }} style={styles.memberAvatarImage} />
+      ) : (
+        <Text style={initialStyle}>{member.name.slice(0, 1)}</Text>
+      )}
+    </View>
+  );
+}
+
 function MemberRow({
   member,
   canTransfer,
@@ -236,9 +312,7 @@ function MemberRow({
 }) {
   return (
     <View style={styles.memberRow}>
-      <View style={styles.memberAvatarSmall}>
-        <Text style={styles.memberInitialSmall}>{member.name.slice(0, 1)}</Text>
-      </View>
+      <MemberAvatar member={member} size="small" />
       <View style={styles.memberBody}>
         <View style={styles.memberNameRow}>
           <Text style={styles.memberName} numberOfLines={1}>{member.name}</Text>
@@ -351,6 +425,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  memberAvatarButton: {
+    width: 54,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarButtonPressed: {
+    opacity: 0.78,
+  },
   memberAvatar: {
     width: 48,
     height: 48,
@@ -358,11 +441,30 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  memberAvatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   memberInitial: {
     color: theme.colors.primaryDark,
     fontSize: 20,
     fontWeight: '900',
+  },
+  profileEditBadge: {
+    position: 'absolute',
+    right: 1,
+    bottom: 1,
+    width: 23,
+    height: 23,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   myText: {
     flex: 1,
@@ -443,6 +545,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   memberInitialSmall: {
     color: theme.colors.text,

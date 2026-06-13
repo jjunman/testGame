@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { ScheduleProposalDto, ScheduleSlotDto, ScheduleSummaryDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
+import {
+  formatDateTimeLabel,
+  getCurrentWeekDates,
+  isScheduleHour,
+  toMinute,
+} from '../../components/ScheduleAvailability';
 import { Screen } from '../../components/Screen';
 import { ActionCardButton, HeroBanner, PrimaryButton, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
@@ -11,10 +18,6 @@ import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<BandsStackParamList, 'Schedule'>;
-
-const WEEK_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
-const AFTERNOON_HOURS = Array.from({ length: 12 }, (_, index) => index + 12);
-const MORNING_HOURS = Array.from({ length: 12 }, (_, index) => index);
 
 export function ScheduleScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
@@ -43,19 +46,17 @@ export function ScheduleScreen({ route, navigation }: Props) {
     return unsubscribe;
   }, [load, navigation]);
 
-  const slotsByKey = useMemo(() => {
-    return new Map(slots.map((slot) => [slotKey(slot.date, Number(slot.startTime.slice(0, 2))), slot]));
-  }, [slots]);
+  const visibleSlots = useMemo(() => {
+    return slots.filter((slot) => weekDates.includes(slot.date) && isScheduleHour(Number(slot.startTime.slice(0, 2))));
+  }, [slots, weekDates]);
 
-  const summaryBySlotId = useMemo(() => {
-    return new Map(summary.map((item) => [item.slotId, item]));
-  }, [summary]);
+  const allAvailableItems = useMemo(() => buildAllAvailableItems(summary, weekDates), [summary, weekDates]);
 
   const activeProposal = proposal?.active ? proposal : null;
   const confirmedProposal = proposal && !proposal.active && proposal.confirmed ? proposal : null;
-  const mySelectedCount = slots.filter((slot) => slot.myAvailability === 'yes').length;
   const isLeader = currentBand?.myRole === 'leader';
   const voteLocked = !activeProposal;
+
   const submitVote = async (availability: 'yes' | 'no') => {
     if (!activeProposal) {
       return;
@@ -67,7 +68,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
         proposalId: activeProposal.id,
         availability,
       });
-      Alert.alert('응답 완료', '찬반 응답이 저장되었습니다.');
+      Alert.alert('응답 완료', '찬반 응답을 저장했어요.');
       await load();
     } catch (error) {
       Alert.alert('응답 실패', error instanceof Error ? error.message : '찬반 응답을 저장하지 못했어요.');
@@ -77,19 +78,19 @@ export function ScheduleScreen({ route, navigation }: Props) {
   };
 
   const finishProposalNow = () => {
-    Alert.alert('찬반투표를 지금 끝낼까요?', '현재까지의 찬반 결과로 합주 시간을 확정하거나 종료합니다.', [
+    Alert.alert('찬반 투표를 지금 마감할까요?', '현재까지의 응답으로 합주 시간을 확정하거나 투표를 종료합니다.', [
       { text: '취소', style: 'cancel' },
       {
-        text: '지금 끝내기',
+        text: '지금 마감',
         style: 'destructive',
         onPress: async () => {
           setEndingProposal(true);
           try {
             const result = await api.post<ScheduleProposalDto>(`/bands/${bandId}/schedule-proposal/finalize`);
-            Alert.alert('찬반투표 종료', result.confirmed ? '합주 시간이 확정되었어요.' : '모두 찬성하지 않아 확정되지 않았어요.');
+            Alert.alert('찬반 투표 종료', result.confirmed ? '합주 시간이 확정되었어요.' : '모두 찬성하지 않아 확정되지 않았어요.');
             await load();
           } catch (error) {
-            Alert.alert('종료 실패', error instanceof Error ? error.message : '찬반투표를 끝내지 못했어요.');
+            Alert.alert('종료 실패', error instanceof Error ? error.message : '찬반 투표를 마감하지 못했어요.');
           } finally {
             setEndingProposal(false);
           }
@@ -100,38 +101,60 @@ export function ScheduleScreen({ route, navigation }: Props) {
 
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
-      <HeroBanner title="우리 일정" subtitle="합주 일정을 맞춰봐요" align="center" />
+      <HeroBanner title="우리 일정" align="center" />
 
-      <ActionCardButton
-        title="합주 시간 제안"
-        icon="calendar-outline"
-        onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
-      />
+      <View style={styles.quickActions}>
+        <View style={styles.quickActionItem}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="합주 시간 제안하기"
+            onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
+            style={styles.emptyAddButton}
+          >
+            <Ionicons name="add" size={26} color="#fff" />
+          </Pressable>
+          <Text style={styles.emptyAddLabel}>일정 제안하기</Text>
+        </View>
+        <View style={styles.quickActionItem}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="내 가능 시간 등록하기"
+            onPress={() => navigation.navigate('ScheduleEdit', { bandId })}
+            style={styles.emptyAddButton}
+          >
+            <Ionicons name="create-outline" size={24} color="#fff" />
+          </Pressable>
+          <Text style={styles.emptyAddLabel}>내 일정 입력하기</Text>
+        </View>
+      </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>찬반투표</Text>
+        <Text style={styles.sectionTitle}>찬반 투표</Text>
         {confirmedProposal ? (
           <View style={styles.confirmedCard}>
             <StatusBadge label="합주 시간 확정" tone="success" />
             <Text style={styles.voteTitle}>
-              {formatScheduleLabel(confirmedProposal.date, confirmedProposal.startTime, confirmedProposal.endTime)}
+              {formatDateTimeLabel(confirmedProposal.date, confirmedProposal.startTime, confirmedProposal.endTime)}
             </Text>
             <Text style={styles.voteSubmitter}>올린 사람: {confirmedProposal.createdByName}</Text>
-            <Text style={styles.voteMessage}>모두가 찬성해서 이 시간으로 합주가 확정됐어요.</Text>
+            <Text style={styles.voteMessage}>모두가 찬성해서 이 시간으로 합주가 확정되었어요.</Text>
             <ActionCardButton
               title="일정 변경"
+              subtitle="새로운 합주 시간을 다시 제안해요"
               icon="create-outline"
               onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
             />
           </View>
         ) : null}
         {!activeProposal && !confirmedProposal ? (
-          <Text style={styles.disabledHint}>찬반투표가 시작되지 않았어요</Text>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>아직 진행 중인 찬반 투표가 없어요</Text>
+          </View>
         ) : null}
         {activeProposal ? (
           <View style={styles.voteCard}>
             <Text style={styles.voteTitle}>
-              {formatScheduleLabel(activeProposal.date, activeProposal.startTime, activeProposal.endTime)}
+              {formatDateTimeLabel(activeProposal.date, activeProposal.startTime, activeProposal.endTime)}
             </Text>
             <Text style={styles.voteSubmitter}>올린 사람: {activeProposal.createdByName}</Text>
             <Text style={styles.voteMessage}>{activeProposal.message}</Text>
@@ -168,7 +191,7 @@ export function ScheduleScreen({ route, navigation }: Props) {
                 disabled={endingProposal || voting}
                 style={[styles.subtleEndButton, (endingProposal || voting) && styles.subtleEndButtonDisabled]}
               >
-                <Text style={styles.subtleEndButtonText}>{endingProposal ? '끝내는 중...' : '지금 끝내기'}</Text>
+                <Text style={styles.subtleEndButtonText}>{endingProposal ? '마감 중...' : '지금 마감하기'}</Text>
               </Pressable>
             ) : null}
             {activeProposal.myAvailability ? <Text style={styles.lockedHint}>응답은 투표가 끝나기 전까지 다시 바꿀 수 있어요.</Text> : null}
@@ -178,224 +201,203 @@ export function ScheduleScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>시간표 미리보기</Text>
-        </View>
-        <Text style={styles.caption}>오전, 오후 시간표를 각각 눌러 편집 화면에서 가능한 시간을 등록할 수 있어요.</Text>
-
-        <View style={styles.previewTables}>
-          <Pressable onPress={() => navigation.navigate('ScheduleEdit', { bandId, period: 'morning' })} style={styles.previewPane}>
-            <MiniTimeTable title="새벽/오전" dates={weekDates} hours={MORNING_HOURS} slotsByKey={slotsByKey} summaryBySlotId={summaryBySlotId} />
-            <Text style={styles.previewHint}>오전 크게 보기</Text>
+        <Text style={styles.sectionTitle}>모두가 가능한 시간</Text>
+        {allAvailableItems.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>아직 모두 가능한 시간이 없어요</Text>
+          </View>
+        ) : null}
+        {allAvailableItems.map((item) => (
+          <Pressable key={item.id} style={styles.availableRow} onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}>
+            <View style={styles.availableDateBox}>
+              <Text style={styles.availableWeekday}>{item.weekday}</Text>
+            </View>
+            <View style={styles.availableBody}>
+              <Text style={styles.availableMeta}>전원 가능 시간</Text>
+              <Text style={styles.availableTime}>{item.timeLabel}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} />
           </Pressable>
-
-          <Pressable onPress={() => navigation.navigate('ScheduleEdit', { bandId, period: 'afternoon' })} style={styles.previewPane}>
-            <MiniTimeTable title="오후 가능 시간" dates={weekDates} hours={AFTERNOON_HOURS} slotsByKey={slotsByKey} summaryBySlotId={summaryBySlotId} />
-            <Text style={styles.previewHint}>오후 크게 보기</Text>
-          </Pressable>
-        </View>
+        ))}
       </View>
-
     </Screen>
   );
 }
 
-function MiniTimeTable({
-  title,
-  dates,
-  hours,
-  slotsByKey,
-  summaryBySlotId,
-}: {
-  title: string;
-  dates: string[];
-  hours: number[];
-  slotsByKey: Map<string, ScheduleSlotDto>;
-  summaryBySlotId: Map<string, ScheduleSummaryDto>;
-}) {
-  return (
-    <View style={styles.tableCard}>
-      <Text style={styles.tableTitle}>{title}</Text>
-      <View style={styles.legendItems}>
-        <LegendDot color={theme.colors.primary} label="모두 가능" />
-        <LegendDot color={theme.colors.primarySoft} label="내 선택" />
-        <LegendDot color="#fff" label="미선택" bordered />
-      </View>
-      <View style={styles.gridHeader}>
-        <Text style={styles.timeLabel} />
-        {WEEK_LABELS.map((label) => (
-          <Text key={label} style={styles.dayLabel}>
-            {label}
-          </Text>
-        ))}
-      </View>
-      {hours.map((hour) => (
-        <View key={hour} style={styles.gridRow}>
-          <Text style={styles.timeLabel}>{`${String(hour).padStart(2, '0')}시`}</Text>
-          {dates.map((date) => {
-            const slot = slotsByKey.get(slotKey(date, hour));
-            const selected = slot?.myAvailability === 'yes';
-            const matched = slot ? summaryBySlotId.get(slot.id)?.allAvailable : false;
+type AllAvailableItem = {
+  id: string;
+  weekday: string;
+  timeLabel: string;
+  date: string;
+};
 
-            return <View key={`${date}-${hour}`} style={[styles.gridCell, selected && styles.gridCellSelected, matched && styles.gridCellMatched]} />;
-          })}
-        </View>
-      ))}
-    </View>
-  );
+function buildAllAvailableItems(summary: ScheduleSummaryDto[], weekDates: string[]): AllAvailableItem[] {
+  const grouped = new Map<string, number[]>();
+
+  summary
+    .filter((item) => item.allAvailable && isVisibleSummary(item, weekDates))
+    .forEach((item) => {
+      const hour = Math.floor(toMinute(item.startTime) / 60);
+      grouped.set(item.date, [...(grouped.get(item.date) ?? []), hour]);
+    });
+
+  return Array.from(grouped.entries())
+    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+    .flatMap(([date, hours]) =>
+      buildHourRanges(hours).map((range) => ({
+        id: `${date}-${range.startHour}-${range.endHour}`,
+        weekday: weekdayLabel(date),
+        timeLabel: range.label,
+        date,
+      })),
+    );
 }
 
-function LegendDot({ color, label, bordered }: { color: string; label: string; bordered?: boolean }) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }, bordered && styles.legendDotBordered]} />
-      <Text style={styles.legendText}>{label}</Text>
-    </View>
-  );
+function isVisibleSummary(item: ScheduleSummaryDto, weekDates: string[]) {
+  return weekDates.includes(item.date) && isScheduleHour(Math.floor(toMinute(item.startTime) / 60));
 }
 
-function getCurrentWeekDates() {
-  const today = new Date();
-  const day = today.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(today.getDate() + mondayOffset);
-
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + index);
-    return toDateValue(date);
-  });
+function weekdayLabel(date: string) {
+  const labels = ['일', '월', '화', '수', '목', '금', '토'];
+  return labels[new Date(`${date}T00:00:00`).getDay()];
 }
 
-function toDateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function buildHourRanges(hours: number[]) {
+  const sortedHours = Array.from(new Set(hours)).sort((a, b) => a - b);
+  const ranges: Array<{ startHour: number; endHour: number; label: string }> = [];
+  let rangeStart = sortedHours[0];
+  let rangeEnd = sortedHours[0];
+
+  for (let index = 1; index < sortedHours.length; index += 1) {
+    const hour = sortedHours[index];
+    if (hour === rangeEnd + 1) {
+      rangeEnd = hour;
+      continue;
+    }
+
+    ranges.push({
+      startHour: rangeStart,
+      endHour: rangeEnd,
+      label: formatHourRange(rangeStart, rangeEnd),
+    });
+    rangeStart = hour;
+    rangeEnd = hour;
+  }
+
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    ranges.push({
+      startHour: rangeStart,
+      endHour: rangeEnd,
+      label: formatHourRange(rangeStart, rangeEnd),
+    });
+  }
+
+  return ranges;
 }
 
-function formatScheduleLabel(date: string, startTime: string, endTime: string) {
-  const day = new Date(`${date}T00:00:00`).getDay();
-  const weekdayIndex = day === 0 ? 6 : day - 1;
-  return `${WEEK_LABELS[weekdayIndex]}요일 ${startTime} - ${endTime}`;
+function formatHourRange(startHour: number, endHour: number) {
+  const start = formatHourValue(startHour);
+  const end = formatHourValue(endHour + 1);
+  return `${start}시~${end}시`;
 }
 
-function slotKey(date: string, hour: number) {
-  return `${date}T${String(hour).padStart(2, '0')}`;
+function formatHourValue(hour: number) {
+  return String(hour).padStart(2, '0');
 }
 
 const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 17,
     fontWeight: '900',
   },
-  caption: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  previewTables: {
+  quickActions: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 34,
+    paddingVertical: 2,
   },
-  previewPane: {
-    flex: 1,
-    gap: 8,
-  },
-  previewHint: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  tableCard: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  tableTitle: {
-    color: theme.colors.text,
-    fontSize: 11,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  legendItems: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 4,
-  },
-  legendItem: {
-    flexDirection: 'row',
+  quickActionItem: {
+    minWidth: 104,
     alignItems: 'center',
     gap: 5,
   },
-  legendDot: {
-    width: 10,
-    height: 10,
-  },
-  legendDotBordered: {
+  emptyCard: {
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-  },
-  legendText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  gridHeader: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 4,
+    backgroundColor: theme.colors.surface,
+    padding: 14,
     alignItems: 'center',
+    gap: 5,
   },
-  timeLabel: {
-    width: 32,
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  dayLabel: {
-    flex: 1,
+  emptyTitle: {
     color: theme.colors.text,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '900',
-    textAlign: 'center',
   },
-  gridCell: {
-    flex: 1,
-    height: 15,
-    borderWidth: 1,
-    borderColor: theme.colors.primarySoft,
-    backgroundColor: '#fff',
-  },
-  gridCellSelected: {
-    backgroundColor: theme.colors.primarySoft,
-    borderColor: theme.colors.primary,
-  },
-  gridCellMatched: {
+  emptyAddButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyAddLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  availableRow: {
+    minHeight: 78,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: '#8ddfd3',
+    backgroundColor: '#f0fdfa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    shadowColor: '#0f766e',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  availableDateBox: {
+    width: 50,
+    height: 54,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: '#99e3d7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  availableWeekday: {
+    color: theme.colors.accent,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  availableBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 7,
+  },
+  availableMeta: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  availableTime: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
   },
   disabledHint: {
     color: theme.colors.textMuted,
@@ -420,6 +422,7 @@ const styles = StyleSheet.create({
   voteMessage: {
     color: theme.colors.text,
     fontWeight: '700',
+    lineHeight: 20,
   },
   voteSubmitter: {
     color: theme.colors.textMuted,
@@ -459,9 +462,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     borderWidth: 2,
     borderColor: '#b91c1c',
-  },
-  secondaryAction: {
-    backgroundColor: theme.colors.primaryDark,
   },
   subtleEndButton: {
     alignSelf: 'center',

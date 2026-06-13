@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -124,6 +125,34 @@ export class BandsController {
   ) {
     res.locals.message = '밴드 멤버 목록을 불러왔습니다.';
     return this.bandsService.getMembers(user.userId, bandId);
+  }
+
+  @Patch(':bandId/members/me/profile-image')
+  @UseInterceptors(
+    FileInterceptor('profileImage', {
+      storage: diskStorage({
+        destination: 'uploads',
+        filename: (_req, file, callback) => {
+          const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extname(file.originalname)}`;
+          callback(null, name);
+        },
+      }),
+    }),
+  )
+  updateMyProfileImage(
+    @CurrentUser() user: { userId: string },
+    @Param('bandId') bandId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '프로필 사진을 변경했습니다.';
+    if (!file) {
+      throw new BadRequestException('프로필 사진 파일을 선택해 주세요.');
+    }
+    const baseUrl = this.configService.get<string>('uploadBaseUrl') ?? `${req.protocol}://${req.get('host')}`;
+    const profileImageUrl = `${baseUrl}/uploads/${file.filename}`;
+    return this.bandsService.updateMyProfileImage(user.userId, bandId, profileImageUrl);
   }
 
   @Get(':bandId/todos')

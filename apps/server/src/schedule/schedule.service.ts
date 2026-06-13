@@ -34,6 +34,8 @@ export class ScheduleService {
 
   async getSlots(userId: string, bandId: string) {
     await this.bandsService.requireMembership(userId, bandId);
+    const members = await this.bandsService.getMembers(userId, bandId);
+    const memberByUserId = new Map(members.map((member) => [member.userId, member]));
     const slots = await this.slotsRepository.find({
       where: { band: { id: bandId } },
       relations: ['createdByUser'],
@@ -44,6 +46,15 @@ export class ScheduleService {
       slots.map(async (slot) => {
         const items = await this.availabilityRepository.find({ where: { slot: { id: slot.id } } });
         const mine = items.find((item) => item.user.id === userId);
+        const availableMembers = items
+          .filter((item) => item.availability === ScheduleAvailabilityType.YES)
+          .map((item) => memberByUserId.get(item.user.id))
+          .filter((member): member is NonNullable<typeof member> => Boolean(member))
+          .map((member) => ({
+            userId: member.userId,
+            name: member.name,
+            profileImageUrl: member.profileImageUrl,
+          }));
         return {
           id: slot.id,
           date: slot.date,
@@ -54,6 +65,7 @@ export class ScheduleService {
           yesCount: items.filter((item) => item.availability === ScheduleAvailabilityType.YES).length,
           noCount: items.filter((item) => item.availability === ScheduleAvailabilityType.NO).length,
           myAvailability: mine?.availability ?? null,
+          availableMembers,
         };
       }),
     );

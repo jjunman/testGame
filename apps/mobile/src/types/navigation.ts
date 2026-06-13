@@ -18,7 +18,7 @@ export type BandsStackParamList = {
   CreatePracticeAssignment: { bandId: string; songCandidateId?: string };
   PracticeAssignmentDetail: { bandId: string; assignmentId: string };
   Schedule: { bandId: string };
-  ScheduleEdit: { bandId: string; period: 'morning' | 'afternoon' };
+  ScheduleEdit: { bandId: string; period?: 'morning' | 'afternoon'; initialDayIndex?: number };
   CreateScheduleSlot: { bandId: string };
   Studios: { bandId: string };
   CreateStudioCandidate: { bandId: string };
