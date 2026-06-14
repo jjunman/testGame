@@ -263,7 +263,7 @@ export function SettlementScreen({ route, navigation }: Props) {
             </View>
 
             <View style={styles.overrideBox}>
-              <Text style={styles.overrideLabel}>실제 결제 금액</Text>
+              <Text style={styles.overrideLabel}>금액 직접 입력</Text>
               <View style={styles.overrideInputWrap}>
                 <TextInput
                   value={customTotalText}
@@ -277,7 +277,6 @@ export function SettlementScreen({ route, navigation }: Props) {
                 />
                 <Text style={styles.overrideUnit}>원</Text>
               </View>
-              <Text style={styles.overrideHint}>가격 미정, 현장 할인, 추가 시간을 반영할 때 입력하세요.</Text>
             </View>
 
             <View style={styles.timeCard}>
@@ -304,7 +303,7 @@ export function SettlementScreen({ route, navigation }: Props) {
           <View style={styles.splitCard}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>참여 멤버</Text>
-              <Text style={styles.sectionHint}>변경하면 모든 멤버에게 같은 정산 상태로 저장돼요.</Text>
+              <Text style={styles.sectionHint}>합주에 참여하는 멤버를 선택해주세요</Text>
             </View>
             <View style={styles.participantList}>
               {members.map((member) => {
@@ -339,7 +338,7 @@ export function SettlementScreen({ route, navigation }: Props) {
                 <Text style={styles.smallActionText}>전체 완료</Text>
               </Pressable>
               <Pressable style={styles.smallActionButtonMuted} onPress={clearPaid}>
-                <Text style={styles.smallActionMutedText}>체크 해제</Text>
+                <Text style={styles.smallActionMutedText}>전체 해제</Text>
               </Pressable>
             </View>
             <View style={styles.memberList}>
@@ -370,7 +369,6 @@ export function SettlementScreen({ route, navigation }: Props) {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>합주실 선택</Text>
-              <Text style={styles.sectionHint}>등록된 합주실이 있으면 자동 선택되고, 없으면 목록 첫 항목이 선택돼요.</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionScroller}>
               {options.map((option) => (

@@ -37,6 +37,7 @@ export type BandSummary = {
   myRole: MemberRole;
   myPosition: string;
   memberCount: number;
+  todoCount: number;
 };
 
 export type BandMemberSummary = {

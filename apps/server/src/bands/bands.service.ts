@@ -162,6 +162,7 @@ export class BandsService {
         memberCount: await this.membersRepository.count({
           where: { band: { id: membership.band.id } },
         }),
+        todoCount: (await this.getTodos(userId, membership.band.id)).length,
       })),
     );
   }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +43,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
         myRole: result.myMembership?.role ?? 'member',
         myPosition: result.myMembership?.positionLabel ?? '',
         memberCount: 0,
+        todoCount: Array.isArray(result.todos) ? result.todos.length : 0,
       });
       setDetail({
         ...result,
@@ -157,7 +158,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>밴드 진행</Text>
+          <Text style={styles.sectionTitle}>밴드 현황</Text>
         </View>
         <BandFlowTimeline
           detail={detail}
@@ -273,52 +274,60 @@ function BandFlowTimeline({
 }) {
   const hasConfirmedSong = detail.songCards.some((card) => card.kind === 'song');
   const practiceStatus: VoteStepStatus = detail.openPracticeCount > 0 ? 'needed' : hasConfirmedSong ? 'done' : 'none';
-  const steps: Array<{ key: 'song' | 'practice' | 'studio'; label: string; status: VoteStepStatus; description: string }> = [
+  const steps: Array<{
+    key: 'song' | 'practice' | 'studio';
+    label: string;
+    status: VoteStepStatus;
+    description: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
     {
       key: 'song',
       label: '곡 정하기',
       status: detail.voteSummary.song,
       description: detail.voteSummary.song === 'done' ? '합주곡 확정' : detail.voteSummary.song === 'needed' ? '투표 진행 중' : '대기 중',
+      icon: 'musical-notes-outline',
     },
     {
       key: 'practice',
       label: '연습하기',
       status: practiceStatus,
       description: practiceStatus === 'done' ? '연습 정리됨' : practiceStatus === 'needed' ? '제출 필요' : '곡 확정 후 시작',
+      icon: 'mic-outline',
     },
     {
       key: 'studio',
       label: '합주실 잡기',
       status: detail.voteSummary.studio,
       description: detail.voteSummary.studio === 'done' ? '합주실 확정' : detail.voteSummary.studio === 'needed' ? '후보 투표 중' : '대기 중',
+      icon: 'location-outline',
     },
   ];
 
   return (
-    <View style={styles.voteTimelineCard}>
-      <Text style={styles.voteTimelineTitle}>곡부터 합주실까지</Text>
-      <View style={styles.voteSteps}>
-        {steps.map((step, index) => {
-          const done = step.status === 'done';
-          const needed = step.status === 'needed';
-          return (
-            <React.Fragment key={step.key}>
-              <Pressable style={styles.voteStep} onPress={() => onPress(step.key)}>
-                <View style={[styles.voteStepDot, done && styles.voteStepDone, needed && styles.voteStepNeeded]}>
-                  {done ? (
-                    <Ionicons name="checkmark" size={15} color="#fff" />
-                  ) : (
-                    <Text style={[styles.voteStepNumber, needed && styles.voteStepNumberNeeded]}>{index + 1}</Text>
-                  )}
-                </View>
-                <Text style={[styles.voteStepLabel, needed && styles.voteStepLabelNeeded]} numberOfLines={2}>{step.label}</Text>
-                <Text style={styles.voteStepStatus} numberOfLines={2}>{step.description}</Text>
-              </Pressable>
-              {index < steps.length - 1 ? <View style={[styles.voteStepLine, done && styles.voteStepLineDone]} /> : null}
-            </React.Fragment>
-          );
-        })}
-      </View>
+    <View style={styles.voteSteps}>
+      {steps.map((step) => {
+        const done = step.status === 'done';
+        const needed = step.status === 'needed';
+        return (
+          <Pressable
+            key={step.key}
+            style={({ pressed }) => [
+              styles.voteStep,
+              done && styles.voteStepDoneCard,
+              needed && styles.voteStepNeededCard,
+              pressed && styles.voteStepPressed,
+            ]}
+            onPress={() => onPress(step.key)}
+          >
+            <View style={[styles.voteStepIcon, done && styles.voteStepDoneIcon, needed && styles.voteStepNeededIcon]}>
+              <Ionicons name={done ? 'checkmark' : step.icon} size={17} color={done || needed ? '#fff' : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.voteStepLabel, needed && styles.voteStepLabelNeeded]} numberOfLines={2}>{step.label}</Text>
+            <Text style={styles.voteStepStatus} numberOfLines={2}>{step.description}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -489,61 +498,53 @@ const styles = StyleSheet.create({
     minWidth: 34,
     textAlign: 'right',
   },
-  voteTimelineCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 13,
-    gap: 12,
-  },
-  voteTimelineTitle: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
   voteSteps: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
+    gap: 8,
   },
   voteStep: {
     flex: 1,
-    alignItems: 'center',
-    gap: 5,
-  },
-  voteStepDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1.5,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
     borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  voteStepPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }],
+  },
+  voteStepDoneCard: {
     backgroundColor: '#fff',
+    borderColor: '#cfe9dc',
+  },
+  voteStepNeededCard: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: '#d8d2ff',
+  },
+  voteStepIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  voteStepDone: {
+  voteStepDoneIcon: {
     backgroundColor: theme.colors.success,
-    borderColor: theme.colors.success,
   },
-  voteStepNeeded: {
+  voteStepNeededIcon: {
     backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  voteStepNumber: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  voteStepNumberNeeded: {
-    color: '#fff',
   },
   voteStepLabel: {
     color: theme.colors.text,
-    fontSize: 11,
-    fontWeight: '800',
-    minHeight: 30,
-    textAlign: 'center',
-    lineHeight: 15,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
   },
   voteStepLabelNeeded: {
     color: theme.colors.text,
@@ -552,16 +553,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
-  },
-  voteStepLine: {
-    width: 22,
-    height: 2,
-    borderRadius: 999,
-    backgroundColor: theme.colors.border,
-    marginTop: 14,
-  },
-  voteStepLineDone: {
-    backgroundColor: theme.colors.primary,
+    lineHeight: 14,
   },
   todoTitle: {
     color: theme.colors.text,

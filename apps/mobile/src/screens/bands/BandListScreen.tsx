@@ -56,6 +56,7 @@ export function BandListScreen({ navigation }: Props) {
       <View style={styles.listWrap}>
         {bands.map((band) => {
           const selected = currentBand?.id === band.id;
+          const todoCount = band.todoCount ?? 0;
 
           return (
             <Pressable
@@ -66,6 +67,11 @@ export function BandListScreen({ navigation }: Props) {
               }}
               style={[styles.cardWrap, selected && styles.cardWrapSelected]}
             >
+              {todoCount > 0 ? (
+                <View style={styles.todoBadge}>
+                  <Text style={styles.todoBadgeText}>{todoCount > 9 ? '9+' : todoCount}</Text>
+                </View>
+              ) : null}
               <ImageBackground source={{ uri: band.thumbnailUrl || fallbackBandImage }} imageStyle={styles.cardImage} style={styles.bandCard}>
                 <View style={styles.cardDim} />
                 <View style={styles.cardTop}>
@@ -110,7 +116,7 @@ const styles = StyleSheet.create({
   },
   cardWrap: {
     borderRadius: theme.radius.md,
-    overflow: 'hidden',
+    overflow: 'visible',
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -122,6 +128,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 18,
     borderRadius: theme.radius.md,
+    overflow: 'hidden',
+  },
+  todoBadge: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    zIndex: 5,
+    elevation: 5,
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.danger,
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+  todoBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   cardTop: {
     flexDirection: 'row',
