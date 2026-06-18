@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
@@ -253,6 +253,16 @@ export function EmptyState({ title, description }: { title: string; description:
 
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return <Text style={styles.error}>{children}</Text>;
+}
+
+export function LoadingState({ fullScreen = false }: { fullScreen?: boolean }) {
+  return (
+    <View style={[styles.loadingState, fullScreen && styles.loadingStateFullScreen]}>
+      <View style={styles.loadingWindow}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -543,6 +553,30 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.danger,
     fontWeight: '600',
+  },
+  loadingState: {
+    minHeight: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingStateFullScreen: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  loadingWindow: {
+    width: 84,
+    height: 84,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#111827',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   textButton: {
     alignSelf: 'flex-start',
