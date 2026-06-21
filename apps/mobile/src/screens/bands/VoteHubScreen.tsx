@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScheduleProposalDto, SongRoundDto, StudioCandidateDto } from '@band/shared-types';
+import { SongRoundDto, StudioCandidateDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
@@ -15,20 +15,17 @@ type VoteTone = 'need' | 'done' | 'none' | 'changeable';
 export function VoteHubScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const [round, setRound] = useState<SongRoundDto | null>(null);
-  const [proposal, setProposal] = useState<ScheduleProposalDto | null>(null);
   const [studios, setStudios] = useState<StudioCandidateDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextRound, nextProposal, nextStudios] = await Promise.all([
+      const [nextRound, nextStudios] = await Promise.all([
         api.get<SongRoundDto | null>(`/bands/${bandId}/song-round`),
-        api.get<ScheduleProposalDto | null>(`/bands/${bandId}/schedule-proposal`),
         api.get<StudioCandidateDto[]>(`/bands/${bandId}/studio-candidates`),
       ]);
       setRound(nextRound);
-      setProposal(nextProposal);
       setStudios(nextStudios);
     } catch (error) {
       Alert.alert('투표 불러오기 실패', error instanceof Error ? error.message : '투표 현황을 불러오지 못했어요.');
@@ -45,7 +42,6 @@ export function VoteHubScreen({ route, navigation }: Props) {
   const cards = useMemo(() => {
     const songVoting = round?.status === 'voting';
     const songVoted = round?.candidates.some((candidate) => candidate.didVote) ?? false;
-    const activeProposal = proposal?.active ? proposal : null;
     const activeStudioCandidates = studios.filter((candidate) => candidate.status === 'open');
     const hasStudioCandidates = activeStudioCandidates.length > 0;
     const studioVoted = activeStudioCandidates.some((candidate) => candidate.didVote);
@@ -64,19 +60,6 @@ export function VoteHubScreen({ route, navigation }: Props) {
         status: songVoting ? (songVoted ? '변경 가능' : '투표 필요') : round?.status === 'done' ? '후보 추가' : '진행 없음',
         tone: songVoting ? (songVoted ? 'changeable' : 'need') : round?.status === 'done' ? 'changeable' : 'none',
         onPress: () => navigation.navigate('SongRound', { bandId, initialTab: 'vote' }),
-      },
-      {
-        title: '합주 시간 투표',
-        description: activeProposal
-          ? activeProposal.myAvailability
-            ? '찬반 응답이 저장되어 있어요. 투표가 끝나기 전까지 바꿀 수 있어요.'
-            : '제안된 합주 시간이 괜찮은지 응답해 주세요.'
-          : proposal?.confirmed
-            ? '합주 시간이 확정되었어요. 필요하면 일정 변경을 열 수 있어요.'
-            : '진행 중인 합주 시간 투표가 없어요.',
-        status: activeProposal ? (activeProposal.myAvailability ? '변경 가능' : '투표 필요') : proposal?.confirmed ? '확정됨' : '진행 없음',
-        tone: activeProposal ? (activeProposal.myAvailability ? 'changeable' : 'need') : proposal?.confirmed ? 'done' : 'none',
-        onPress: () => navigation.navigate('Schedule', { bandId }),
       },
       {
         title: '합주실 투표',
@@ -98,7 +81,7 @@ export function VoteHubScreen({ route, navigation }: Props) {
       tone: VoteTone;
       onPress: () => void;
     }>;
-  }, [bandId, navigation, proposal, round, studios]);
+  }, [bandId, navigation, round, studios]);
 
   const needCount = cards.filter((card) => card.tone === 'need').length;
 

@@ -216,6 +216,63 @@ export class ScheduleService {
     return proposal;
   }
 
+  async getRegisteredSchedules(userId: string, bandId: string) {
+    await this.bandsService.requireMembership(userId, bandId);
+    const schedules = await this.proposalsRepository.find({
+      where: { band: { id: bandId }, confirmed: true },
+      relations: ['createdByUser'],
+      order: { date: 'ASC', startTime: 'ASC' },
+    });
+    const today = new Date().toISOString().slice(0, 10);
+
+    return schedules
+      .filter((schedule) => schedule.date >= today)
+      .map((schedule) => ({
+        id: schedule.id,
+        date: schedule.date,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        createdByUserId: schedule.createdByUser.id,
+        createdByName: schedule.createdByUser.name,
+        active: false,
+        yesCount: 0,
+        noCount: 0,
+        myAvailability: null,
+        allAgreed: false,
+        confirmed: true,
+        message: '등록된 합주 일정이에요.',
+      }));
+  }
+
+  async registerSchedule(userId: string, bandId: string, dto: CreateScheduleProposalDto) {
+    const membership = await this.bandsService.requireMembership(userId, bandId);
+
+    if (this.toMinute(dto.endTime) <= this.toMinute(dto.startTime)) {
+      throw new BadRequestException('종료 시간은 시작 시간보다 늦어야 합니다.');
+    }
+
+    const schedule = await this.proposalsRepository.save(
+      this.proposalsRepository.create({
+        band: membership.band,
+        createdByUser: membership.user,
+        date: dto.date.slice(0, 10),
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        active: false,
+        confirmed: true,
+        endedAt: new Date(),
+      }),
+    );
+
+    await this.notificationsService.notifyBandMembers(bandId, {
+      title: membership.band.name,
+      body: `${schedule.date} ${schedule.startTime}-${schedule.endTime} 합주 일정이 등록됐어요.`,
+      data: { type: 'schedule_confirmed', bandId, scheduleId: schedule.id },
+    });
+
+    return schedule;
+  }
+
   async voteProposal(userId: string, bandId: string, dto: VoteScheduleProposalDto) {
     await this.bandsService.requireMembership(userId, bandId);
     const proposal = await this.proposalsRepository.findOne({
@@ -324,5 +381,10 @@ export class ScheduleService {
       confirmed,
       message,
     };
+  }
+
+  private toMinute(value: string) {
+    const [hour, minute] = value.split(':').map(Number);
+    return hour * 60 + minute;
   }
 }

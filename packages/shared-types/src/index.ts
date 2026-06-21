@@ -194,6 +194,8 @@ export type StudioLocationDto = {
 export type SettlementDto = {
   selectedStudioId: string | null;
   customTotalPrice: number | null;
+  usageHours: number;
+  usageHoursFromSchedule: boolean;
   participantUserIds: string[];
   paidUserIds: string[];
   updatedAt: string;
@@ -253,6 +255,11 @@ export type BandHomeDto = {
   } | null;
   openPracticeCount: number;
   openScheduleSlotCount: number;
+  nextRehearsal: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  } | null;
   todos: TodoItemDto[];
   voteSummary: VoteSummaryDto;
   songCards: BandSongCardDto[];

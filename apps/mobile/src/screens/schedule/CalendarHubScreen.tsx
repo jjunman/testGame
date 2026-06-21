@@ -61,8 +61,8 @@ export function CalendarHubScreen() {
           style={styles.secondaryRow}
           onPress={() => navigation.navigate('CreateScheduleSlot', { bandId: currentBand.id })}
         >
-          <Text style={styles.secondaryTitle}>합주 시간 제안하기</Text>
-          <Text style={styles.secondaryMeta}>가능한 시간을 골라 찬반 투표를 열어요</Text>
+          <Text style={styles.secondaryTitle}>합주 일정 등록하기</Text>
+          <Text style={styles.secondaryMeta}>추천받거나 직접 골라 바로 등록해요</Text>
         </Pressable>
       </View>
 

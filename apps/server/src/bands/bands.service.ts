@@ -5,7 +5,7 @@
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { MemberRole, PositionType, PracticeAssignmentStatus, SongRoundStatus } from '../common/enums';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { ScheduleAvailability } from '../schedule/schedule-availability.entity';
@@ -255,6 +255,18 @@ export class BandsService {
       });
     }
 
+    const todayInKorea = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+    }).format(new Date());
+    const nextRehearsal = await this.scheduleProposalsRepository.findOne({
+      where: {
+        band: { id: bandId },
+        confirmed: true,
+        date: MoreThanOrEqual(todayInKorea),
+      },
+      order: { date: 'ASC', startTime: 'ASC' },
+    });
+
     return {
       id: membership.band.id,
       name: membership.band.name,
@@ -281,6 +293,13 @@ export class BandsService {
       openScheduleSlotCount: await this.slotsRepository.count({
         where: { band: { id: bandId } },
       }),
+      nextRehearsal: nextRehearsal
+        ? {
+            date: nextRehearsal.date,
+            startTime: nextRehearsal.startTime,
+            endTime: nextRehearsal.endTime,
+          }
+        : null,
         todos: await this.getTodos(userId, bandId),
         voteSummary: await this.getVoteSummary(userId, bandId),
         songCards,
@@ -372,23 +391,6 @@ export class BandsService {
           shortcut: 'song_round',
         });
       }
-    }
-
-    const activeProposal = await this.scheduleProposalsRepository.findOne({
-      where: { band: { id: bandId }, active: true },
-      relations: ['votes', 'votes.user'],
-      order: { createdAt: 'DESC' },
-    });
-    if (activeProposal && !activeProposal.votes?.some((vote) => vote.user.id === userId)) {
-      const dueAt = this.toDateTime(activeProposal.date, activeProposal.startTime);
-      todos.push({
-        type: 'vote_schedule_proposal',
-        title: '합주 시간 투표하기',
-        description: '제안된 합주 시간이 괜찮은지 찬성 또는 반대로 응답해 주세요.',
-        dueLabel: this.formatTodoDueLabel(dueAt),
-        dueAt: dueAt.toISOString(),
-        shortcut: 'schedule',
-      });
     }
 
     const studioCandidates = await this.studioCandidatesRepository.find({

@@ -6,7 +6,7 @@ import { BandMemberSummary, SettlementDto, StudioCandidateDto, StudioDto } from 
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { EmptyState, StatusBadge } from '../../components/UI';
+import { EmptyState } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -36,24 +36,32 @@ export function SettlementScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const savingRef = useRef(false);
+  const usageHoursRef = useRef(2);
+  const usageSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUsageHoursRef = useRef<number | null>(null);
 
   const options = useMemo(() => buildOptions(candidates, studios), [candidates, studios]);
   const selected = options.find((option) => option.studioId === selectedStudioId) ?? options[0] ?? null;
+  const usageHours = settlement?.usageHours ?? 2;
+  const calculatedTotalPrice = selected?.hourlyPrice === null || selected?.hourlyPrice === undefined
+    ? null
+    : Math.round(selected.hourlyPrice * usageHours);
   const customTotalPrice = parsePrice(customTotalText);
-  const totalPrice = customTotalPrice ?? selected?.hourlyPrice ?? null;
+  const totalPrice = customTotalPrice ?? calculatedTotalPrice;
   const participantIds = new Set(settlement?.participantUserIds ?? members.map((member) => member.userId));
   const paidIds = new Set(settlement?.paidUserIds ?? []);
   const participatingMembers = members.filter((member) => participantIds.has(member.userId));
   const splitCount = Math.max(1, participatingMembers.length);
   const perMemberPrice = totalPrice === null ? null : Math.ceil(totalPrice / splitCount);
-  const paidCount = participatingMembers.filter((member) => paidIds.has(member.userId)).length;
-  const unpaidCount = Math.max(0, participatingMembers.length - paidCount);
 
   const saveSettlement = useCallback(async (body: Partial<SettlementDto>) => {
     savingRef.current = true;
     try {
       const updated = await api.patch<SettlementDto>(`/bands/${bandId}/settlement`, body);
-      setSettlement(updated);
+      const pendingUsageHours = pendingUsageHoursRef.current;
+      setSettlement(pendingUsageHours === null
+        ? updated
+        : { ...updated, usageHours: pendingUsageHours, usageHoursFromSchedule: false });
       setSelectedStudioId(updated.selectedStudioId);
       if (!totalFocused) {
         setCustomTotalText(updated.customTotalPrice === null ? '' : String(updated.customTotalPrice));
@@ -66,7 +74,7 @@ export function SettlementScreen({ route, navigation }: Props) {
 
   const load = useCallback(async (silent = false) => {
     if (silent) {
-      if (savingRef.current || totalFocused) {
+      if (savingRef.current || usageSaveTimerRef.current !== null || totalFocused) {
         return;
       }
       try {
@@ -128,6 +136,22 @@ export function SettlementScreen({ route, navigation }: Props) {
     return () => clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    usageHoursRef.current = usageHours;
+  }, [usageHours]);
+
+  useEffect(() => {
+    return () => {
+      if (usageSaveTimerRef.current !== null) {
+        clearTimeout(usageSaveTimerRef.current);
+      }
+      const pendingUsageHours = pendingUsageHoursRef.current;
+      if (pendingUsageHours !== null) {
+        void api.patch(`/bands/${bandId}/settlement`, { usageHours: pendingUsageHours });
+      }
+    };
+  }, [bandId]);
+
   const selectOption = (option: SettlementOption) => {
     setSelectedStudioId(option.studioId);
     setCustomTotalText('');
@@ -137,6 +161,33 @@ export function SettlementScreen({ route, navigation }: Props) {
   const saveTotalPrice = () => {
     setTotalFocused(false);
     void saveSettlement({ customTotalPrice: parsePrice(customTotalText) });
+  };
+
+  const changeUsageHours = (amount: number) => {
+    if (!settlement) {
+      return;
+    }
+    const nextUsageHours = Math.max(1, Math.min(24, Math.round(usageHoursRef.current + amount)));
+    if (nextUsageHours === usageHoursRef.current) {
+      return;
+    }
+    usageHoursRef.current = nextUsageHours;
+    pendingUsageHoursRef.current = nextUsageHours;
+    setSettlement((current) => current
+      ? { ...current, usageHours: nextUsageHours, usageHoursFromSchedule: false }
+      : current);
+
+    if (usageSaveTimerRef.current !== null) {
+      clearTimeout(usageSaveTimerRef.current);
+    }
+    usageSaveTimerRef.current = setTimeout(() => {
+      usageSaveTimerRef.current = null;
+      const pendingUsageHours = pendingUsageHoursRef.current;
+      pendingUsageHoursRef.current = null;
+      if (pendingUsageHours !== null) {
+        void saveSettlement({ usageHours: pendingUsageHours });
+      }
+    }, 250);
   };
 
   const toggleParticipant = (userId: string) => {
@@ -229,14 +280,10 @@ export function SettlementScreen({ route, navigation }: Props) {
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="settlement" navigation={navigation} />}>
       {selected ? (
         <>
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryHeader}>
-              <View style={styles.summaryTitleBlock}>
-                <Text style={styles.summaryLabel}>선택한 합주실</Text>
-                <Text style={styles.summaryTitle} numberOfLines={2}>{selected.name}</Text>
-              </View>
+          <View style={styles.calculationSection}>
+            <View style={styles.calculationHeader}>
+              <Text style={styles.sectionTitle}>정산 금액</Text>
               <View style={styles.summaryHeaderActions}>
-                {selected.status === 'confirmed' ? <StatusBadge label="등록됨" tone="success" /> : null}
                 <Pressable style={styles.resetChip} onPress={resetDraft}>
                   <Ionicons name="refresh-outline" size={13} color={theme.colors.textMuted} />
                   <Text style={styles.resetChipText}>초기화</Text>
@@ -247,20 +294,39 @@ export function SettlementScreen({ route, navigation }: Props) {
             <View style={styles.priceHero}>
               <Text style={styles.priceLabel}>1인 정산액</Text>
               <Text style={styles.priceValue}>{formatPrice(perMemberPrice)}</Text>
-              <Text style={styles.priceMeta}>{formatPrice(totalPrice)} / 참여 {splitCount}명</Text>
+              <Text style={styles.priceMeta}>
+                {customTotalPrice === null
+                  ? `${formatPrice(selected.hourlyPrice)} × ${formatHours(usageHours)}시간 / 참여 ${splitCount}명`
+                  : `${formatPrice(customTotalPrice)} / 참여 ${splitCount}명`}
+              </Text>
+            </View>
+
+            <View style={styles.usageCard}>
+              <View style={styles.usageText}>
+                <Text style={styles.usageLabel}>
+                  {settlement.usageHoursFromSchedule ? '확정 일정 기준 이용 시간' : '이용 시간'}
+                </Text>
+                <Text style={styles.usageValue}>{formatHours(usageHours)}시간</Text>
+              </View>
+              <View style={styles.usageStepper}>
+                <Pressable style={styles.usageButton} onPress={() => changeUsageHours(-1)}>
+                  <Ionicons name="remove" size={18} color={theme.colors.text} />
+                </Pressable>
+                <Pressable style={styles.usageButton} onPress={() => changeUsageHours(1)}>
+                  <Ionicons name="add" size={18} color={theme.colors.text} />
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.overrideBox}>
-              <Text style={styles.overrideLabel}>직접 입력</Text>
+              <Text style={styles.overrideLabel}>총액 직접 입력 (선택)</Text>
               <View style={styles.overrideInputWrap}>
                 <TextInput
                   value={customTotalText}
                   onChangeText={setCustomTotalText}
                   onFocus={() => setTotalFocused(true)}
                   onBlur={saveTotalPrice}
-                  placeholder={selected?.hourlyPrice === null || selected?.hourlyPrice === undefined
-                    ? '가격'
-                    : selected.hourlyPrice.toLocaleString('ko-KR')}
+                  placeholder="가격"
                   placeholderTextColor={theme.colors.textMuted}
                   keyboardType="number-pad"
                   style={styles.overrideInput}
@@ -272,10 +338,30 @@ export function SettlementScreen({ route, navigation }: Props) {
             {selected.address ? <Text style={styles.addressText}>{selected.address}</Text> : null}
           </View>
 
-          <View style={styles.splitCard}>
+          <View style={styles.section}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionScroller}>
+              {options.map((option) => {
+                const optionSelected = selected.studioId === option.studioId;
+                return (
+                  <Pressable
+                    key={option.id}
+                    style={[styles.optionCard, optionSelected && styles.optionCardSelected]}
+                    onPress={() => selectOption(option)}
+                  >
+                    <View style={styles.optionCompactHeader}>
+                      <Text style={styles.optionName} numberOfLines={1}>{option.name}</Text>
+                      {optionSelected ? <Ionicons name="checkmark-circle" size={17} color={theme.colors.primaryDark} /> : null}
+                    </View>
+                    <Text style={styles.optionPrice}>{formatPrice(option.hourlyPrice)} / 시간</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>참여 멤버</Text>
-              <Text style={styles.sectionHint}>합주에 참여하는 멤버를 선택해주세요</Text>
             </View>
             <View style={styles.participantList}>
               {members.map((member) => {
@@ -300,10 +386,9 @@ export function SettlementScreen({ route, navigation }: Props) {
             </View>
           </View>
 
-          <View style={styles.checkCard}>
+          <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>입금 체크</Text>
-              <Text style={styles.sectionHint}>{paidCount}명 완료 · {unpaidCount}명 남음</Text>
             </View>
             <View style={styles.checkActions}>
               <Pressable style={styles.smallActionButton} onPress={markAllPaid}>
@@ -338,29 +423,6 @@ export function SettlementScreen({ route, navigation }: Props) {
             </View>
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>합주실 선택</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionScroller}>
-              {options.map((option) => (
-                <Pressable
-                  key={option.id}
-                  style={[styles.optionCard, selected.studioId === option.studioId && styles.optionCardSelected]}
-                  onPress={() => selectOption(option)}
-                >
-                  <View style={styles.optionTop}>
-                    <Text style={styles.optionSource}>{option.source === 'candidate' ? '후보' : '목록'}</Text>
-                    {option.status === 'confirmed' ? <StatusBadge label="등록됨" tone="success" /> : null}
-                  </View>
-                  <Text style={styles.optionName} numberOfLines={2}>{option.name}</Text>
-                  <Text style={styles.optionPrice}>{formatPrice(option.hourlyPrice)}</Text>
-                  <Text style={styles.optionMeta}>합주실 등록 가격</Text>
-                  {typeof option.voteCount === 'number' ? <Text style={styles.optionMeta}>투표 {option.voteCount}표</Text> : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
         </>
       ) : (
         <EmptyState
@@ -420,6 +482,10 @@ function formatPrice(value: number | null) {
   return value === null ? '가격 미정' : `${value.toLocaleString('ko-KR')}원`;
 }
 
+function formatHours(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function MemberAvatar({ member, included }: { member: BandMemberSummary; included: boolean }) {
   return (
     <View style={[styles.avatar, !included && styles.avatarOff]}>
@@ -470,17 +536,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  summaryCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 15,
-    gap: 13,
+  calculationSection: {
+    gap: 12,
   },
-  summaryHeader: {
+  calculationHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
@@ -505,22 +566,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  summaryTitleBlock: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  summaryLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  summaryTitle: {
-    color: theme.colors.text,
-    fontSize: 19,
-    fontWeight: '900',
-    lineHeight: 25,
-  },
   priceHero: {
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primarySoft,
@@ -541,6 +586,47 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
+  },
+  usageCard: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  usageText: {
+    flex: 1,
+    gap: 3,
+  },
+  usageLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  usageValue: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  usageStepper: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  usageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   overrideBox: {
     borderRadius: theme.radius.md,
@@ -577,25 +663,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
-  overrideHint: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
   addressText: {
     color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 18,
-  },
-  splitCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 14,
-    gap: 12,
   },
   section: {
     gap: 10,
@@ -607,11 +679,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: '900',
-  },
-  sectionHint: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
   },
   participantList: {
     gap: 8,
@@ -638,14 +705,6 @@ const styles = StyleSheet.create({
   },
   participantStatusOn: {
     color: theme.colors.primaryDark,
-  },
-  checkCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 14,
-    gap: 12,
   },
   checkActions: {
     flexDirection: 'row',
@@ -760,46 +819,35 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   optionCard: {
-    width: 190,
-    minHeight: 156,
+    width: 164,
+    minHeight: 72,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    padding: 12,
-    gap: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    gap: 6,
   },
   optionCardSelected: {
     borderColor: theme.colors.primary,
     backgroundColor: '#fbfaff',
   },
-  optionTop: {
-    minHeight: 24,
+  optionCompactHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
-  optionSource: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   optionName: {
+    flex: 1,
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '900',
-    lineHeight: 20,
   },
   optionPrice: {
-    marginTop: 'auto',
-    color: theme.colors.primaryDark,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  optionMeta: {
     color: theme.colors.textMuted,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

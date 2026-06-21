@@ -75,6 +75,27 @@ export class ScheduleController {
     return this.scheduleService.getProposal(user.userId, bandId);
   }
 
+  @Get('schedule-events')
+  registeredSchedules(
+    @CurrentUser() user: { userId: string },
+    @Param('bandId') bandId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '등록된 합주 일정을 불러왔습니다.';
+    return this.scheduleService.getRegisteredSchedules(user.userId, bandId);
+  }
+
+  @Post('schedule-events')
+  registerSchedule(
+    @CurrentUser() user: { userId: string },
+    @Param('bandId') bandId: string,
+    @Body() dto: CreateScheduleProposalDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '합주 일정을 등록했습니다.';
+    return this.scheduleService.registerSchedule(user.userId, bandId, dto);
+  }
+
   @Post('schedule-proposal')
   createProposal(
     @CurrentUser() user: { userId: string },

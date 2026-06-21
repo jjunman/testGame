@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
+import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { Studio } from '../studios/studio.entity';
 import { UpdateSettlementDto } from './dto';
@@ -15,6 +16,8 @@ export class SettlementService {
     private readonly settlementsRepository: Repository<Settlement>,
     @InjectRepository(BandMember)
     private readonly membersRepository: Repository<BandMember>,
+    @InjectRepository(ScheduleProposal)
+    private readonly scheduleProposalsRepository: Repository<ScheduleProposal>,
     @InjectRepository(StudioCandidate)
     private readonly studioCandidatesRepository: Repository<StudioCandidate>,
     @InjectRepository(Studio)
@@ -24,9 +27,10 @@ export class SettlementService {
 
   async get(userId: string, bandId: string) {
     const membership = await this.bandsService.requireMembership(userId, bandId);
-    const [settlement, members] = await Promise.all([
+    const [settlement, members, confirmedUsageHours] = await Promise.all([
       this.findOrCreate(membership),
       this.getMembers(bandId),
+      this.getConfirmedUsageHours(bandId),
     ]);
     const memberIds = members.map((member) => member.user.id);
     let selectedStudioId = settlement.selectedStudioId;
@@ -40,6 +44,10 @@ export class SettlementService {
     return {
       selectedStudioId,
       customTotalPrice: settlement.customTotalPrice,
+      usageHours: confirmedUsageHours !== null && !settlement.usageHoursOverridden
+        ? confirmedUsageHours
+        : settlement.usageHours,
+      usageHoursFromSchedule: confirmedUsageHours !== null && !settlement.usageHoursOverridden,
       participantUserIds: nextParticipantUserIds,
       paidUserIds,
       updatedAt: settlement.updatedAt.toISOString(),
@@ -67,6 +75,11 @@ export class SettlementService {
 
     if (Object.prototype.hasOwnProperty.call(dto, 'customTotalPrice')) {
       settlement.customTotalPrice = dto.customTotalPrice ?? null;
+    }
+
+    if (dto.usageHours !== undefined) {
+      settlement.usageHours = dto.usageHours;
+      settlement.usageHoursOverridden = true;
     }
 
     if (dto.participantUserIds) {
@@ -100,6 +113,8 @@ export class SettlementService {
         band: membership.band,
         selectedStudioId: defaultSelectedStudioId,
         customTotalPrice: null,
+        usageHours: 2,
+        usageHoursOverridden: false,
         participantUserIds: null,
         paidUserIds: null,
       }),
@@ -145,6 +160,24 @@ export class SettlementService {
       }),
     ]);
     return Boolean(studio || candidate);
+  }
+
+  private async getConfirmedUsageHours(bandId: string) {
+    const proposal = await this.scheduleProposalsRepository.findOne({
+      where: { band: { id: bandId }, confirmed: true },
+      order: { createdAt: 'DESC' },
+    });
+    if (!proposal) {
+      return null;
+    }
+
+    const minutes = this.toMinute(proposal.endTime) - this.toMinute(proposal.startTime);
+    return minutes > 0 ? minutes / 60 : null;
+  }
+
+  private toMinute(value: string) {
+    const [hour, minute] = value.split(':').map(Number);
+    return hour * 60 + minute;
   }
 
   private cleanIds(value: string[] | null | undefined, allowedIds: string[]) {

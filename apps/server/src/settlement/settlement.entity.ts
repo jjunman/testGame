@@ -23,6 +23,12 @@ export class Settlement {
   @Column({ name: 'custom_total_price', type: 'int', nullable: true })
   customTotalPrice: number | null;
 
+  @Column({ name: 'usage_hours', type: 'float', default: 2 })
+  usageHours: number;
+
+  @Column({ name: 'usage_hours_overridden', default: false })
+  usageHoursOverridden: boolean;
+
   @Column({ name: 'participant_user_ids', type: 'simple-json', nullable: true })
   participantUserIds: string[] | null;
 

@@ -139,7 +139,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
       <View style={styles.dashboardHero}>
         <Image source={{ uri: detail.thumbnailUrl || fallbackBandImage }} style={styles.bandImage} />
         <View style={styles.heroText}>
-          <Text style={styles.kicker}>오늘의 밴드 준비</Text>
           <Text style={styles.bandName} numberOfLines={1}>{detail.name}</Text>
           <Text style={styles.memberMeta} numberOfLines={1}>
             {detail.myMembership.role === 'leader' ? '리더' : '멤버'} · {detail.myMembership.positionLabel || '파트 미정'} · 멤버 {detail.memberCount}명
@@ -175,9 +174,9 @@ export function BandHomeScreen({ route, navigation }: Props) {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>기능</Text>
-          <Text style={styles.sectionMeta}>바로가기</Text>
         </View>
         <View style={styles.flowGrid}>
+          <NextRehearsalCard rehearsal={detail.nextRehearsal} />
           {shortcutCards.map((item) => (
             <FlowCard
               key={item.key}
@@ -193,6 +192,10 @@ export function BandHomeScreen({ route, navigation }: Props) {
                 }
                 if (item.key === 'schedule') {
                   navigation.navigate('Schedule', { bandId });
+                  return;
+                }
+                if (item.key === 'settlement') {
+                  navigation.navigate('Settlement', { bandId });
                   return;
                 }
                 navigation.navigate('Studios', { bandId });
@@ -282,6 +285,18 @@ function FlowCard({
   );
 }
 
+function NextRehearsalCard({ rehearsal }: { rehearsal: BandHomeDto['nextRehearsal'] }) {
+  const display = getNextRehearsalDisplay(rehearsal);
+
+  return (
+    <View style={styles.nextRehearsalCard}>
+      <Text style={styles.nextRehearsalDday}>{display.dDay}</Text>
+      <Text style={styles.nextRehearsalDate}>{display.date}</Text>
+      <Text style={styles.nextRehearsalTime}>{display.time}</Text>
+    </View>
+  );
+}
+
 function todoDeadlineLabel(todo: TodoItemDto) {
   if (todo.dueAt) {
     const diff = new Date(todo.dueAt).getTime() - Date.now();
@@ -366,7 +381,36 @@ function buildShortcutCards(detail: BandHomeDto) {
       description: detail.voteSummary.studio === 'needed' ? '후보 투표 중' : '후보와 지도',
       icon: 'location-outline' as const,
     },
+    {
+      key: 'settlement' as const,
+      label: '정산',
+      description: '합주 비용 정리',
+      icon: 'card-outline' as const,
+    },
   ];
+}
+
+function getNextRehearsalDisplay(rehearsal: BandHomeDto['nextRehearsal']) {
+  if (!rehearsal) {
+    return { date: '--/--', dDay: '미정', time: '시간 미정' };
+  }
+
+  const [year, month, day] = rehearsal.date.split('-').map(Number);
+  const targetDate = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysLeft = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  return {
+    date: `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`,
+    dDay: daysLeft === 0 ? 'D-DAY' : daysLeft > 0 ? `D-${daysLeft}` : `D+${Math.abs(daysLeft)}`,
+    time: `${formatRehearsalTime(rehearsal.startTime)}~${formatRehearsalTime(rehearsal.endTime)}`,
+  };
+}
+
+function formatRehearsalTime(value: string) {
+  const [hour, minute] = value.slice(0, 5).split(':');
+  return minute === '00' ? `${hour}시` : `${hour}:${minute}`;
 }
 
 const styles = StyleSheet.create({
@@ -454,11 +498,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 4,
-  },
-  kicker: {
-    color: theme.colors.primaryDark,
-    fontSize: 12,
-    fontWeight: '900',
   },
   bandName: {
     color: theme.colors.text,
@@ -639,6 +678,39 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     padding: 12,
     gap: 8,
+  },
+  nextRehearsalCard: {
+    width: '48.8%',
+    minHeight: 104,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  nextRehearsalDday: {
+    alignSelf: 'flex-end',
+    overflow: 'hidden',
+    color: '#fff',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  nextRehearsalDate: {
+    color: theme.colors.text,
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '900',
+  },
+  nextRehearsalTime: {
+    alignSelf: 'flex-end',
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   flowCardPressed: {
     backgroundColor: theme.colors.primarySoft,

@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   Min,
 } from 'class-validator';
 
@@ -16,6 +17,12 @@ export class UpdateSettlementDto {
   @IsInt()
   @Min(0)
   customTotalPrice?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  usageHours?: number;
 
   @IsOptional()
   @IsArray()
