@@ -47,6 +47,7 @@ export class PracticeService {
     return items.map((assignment) => ({
       id: assignment.id,
       bandId,
+      songCandidateId: assignment.songCandidate?.id ?? null,
       title: assignment.title,
       description: assignment.description,
       dueAt: assignment.dueAt.toISOString(),

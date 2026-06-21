@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScheduleProposalDto, ScheduleSlotDto, ScheduleSummaryDto } from '@band/shared-types';
@@ -50,7 +50,13 @@ export function ScheduleScreen({ route, navigation }: Props) {
     return slots.filter((slot) => weekDates.includes(slot.date) && isScheduleHour(Number(slot.startTime.slice(0, 2))));
   }, [slots, weekDates]);
 
-  const allAvailableItems = useMemo(() => buildAllAvailableItems(summary, weekDates), [summary, weekDates]);
+  const allAvailableSlotKeys = useMemo(() => {
+    return new Set(
+      summary
+        .filter((item) => item.allAvailable && isVisibleSummary(item, weekDates))
+        .map((item) => `${item.date}-${Math.floor(toMinute(item.startTime) / 60)}`),
+    );
+  }, [summary, weekDates]);
 
   const activeProposal = proposal?.active ? proposal : null;
   const confirmedProposal = proposal && !proposal.active && proposal.confirmed ? proposal : null;
@@ -104,27 +110,57 @@ export function ScheduleScreen({ route, navigation }: Props) {
       <HeroBanner title="우리 일정" align="center" />
 
       <View style={styles.quickActions}>
-        <View style={styles.quickActionItem}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="합주 시간 제안하기"
-            onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
-            style={styles.emptyAddButton}
-          >
-            <Ionicons name="add" size={26} color="#fff" />
-          </Pressable>
-          <Text style={styles.emptyAddLabel}>일정 제안하기</Text>
-        </View>
-        <View style={styles.quickActionItem}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="내 가능 시간 등록하기"
-            onPress={() => navigation.navigate('ScheduleEdit', { bandId })}
-            style={styles.emptyAddButton}
-          >
-            <Ionicons name="create-outline" size={24} color="#fff" />
-          </Pressable>
-          <Text style={styles.emptyAddLabel}>내 일정 입력하기</Text>
+        <QuickAction
+          icon="create-outline"
+          label="내 일정 입력하기"
+          onPress={() => navigation.navigate('ScheduleEdit', { bandId })}
+        />
+        <QuickAction
+          icon="add"
+          label="일정 제안하기"
+          onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>모두가 가능한 시간</Text>
+        <View style={styles.scheduleTable}>
+          <View style={styles.weekdayColumn}>
+            <View style={styles.tableCorner} />
+            {weekDates.map((date) => (
+              <View key={date} style={styles.weekdayCell}>
+                <Text style={styles.weekdayText}>{weekdayLabel(date)}</Text>
+              </View>
+            ))}
+          </View>
+          <ScrollView style={styles.scheduleScroll} horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+            <View style={styles.tableGrid}>
+              <View style={styles.tableRow}>
+                {SCHEDULE_HOURS.map((hour) => (
+                  <View key={hour} style={styles.hourCell}>
+                    <Text style={styles.hourText}>{formatHourValue(hour)}시</Text>
+                  </View>
+                ))}
+              </View>
+              {weekDates.map((date) => (
+                <View key={date} style={styles.tableRow}>
+                  {SCHEDULE_HOURS.map((hour) => {
+                    const isAllAvailable = allAvailableSlotKeys.has(`${date}-${hour}`);
+                    return (
+                      <View
+                        key={`${date}-${hour}`}
+                        accessibilityLabel={`${weekdayLabel(date)}요일 ${formatHourValue(hour)}시부터 ${formatHourValue(hour + 1)}시${isAllAvailable ? ', 모두 가능' : ''}`}
+                        style={[
+                          styles.scheduleCell,
+                          isAllAvailable && styles.scheduleCellAvailable,
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       </View>
 
@@ -200,58 +236,30 @@ export function ScheduleScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>모두가 가능한 시간</Text>
-        {allAvailableItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>아직 모두 가능한 시간이 없어요</Text>
-          </View>
-        ) : null}
-        {allAvailableItems.map((item) => (
-          <Pressable key={item.id} style={styles.availableRow} onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}>
-            <View style={styles.availableDateBox}>
-              <Text style={styles.availableWeekday}>{item.weekday}</Text>
-            </View>
-            <View style={styles.availableBody}>
-              <Text style={styles.availableMeta}>전원 가능 시간</Text>
-              <Text style={styles.availableTime}>{item.timeLabel}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} />
-          </Pressable>
-        ))}
-      </View>
     </Screen>
   );
 }
 
-type AllAvailableItem = {
-  id: string;
-  weekday: string;
-  timeLabel: string;
-  date: string;
-};
-
-function buildAllAvailableItems(summary: ScheduleSummaryDto[], weekDates: string[]): AllAvailableItem[] {
-  const grouped = new Map<string, number[]>();
-
-  summary
-    .filter((item) => item.allAvailable && isVisibleSummary(item, weekDates))
-    .forEach((item) => {
-      const hour = Math.floor(toMinute(item.startTime) / 60);
-      grouped.set(item.date, [...(grouped.get(item.date) ?? []), hour]);
-    });
-
-  return Array.from(grouped.entries())
-    .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
-    .flatMap(([date, hours]) =>
-      buildHourRanges(hours).map((range) => ({
-        id: `${date}-${range.startHour}-${range.endHour}`,
-        weekday: weekdayLabel(date),
-        timeLabel: range.label,
-        date,
-      })),
-    );
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.quickActionItem}>
+      <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.emptyAddButton}>
+        <Ionicons name={icon} size={icon === 'add' ? 26 : 24} color="#fff" />
+      </Pressable>
+      <Text style={styles.emptyAddLabel}>{label}</Text>
+    </View>
+  );
 }
+
+const SCHEDULE_HOURS = Array.from({ length: 15 }, (_, index) => index + 7);
 
 function isVisibleSummary(item: ScheduleSummaryDto, weekDates: string[]) {
   return weekDates.includes(item.date) && isScheduleHour(Math.floor(toMinute(item.startTime) / 60));
@@ -260,45 +268,6 @@ function isVisibleSummary(item: ScheduleSummaryDto, weekDates: string[]) {
 function weekdayLabel(date: string) {
   const labels = ['일', '월', '화', '수', '목', '금', '토'];
   return labels[new Date(`${date}T00:00:00`).getDay()];
-}
-
-function buildHourRanges(hours: number[]) {
-  const sortedHours = Array.from(new Set(hours)).sort((a, b) => a - b);
-  const ranges: Array<{ startHour: number; endHour: number; label: string }> = [];
-  let rangeStart = sortedHours[0];
-  let rangeEnd = sortedHours[0];
-
-  for (let index = 1; index < sortedHours.length; index += 1) {
-    const hour = sortedHours[index];
-    if (hour === rangeEnd + 1) {
-      rangeEnd = hour;
-      continue;
-    }
-
-    ranges.push({
-      startHour: rangeStart,
-      endHour: rangeEnd,
-      label: formatHourRange(rangeStart, rangeEnd),
-    });
-    rangeStart = hour;
-    rangeEnd = hour;
-  }
-
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    ranges.push({
-      startHour: rangeStart,
-      endHour: rangeEnd,
-      label: formatHourRange(rangeStart, rangeEnd),
-    });
-  }
-
-  return ranges;
-}
-
-function formatHourRange(startHour: number, endHour: number) {
-  const start = formatHourValue(startHour);
-  const end = formatHourValue(endHour + 1);
-  return `${start}시~${end}시`;
 }
 
 function formatHourValue(hour: number) {
@@ -317,8 +286,9 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 34,
-    paddingVertical: 2,
+    gap: 42,
+    paddingVertical: 4,
+    marginBottom: 4,
   },
   quickActionItem: {
     minWidth: 104,
@@ -352,52 +322,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  availableRow: {
-    minHeight: 78,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: '#8ddfd3',
-    backgroundColor: '#f0fdfa',
+  scheduleTable: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    shadowColor: '#0f766e',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  availableDateBox: {
-    width: 50,
-    height: 54,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: '#99e3d7',
+    overflow: 'hidden',
+    backgroundColor: '#f1f3f6',
+    padding: 10,
+  },
+  scheduleScroll: {
+    flex: 1,
+  },
+  weekdayColumn: {
+    width: 34,
+    gap: 5,
+    marginRight: 8,
+    zIndex: 1,
+  },
+  tableCorner: {
+    height: 24,
+  },
+  weekdayCell: {
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
   },
-  availableWeekday: {
-    color: theme.colors.accent,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  availableBody: {
-    flex: 1,
-    minWidth: 0,
-    gap: 7,
-  },
-  availableMeta: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  availableTime: {
+  weekdayText: {
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '900',
+  },
+  tableGrid: {
+    gap: 5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  hourCell: {
+    width: 36,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hourText: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  scheduleCell: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#e3e7ec',
+  },
+  scheduleCellAvailable: {
+    backgroundColor: '#159a78',
   },
   disabledHint: {
     color: theme.colors.textMuted,

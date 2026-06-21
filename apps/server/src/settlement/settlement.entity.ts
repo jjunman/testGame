@@ -23,9 +23,6 @@ export class Settlement {
   @Column({ name: 'custom_total_price', type: 'int', nullable: true })
   customTotalPrice: number | null;
 
-  @Column({ name: 'expected_hours', type: 'float', nullable: true })
-  expectedHours: number | null;
-
   @Column({ name: 'participant_user_ids', type: 'simple-json', nullable: true })
   participantUserIds: string[] | null;
 

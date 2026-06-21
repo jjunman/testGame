@@ -78,6 +78,7 @@ export type SongRoundDto = {
 export type PracticeAssignmentDto = {
   id: string;
   bandId: string;
+  songCandidateId: string | null;
   title: string;
   description: string | null;
   dueAt: string;
@@ -193,15 +194,6 @@ export type StudioLocationDto = {
 export type SettlementDto = {
   selectedStudioId: string | null;
   customTotalPrice: number | null;
-  expectedHours: number;
-  scheduleLocked: boolean;
-  confirmedSchedule: {
-    id: string;
-    date: string;
-    startTime: string;
-    endTime: string;
-    expectedHours: number;
-  } | null;
   participantUserIds: string[];
   paidUserIds: string[];
   updatedAt: string;

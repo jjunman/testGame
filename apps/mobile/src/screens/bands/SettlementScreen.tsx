@@ -22,7 +22,6 @@ type SettlementOption = {
   status?: StudioCandidateDto['status'];
 };
 
-const DEFAULT_EXPECTED_HOURS = 2;
 const REFRESH_MS = 5000;
 
 export function SettlementScreen({ route, navigation }: Props) {
@@ -40,10 +39,8 @@ export function SettlementScreen({ route, navigation }: Props) {
 
   const options = useMemo(() => buildOptions(candidates, studios), [candidates, studios]);
   const selected = options.find((option) => option.studioId === selectedStudioId) ?? options[0] ?? null;
-  const expectedHours = settlement?.expectedHours ?? DEFAULT_EXPECTED_HOURS;
-  const estimatedTotalPrice = selected ? toTotalPrice(selected.hourlyPrice, expectedHours) : null;
   const customTotalPrice = parsePrice(customTotalText);
-  const totalPrice = customTotalPrice ?? estimatedTotalPrice;
+  const totalPrice = customTotalPrice ?? selected?.hourlyPrice ?? null;
   const participantIds = new Set(settlement?.participantUserIds ?? members.map((member) => member.userId));
   const paidIds = new Set(settlement?.paidUserIds ?? []);
   const participatingMembers = members.filter((member) => participantIds.has(member.userId));
@@ -140,15 +137,6 @@ export function SettlementScreen({ route, navigation }: Props) {
   const saveTotalPrice = () => {
     setTotalFocused(false);
     void saveSettlement({ customTotalPrice: parsePrice(customTotalText) });
-  };
-
-  const changeExpectedHours = (amount: number) => {
-    if (!settlement || settlement.scheduleLocked) {
-      return;
-    }
-    const nextHours = Math.max(0.5, Math.min(12, Math.round((expectedHours + amount) * 2) / 2));
-    setSettlement({ ...settlement, expectedHours: nextHours });
-    void saveSettlement({ expectedHours: nextHours });
   };
 
   const toggleParticipant = (userId: string) => {
@@ -263,14 +251,16 @@ export function SettlementScreen({ route, navigation }: Props) {
             </View>
 
             <View style={styles.overrideBox}>
-              <Text style={styles.overrideLabel}>금액 직접 입력</Text>
+              <Text style={styles.overrideLabel}>직접 입력</Text>
               <View style={styles.overrideInputWrap}>
                 <TextInput
                   value={customTotalText}
                   onChangeText={setCustomTotalText}
                   onFocus={() => setTotalFocused(true)}
                   onBlur={saveTotalPrice}
-                  placeholder={estimatedTotalPrice === null ? '총액 입력' : `${estimatedTotalPrice.toLocaleString('ko-KR')}원`}
+                  placeholder={selected?.hourlyPrice === null || selected?.hourlyPrice === undefined
+                    ? '가격'
+                    : selected.hourlyPrice.toLocaleString('ko-KR')}
                   placeholderTextColor={theme.colors.textMuted}
                   keyboardType="number-pad"
                   style={styles.overrideInput}
@@ -279,24 +269,6 @@ export function SettlementScreen({ route, navigation }: Props) {
               </View>
             </View>
 
-            <View style={styles.timeCard}>
-              <View style={styles.timeText}>
-                <Text style={styles.timeTitle}>{settlement.scheduleLocked ? '확정된 합주 시간' : '합주 시간'}</Text>
-                <Text style={styles.timeDescription}>{formatSchedule(settlement)}</Text>
-              </View>
-              {!settlement.scheduleLocked ? (
-                <View style={styles.timeStepper}>
-                  <Pressable style={styles.timeButton} onPress={() => changeExpectedHours(-0.5)}>
-                    <Ionicons name="remove" size={18} color={theme.colors.text} />
-                  </Pressable>
-                  <Pressable style={styles.timeButton} onPress={() => changeExpectedHours(0.5)}>
-                    <Ionicons name="add" size={18} color={theme.colors.text} />
-                  </Pressable>
-                </View>
-              ) : (
-                <StatusBadge label="자동 적용" tone="success" />
-              )}
-            </View>
             {selected.address ? <Text style={styles.addressText}>{selected.address}</Text> : null}
           </View>
 
@@ -382,8 +354,8 @@ export function SettlementScreen({ route, navigation }: Props) {
                     {option.status === 'confirmed' ? <StatusBadge label="등록됨" tone="success" /> : null}
                   </View>
                   <Text style={styles.optionName} numberOfLines={2}>{option.name}</Text>
-                  <Text style={styles.optionPrice}>{formatPrice(toTotalPrice(option.hourlyPrice, expectedHours))}</Text>
-                  <Text style={styles.optionMeta}>{formatPrice(option.hourlyPrice)} · {formatHours(expectedHours)}시간</Text>
+                  <Text style={styles.optionPrice}>{formatPrice(option.hourlyPrice)}</Text>
+                  <Text style={styles.optionMeta}>합주실 등록 가격</Text>
                   {typeof option.voteCount === 'number' ? <Text style={styles.optionMeta}>투표 {option.voteCount}표</Text> : null}
                 </Pressable>
               ))}
@@ -439,10 +411,6 @@ function resolveSelectedStudioId(value: string | null, options: SettlementOption
   return confirmed?.studioId ?? options[0]?.studioId ?? null;
 }
 
-function toTotalPrice(hourlyPrice: number | null, expectedHours: number) {
-  return hourlyPrice === null ? null : Math.round(hourlyPrice * expectedHours);
-}
-
 function parsePrice(value: string) {
   const normalized = value.replace(/[^0-9]/g, '');
   return normalized ? Number(normalized) : null;
@@ -450,23 +418,6 @@ function parsePrice(value: string) {
 
 function formatPrice(value: number | null) {
   return value === null ? '가격 미정' : `${value.toLocaleString('ko-KR')}원`;
-}
-
-function formatHours(value: number) {
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
-}
-
-function formatSchedule(settlement: SettlementDto) {
-  if (!settlement.confirmedSchedule) {
-    return '확정된 합주 시간이 없어 직접 조정할 수 있어요.';
-  }
-
-  const date = new Date(`${settlement.confirmedSchedule.date}T00:00:00`).toLocaleDateString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short',
-  });
-  return `${date} ${settlement.confirmedSchedule.startTime}-${settlement.confirmedSchedule.endTime}`;
 }
 
 function MemberAvatar({ member, included }: { member: BandMemberSummary; included: boolean }) {
@@ -631,45 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 16,
-  },
-  timeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceMuted,
-    padding: 12,
-  },
-  timeText: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  timeTitle: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  timeDescription: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  timeStepper: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  timeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   addressText: {
     color: theme.colors.textMuted,

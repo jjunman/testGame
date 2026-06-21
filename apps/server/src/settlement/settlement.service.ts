@@ -3,13 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
-import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { Studio } from '../studios/studio.entity';
 import { UpdateSettlementDto } from './dto';
 import { Settlement } from './settlement.entity';
-
-const DEFAULT_EXPECTED_HOURS = 2;
 
 @Injectable()
 export class SettlementService {
@@ -18,8 +15,6 @@ export class SettlementService {
     private readonly settlementsRepository: Repository<Settlement>,
     @InjectRepository(BandMember)
     private readonly membersRepository: Repository<BandMember>,
-    @InjectRepository(ScheduleProposal)
-    private readonly scheduleProposalsRepository: Repository<ScheduleProposal>,
     @InjectRepository(StudioCandidate)
     private readonly studioCandidatesRepository: Repository<StudioCandidate>,
     @InjectRepository(Studio)
@@ -29,10 +24,9 @@ export class SettlementService {
 
   async get(userId: string, bandId: string) {
     const membership = await this.bandsService.requireMembership(userId, bandId);
-    const [settlement, members, confirmedSchedule] = await Promise.all([
+    const [settlement, members] = await Promise.all([
       this.findOrCreate(membership),
       this.getMembers(bandId),
-      this.getConfirmedSchedule(bandId),
     ]);
     const memberIds = members.map((member) => member.user.id);
     let selectedStudioId = settlement.selectedStudioId;
@@ -43,14 +37,9 @@ export class SettlementService {
     const participantUserIds = this.cleanIds(settlement.participantUserIds, memberIds);
     const nextParticipantUserIds = participantUserIds.length > 0 ? participantUserIds : memberIds;
     const paidUserIds = this.cleanIds(settlement.paidUserIds, nextParticipantUserIds);
-    const expectedHours = confirmedSchedule?.expectedHours ?? settlement.expectedHours ?? DEFAULT_EXPECTED_HOURS;
-
     return {
       selectedStudioId,
       customTotalPrice: settlement.customTotalPrice,
-      expectedHours,
-      scheduleLocked: Boolean(confirmedSchedule),
-      confirmedSchedule,
       participantUserIds: nextParticipantUserIds,
       paidUserIds,
       updatedAt: settlement.updatedAt.toISOString(),
@@ -59,10 +48,9 @@ export class SettlementService {
 
   async update(userId: string, bandId: string, dto: UpdateSettlementDto) {
     const membership = await this.bandsService.requireMembership(userId, bandId);
-    const [settlement, members, confirmedSchedule] = await Promise.all([
+    const [settlement, members] = await Promise.all([
       this.findOrCreate(membership),
       this.getMembers(bandId),
-      this.getConfirmedSchedule(bandId),
     ]);
     const memberIds = members.map((member) => member.user.id);
 
@@ -79,10 +67,6 @@ export class SettlementService {
 
     if (Object.prototype.hasOwnProperty.call(dto, 'customTotalPrice')) {
       settlement.customTotalPrice = dto.customTotalPrice ?? null;
-    }
-
-    if (!confirmedSchedule && dto.expectedHours !== undefined) {
-      settlement.expectedHours = dto.expectedHours;
     }
 
     if (dto.participantUserIds) {
@@ -116,7 +100,6 @@ export class SettlementService {
         band: membership.band,
         selectedStudioId: defaultSelectedStudioId,
         customTotalPrice: null,
-        expectedHours: DEFAULT_EXPECTED_HOURS,
         participantUserIds: null,
         paidUserIds: null,
       }),
@@ -162,34 +145,6 @@ export class SettlementService {
       }),
     ]);
     return Boolean(studio || candidate);
-  }
-
-  private async getConfirmedSchedule(bandId: string) {
-    const proposal = await this.scheduleProposalsRepository.findOne({
-      where: { band: { id: bandId }, confirmed: true },
-      order: { createdAt: 'DESC' },
-    });
-    if (!proposal) {
-      return null;
-    }
-
-    return {
-      id: proposal.id,
-      date: proposal.date,
-      startTime: proposal.startTime,
-      endTime: proposal.endTime,
-      expectedHours: this.toExpectedHours(proposal.startTime, proposal.endTime),
-    };
-  }
-
-  private toExpectedHours(startTime: string, endTime: string) {
-    const minutes = this.toMinute(endTime) - this.toMinute(startTime);
-    return minutes > 0 ? Math.max(0.5, minutes / 60) : DEFAULT_EXPECTED_HOURS;
-  }
-
-  private toMinute(value: string) {
-    const [hour, minute] = value.split(':').map(Number);
-    return hour * 60 + minute;
   }
 
   private cleanIds(value: string[] | null | undefined, allowedIds: string[]) {

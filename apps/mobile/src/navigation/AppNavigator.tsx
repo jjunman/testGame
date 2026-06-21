@@ -15,6 +15,7 @@ import { BandMembersScreen } from '../screens/bands/BandMembersScreen';
 import { SongRoundScreen } from '../screens/bands/SongRoundScreen';
 import { AddSongCandidateScreen } from '../screens/bands/AddSongCandidateScreen';
 import { PracticeAssignmentListScreen } from '../screens/bands/PracticeAssignmentListScreen';
+import { SongPracticeDetailScreen } from '../screens/bands/SongPracticeDetailScreen';
 import { CreatePracticeAssignmentScreen } from '../screens/bands/CreatePracticeAssignmentScreen';
 import { PracticeAssignmentDetailScreen } from '../screens/bands/PracticeAssignmentDetailScreen';
 import { ScheduleScreen } from '../screens/bands/ScheduleScreen';
@@ -58,6 +59,7 @@ function BandsNavigator() {
       <BandsStack.Screen name="SongRound" component={SongRoundScreen} options={{ title: '곡과 연습', animation: 'none' }} />
       <BandsStack.Screen name="AddSongCandidate" component={AddSongCandidateScreen} options={{ title: '곡 추가하기' }} />
       <BandsStack.Screen name="PracticeAssignments" component={PracticeAssignmentListScreen} options={{ title: '개인 연습' }} />
+      <BandsStack.Screen name="SongPracticeDetail" component={SongPracticeDetailScreen} options={{ title: '연습 메인' }} />
       <BandsStack.Screen name="CreatePracticeAssignment" component={CreatePracticeAssignmentScreen} options={{ title: '연습 과제 만들기' }} />
       <BandsStack.Screen name="PracticeAssignmentDetail" component={PracticeAssignmentDetailScreen} options={{ title: '연습 상세' }} />
       <BandsStack.Screen name="Schedule" component={ScheduleScreen} options={{ title: '합주 스케줄러', animation: 'none' }} />

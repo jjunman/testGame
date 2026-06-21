@@ -107,24 +107,6 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
     <Screen scrollEnabled={false}>
       <HeroBanner title="합주 시간 제안하기" subtitle="몇 시간 합주할지 고르면, 가능한 연속 시간대를 추천해요." />
 
-      <SectionCard title="합주 길이">
-        <Label>몇 시간 합주할까요?</Label>
-        <View style={styles.durationRow}>
-          {DURATION_OPTIONS.map((hours) => {
-            const selected = durationHours === hours;
-            return (
-              <Pressable
-                key={hours}
-                style={[styles.durationChip, selected && styles.durationChipSelected]}
-                onPress={() => setDurationHours(hours)}
-              >
-                <Text style={[styles.durationText, selected && styles.durationTextSelected]}>{hours}시간</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </SectionCard>
-
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={activeTab === 'recommended' ? '직접 정하기로 전환' : '추천 시간으로 전환'}
@@ -157,6 +139,23 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
 
       {activeTab === 'recommended' ? (
         <SectionCard title="추천 시간">
+          <View style={styles.durationSection}>
+            <Label>합주 길이</Label>
+            <View style={styles.durationRow}>
+              {DURATION_OPTIONS.map((hours) => {
+                const selected = durationHours === hours;
+                return (
+                  <Pressable
+                    key={hours}
+                    style={[styles.durationChip, selected && styles.durationChipSelected]}
+                    onPress={() => setDurationHours(hours)}
+                  >
+                    <Text style={[styles.durationText, selected && styles.durationTextSelected]}>{hours}시간</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
           {allAvailableRecommendedItems.length > 0 ? (
             <View style={styles.recommendList}>
               {allAvailableRecommendedItems.map((item) => {
@@ -349,6 +348,13 @@ const styles = StyleSheet.create({
   durationRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  durationSection: {
+    gap: 8,
+    paddingBottom: 14,
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   durationChip: {
     flex: 1,

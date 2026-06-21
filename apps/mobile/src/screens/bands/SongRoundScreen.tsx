@@ -208,7 +208,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
   };
 
   const openSongCard = (card: BandSongCardDto) => {
-    navigation.navigate('CreatePracticeAssignment', { bandId, songCandidateId: card.id });
+    navigation.navigate('SongPracticeDetail', { bandId, songCandidateId: card.id });
   };
 
   const beginEditSongCard = (card: BandSongCardDto) => {
@@ -317,7 +317,7 @@ export function SongRoundScreen({ route, navigation }: Props) {
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionTitle}>확정곡 목록</Text>
-              <Text style={styles.sectionCaption}>목록을 눌러 연습을 시작할 수 있어요.</Text>
+              <Text style={styles.sectionCaption}>확정곡을 누르면 연습 상세로 이동해요.</Text>
             </View>
           </View>
           {songCards.length === 0 ? (
@@ -335,7 +335,6 @@ export function SongRoundScreen({ route, navigation }: Props) {
                   editYoutubeUrl={editYoutubeUrl}
                   editingSong={editingSong}
                   onPress={() => openSongCard(card)}
-                  onOpenPractice={(assignmentId) => navigation.navigate('PracticeAssignmentDetail', { bandId, assignmentId })}
                   onToggleMore={() => {
                     setExpandedSongCardId((current) => (current === card.id ? null : card.id));
                     setEditingSongCardId(null);
@@ -371,7 +370,6 @@ function SongLibraryCard({
   editYoutubeUrl,
   editingSong,
   onPress,
-  onOpenPractice,
   onToggleMore,
   onEdit,
   onDelete,
@@ -390,7 +388,6 @@ function SongLibraryCard({
   editYoutubeUrl: string;
   editingSong: boolean;
   onPress: () => void;
-  onOpenPractice: (assignmentId: string) => void;
   onToggleMore: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -402,7 +399,6 @@ function SongLibraryCard({
   onCancelEdit: () => void;
 }) {
   const practiceClosed = card.practiceStatus === 'closed';
-  const practiceAssignments = card.practiceAssignments ?? [];
 
   return (
     <View style={[styles.songCardShell, practiceClosed && styles.songCardShellClosed]}>
@@ -438,25 +434,9 @@ function SongLibraryCard({
             </View>
           </View>
           <Text style={styles.songArtist} numberOfLines={1}>{card.artist}</Text>
+          <Text style={styles.songPracticeHint} numberOfLines={1}>눌러서 연습 목록과 새 연습을 확인해요</Text>
         </View>
       </Pressable>
-      {practiceAssignments.length > 0 ? (
-        <View style={styles.practiceList}>
-          {practiceAssignments.map((assignment) => (
-            <Pressable
-              key={assignment.id}
-              style={styles.practiceListItem}
-              onPress={() => onOpenPractice(assignment.id)}
-            >
-              <View style={styles.practiceListBody}>
-                <Text style={styles.practiceListTitle} numberOfLines={1}>{assignment.title}</Text>
-                <Text style={styles.practiceListMeta} numberOfLines={1}>{formatDueLabel(assignment.dueAt)}</Text>
-              </View>
-              <StatusBadge label={assignment.status === 'open' ? '연습' : '완료'} tone={assignment.status === 'open' ? 'warning' : 'default'} />
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
       {editing ? (
         <View style={styles.songFoldout}>
           <View style={styles.songEditForm}>
@@ -660,10 +640,6 @@ function SongVoteCarousel({
       </View>
     </View>
   );
-}
-
-function formatDueLabel(value: string) {
-  return `마감 ${new Date(value).toLocaleDateString('ko-KR')}`;
 }
 
 const styles = StyleSheet.create({
@@ -983,10 +959,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   listGroup: {
-    gap: 8,
+    gap: 10,
   },
   songCardShell: {
-    borderRadius: theme.radius.sm,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
@@ -1002,7 +978,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 9,
+    padding: 12,
   },
   songListItemPressed: {
     backgroundColor: theme.colors.surfaceMuted,
@@ -1068,40 +1044,6 @@ const styles = StyleSheet.create({
   inlineMenuDanger: {
     color: theme.colors.danger,
   },
-  practiceList: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceMuted,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 7,
-  },
-  practiceListItem: {
-    minHeight: 42,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  practiceListBody: {
-    flex: 1,
-    gap: 2,
-  },
-  practiceListTitle: {
-    color: theme.colors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  practiceListMeta: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
   songFoldout: {
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
@@ -1140,16 +1082,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   songCoverSmall: {
-    width: 70,
-    height: 70,
-    borderRadius: theme.radius.sm,
+    width: 96,
+    height: 96,
+    borderRadius: theme.radius.md,
     backgroundColor: '#20242c',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   songCoverImage: {
-    borderRadius: theme.radius.sm,
+    borderRadius: theme.radius.md,
   },
   songCoverOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1169,6 +1111,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
+  },
+  songPracticeHint: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: '900',
   },
   modalBackdrop: {
     flex: 1,

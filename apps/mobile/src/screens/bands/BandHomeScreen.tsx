@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BandHomeDto, PracticeAssignmentDto, TodoItemDto, VoteStepStatus } from '@band/shared-types';
+import { BandHomeDto, PracticeAssignmentDto, TodoItemDto } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
@@ -107,10 +107,9 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
   const todos = Array.isArray(detail.todos) ? detail.todos : [];
   const primaryTodo = todos[0];
-  const moreTodos = todos.slice(1, 5);
-  const flowCards = buildFlowCards(detail);
-  const completedCount = flowCards.filter((item) => item.status === 'done').length;
-  const progressPercent = Math.round((completedCount / flowCards.length) * 100);
+  const moreTodos = todos.slice(1, 3);
+  const hiddenTodoCount = Math.max(0, todos.length - 3);
+  const shortcutCards = buildShortcutCards(detail);
 
   const openTodo = async (todo: TodoItemDto) => {
     if (todo.type === 'submit_practice') {
@@ -148,19 +147,6 @@ export function BandHomeScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.progressCard}>
-        <View style={styles.progressHeader}>
-          <View>
-            <Text style={styles.progressLabel}>합주 준비 진행률</Text>
-            <Text style={styles.progressTitle}>{completedCount}/{flowCards.length} 단계 완료</Text>
-          </View>
-          <Text style={styles.progressPercent}>{progressPercent}%</Text>
-        </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-        </View>
-      </View>
-
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>오늘 할 일</Text>
@@ -175,6 +161,9 @@ export function BandHomeScreen({ route, navigation }: Props) {
                 {moreTodos.map((todo, index) => (
                   <CompactTodoItem key={`${todo.type}-${todo.targetId ?? index}`} todo={todo} onPress={() => void openTodo(todo)} />
                 ))}
+                {hiddenTodoCount > 0 ? (
+                  <Text style={styles.moreTodoText}>+{hiddenTodoCount}개 더 있음</Text>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -185,11 +174,11 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>준비 흐름</Text>
-          <Text style={styles.sectionMeta}>기능은 그대로, 상태만 빠르게</Text>
+          <Text style={styles.sectionTitle}>기능</Text>
+          <Text style={styles.sectionMeta}>바로가기</Text>
         </View>
         <View style={styles.flowGrid}>
-          {flowCards.map((item) => (
+          {shortcutCards.map((item) => (
             <FlowCard
               key={item.key}
               item={item}
@@ -268,27 +257,27 @@ function FlowCard({
   item,
   onPress,
 }: {
-  item: ReturnType<typeof buildFlowCards>[number];
+  item: ReturnType<typeof buildShortcutCards>[number];
   onPress: () => void;
 }) {
-  const done = item.status === 'done';
-  const needed = item.status === 'needed';
-
   return (
     <Pressable
       style={({ pressed }) => [
         styles.flowCard,
-        needed && styles.flowCardNeeded,
-        done && styles.flowCardDone,
         pressed && styles.flowCardPressed,
       ]}
       onPress={onPress}
     >
-      <View style={[styles.flowIcon, needed && styles.flowIconNeeded, done && styles.flowIconDone]}>
-        <Ionicons name={done ? 'checkmark' : item.icon} size={18} color={needed || done ? '#fff' : theme.colors.textMuted} />
+      <View style={styles.flowIcon}>
+        <Ionicons name={item.icon} size={18} color={theme.colors.primaryDark} />
       </View>
-      <Text style={styles.flowTitle} numberOfLines={1}>{item.label}</Text>
-      <Text style={styles.flowDescription} numberOfLines={2}>{item.description}</Text>
+      <View style={styles.flowText}>
+        <View style={styles.flowTitleRow}>
+          <Text style={styles.flowTitle} numberOfLines={1}>{item.label}</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+        </View>
+        <Text style={styles.flowDescription} numberOfLines={1}>{item.description}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -351,50 +340,33 @@ async function findFirstPendingPracticeId(bandId: string) {
   return pending[0]?.id ?? null;
 }
 
-function buildFlowCards(detail: BandHomeDto) {
-  const hasConfirmedSong = detail.songCards.some((card) => card.kind === 'song');
-  const practiceStatus: VoteStepStatus = detail.openPracticeCount > 0 ? 'needed' : hasConfirmedSong ? 'done' : 'none';
-
+function buildShortcutCards(detail: BandHomeDto) {
   return [
     {
       key: 'song' as const,
-      label: '곡',
-      status: detail.voteSummary.song,
-      description: statusDescription(detail.voteSummary.song, '합주곡 확정', '곡 투표 필요', '곡 후보 준비'),
+      label: '곡 정하기',
+      description: detail.voteSummary.song === 'needed' ? '투표 진행 중' : '후보와 투표',
       icon: 'musical-notes-outline' as const,
     },
     {
       key: 'practice' as const,
       label: '연습',
-      status: practiceStatus,
-      description: practiceStatus === 'done' ? '제출 흐름 정리됨' : practiceStatus === 'needed' ? `${detail.openPracticeCount}개 제출 필요` : '곡 확정 후 시작',
+      description: detail.openPracticeCount > 0 ? `${detail.openPracticeCount}개 제출 필요` : '과제와 제출',
       icon: 'mic-outline' as const,
     },
     {
       key: 'schedule' as const,
       label: '일정',
-      status: detail.voteSummary.schedule,
-      description: detail.voteSummary.schedule === 'done' ? '합주 시간 확정' : detail.openScheduleSlotCount > 0 ? '가능 시간 확인 중' : '가능 시간 입력 전',
+      description: detail.openScheduleSlotCount > 0 ? '가능 시간 확인' : '시간 맞추기',
       icon: 'calendar-outline' as const,
     },
     {
       key: 'studio' as const,
       label: '합주실',
-      status: detail.voteSummary.studio,
-      description: statusDescription(detail.voteSummary.studio, '합주실 확정', '후보 투표 필요', '후보 준비 중'),
+      description: detail.voteSummary.studio === 'needed' ? '후보 투표 중' : '후보와 지도',
       icon: 'location-outline' as const,
     },
   ];
-}
-
-function statusDescription(status: VoteStepStatus, done: string, needed: string, none: string) {
-  if (status === 'done') {
-    return done;
-  }
-  if (status === 'needed') {
-    return needed;
-  }
-  return none;
 }
 
 const styles = StyleSheet.create({
@@ -498,45 +470,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  progressCard: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary,
-    padding: 15,
-    gap: 12,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  progressLabel: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  progressTitle: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '900',
-    marginTop: 3,
-  },
-  progressPercent: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: theme.radius.pill,
-    backgroundColor: '#fff',
-  },
   section: {
     gap: 9,
   },
@@ -633,6 +566,14 @@ const styles = StyleSheet.create({
   compactTodoList: {
     gap: 7,
   },
+  moreTodoText: {
+    alignSelf: 'flex-end',
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    paddingTop: 2,
+    paddingHorizontal: 2,
+  },
   compactTodoItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -697,34 +638,33 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
     padding: 12,
-    gap: 7,
+    gap: 8,
   },
   flowCardPressed: {
     backgroundColor: theme.colors.primarySoft,
     borderColor: theme.colors.primary,
     transform: [{ scale: 0.985 }],
   },
-  flowCardNeeded: {
-    borderColor: theme.colors.primary,
-  },
-  flowCardDone: {
-    borderColor: '#cfe9dc',
-  },
   flowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: theme.colors.surfaceMuted,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  flowIconNeeded: {
-    backgroundColor: theme.colors.primary,
+  flowText: {
+    minWidth: 0,
+    gap: 2,
   },
-  flowIconDone: {
-    backgroundColor: theme.colors.success,
+  flowTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
   },
   flowTitle: {
+    flex: 1,
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: '900',

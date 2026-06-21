@@ -75,7 +75,7 @@ type DraftRecording = {
   waveform?: number[];
 };
 
-type PracticeMode = 'main' | 'practice' | 'submit' | 'submissions';
+type PracticeMode = 'main' | 'practice' | 'submit';
 
 const MAX_DRAFTS = 5;
 const RECORDING_COUNTDOWN_SECONDS = 7;
@@ -407,7 +407,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
             } catch {
               setSubmissions([]);
             }
-            setMode('submissions');
           } catch (error) {
             Alert.alert('마감 실패', error instanceof Error ? error.message : '연습 과제를 마감하지 못했어요.');
           } finally {
@@ -501,7 +500,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
         mode={mode}
         submitted={Boolean(detail.mySubmission)}
         hasDrafts={drafts.length > 0}
-        isClosed={detail.isClosed}
         onChange={setMode}
       />
 
@@ -511,7 +509,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           closing={closingAssignment}
           onCloseNow={closeAssignmentNow}
           onPractice={() => setMode('practice')}
-          onSubmissions={() => setMode('submissions')}
         />
       ) : null}
 
@@ -539,19 +536,6 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
         />
       ) : null}
 
-      {mode === 'submissions' ? (
-        <SubmissionsPanel
-          mySubmission={detail.mySubmission}
-          submissions={submissions}
-          memberStatuses={detail.memberStatuses}
-          isLeader={isLeader}
-          isClosed={detail.isClosed}
-          mixAudioUrl={detail.mixAudioUrl}
-          mixGeneratedAt={detail.mixGeneratedAt}
-          generatingMix={generatingMix}
-          onGenerateMix={() => void generateMix()}
-        />
-      ) : null}
     </Screen>
   );
 }
@@ -685,20 +669,17 @@ function PracticeModeTimeline({
   mode,
   submitted,
   hasDrafts,
-  isClosed,
   onChange,
 }: {
   mode: PracticeMode;
   submitted: boolean;
   hasDrafts: boolean;
-  isClosed: boolean;
   onChange: (mode: PracticeMode) => void;
 }) {
   const steps: Array<{ mode: PracticeMode; label: string; icon: keyof typeof Ionicons.glyphMap; completed: boolean }> = [
     { mode: 'main', label: '과제', icon: 'document-text-outline', completed: true },
     { mode: 'practice', label: '연습', icon: 'musical-notes-outline', completed: hasDrafts || submitted },
     { mode: 'submit', label: '제출', icon: 'mic-outline', completed: submitted },
-    { mode: 'submissions', label: '결과', icon: 'albums-outline', completed: isClosed },
   ];
 
   return (
@@ -724,22 +705,33 @@ function MainPanel({
   closing,
   onCloseNow,
   onPractice,
-  onSubmissions,
 }: {
   detail: PracticeDetailDto;
   closing: boolean;
   onCloseNow: () => void;
   onPractice: () => void;
-  onSubmissions: () => void;
 }) {
   return (
-    <View style={styles.panel}>
-      <Text style={styles.panelTitle}>연습 메인</Text>
-      <Text style={styles.description}>{detail.description ?? '리더가 정한 구간을 듣고 녹음본을 제출해 주세요.'}</Text>
-      <InfoRow label="연습 구간" value={formatRange(detail.startSec, detail.endSec)} />
-      <InfoRow label="제출 상태" value={detail.mySubmission ? '제출 완료' : '제출 필요'} />
-      <ActionRow icon="checkbox-outline" label="연습하러 가기" onPress={onPractice} />
-      <ActionRow icon="play-circle-outline" label="녹음본 듣기" onPress={onSubmissions} />
+    <View style={styles.mainPanel}>
+      <View style={styles.rangeHighlight}>
+        <View style={styles.rangeHighlightHeader}>
+          <View style={styles.rangeHighlightIcon}>
+            <Ionicons name="timer-outline" size={18} color={theme.colors.accent} />
+          </View>
+          <Text style={styles.rangeHighlightLabel}>연습 구간</Text>
+        </View>
+        <Text style={styles.rangeHighlightValue}>{formatRange(detail.startSec, detail.endSec)}</Text>
+      </View>
+      <View style={styles.memoBlock}>
+        <View style={styles.memoHeader}>
+          <Ionicons name="document-text-outline" size={17} color={theme.colors.textMuted} />
+          <Text style={styles.memoLabel}>메모</Text>
+        </View>
+        <Text style={[styles.memoText, !detail.description && styles.memoTextEmpty]}>
+          {detail.description || '등록된 메모가 없어요.'}
+        </Text>
+      </View>
+      <ActionRow icon="musical-notes-outline" label={detail.mySubmission ? '다시 연습하기' : '연습 시작'} onPress={onPractice} />
       {!detail.isClosed ? (
         <Pressable
           onPress={onCloseNow}
@@ -1082,100 +1074,6 @@ function SelectedDraftPlayer({ draft }: { draft: DraftRecording | null }) {
   );
 }
 
-function SubmissionsPanel({
-  mySubmission,
-  submissions,
-  memberStatuses,
-  isLeader,
-  isClosed,
-  mixAudioUrl,
-  mixGeneratedAt,
-  generatingMix,
-  onGenerateMix,
-}: {
-  mySubmission: PracticeDetailDto['mySubmission'];
-  submissions: PracticeSubmissionDto[];
-  memberStatuses: PracticeDetailDto['memberStatuses'];
-  isLeader: boolean;
-  isClosed: boolean;
-  mixAudioUrl: string | null;
-  mixGeneratedAt: string | null;
-  generatingMix: boolean;
-  onGenerateMix: () => void;
-}) {
-  const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
-  if (!isClosed) {
-    return (
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>결과 대기</Text>
-        <EmptyState
-          title="마감 후 열리는 창이에요"
-          description="마감기한이 끝나면 멤버들의 제출본을 합친 믹스 녹음본을 여기에서 들을 수 있어요."
-        />
-        {mySubmission ? (
-          <SubmissionTilePlayer
-            audioId={mySubmission.id}
-            activeAudioId={activeAudioId}
-                onActiveAudioChange={setActiveAudioId}
-            uri={mySubmission.audioUrl}
-            title="내 제출본 확인"
-            positionLabel={mySubmission.positionLabel}
-            dateLabel={formatDateOnly(mySubmission.submittedAt)}
-          />
-        ) : null}
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.panel}>
-      <Text style={styles.panelTitle}>결과</Text>
-      {submissions.length > 0 && !mixAudioUrl ? (
-        <View style={styles.mixButton}>
-          <Ionicons name={generatingMix ? 'hourglass-outline' : 'albums-outline'} size={18} color="#fff" />
-          <View style={styles.submissionBody}>
-            <Text style={styles.submissionTitle}>{generatingMix ? '믹스 생성 중' : '믹스 자동 생성 준비 중'}</Text>
-            <Text style={styles.submissionMeta}>
-              {`${submissions.length}개의 제출본을 하나의 결과 파일로 자동 생성해요`}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-      {mixAudioUrl ? (
-        <>
-          <RemoteAudioPlayer
-            audioId="mix"
-            activeAudioId={activeAudioId}
-                onActiveAudioChange={setActiveAudioId}
-            uri={mixAudioUrl}
-            title="믹싱된 녹음본"
-            subtitle={
-              mixGeneratedAt
-                ? `생성됨 ${new Date(mixGeneratedAt).toLocaleString('ko-KR')}`
-                : '멤버 제출본을 합친 믹스'
-            }
-            onRefresh={onGenerateMix}
-            refreshing={generatingMix}
-          />
-        </>
-      ) : null}
-      {submissions.length === 0 ? (
-        <EmptyState title="제출본이 없어요" description="마감 전 제출된 녹음본이 있어야 결과 믹스를 만들 수 있어요." />
-      ) : null}
-      {isLeader ? (
-        <View style={styles.memberGrid}>
-          {memberStatuses.map((member) => (
-            <View key={member.userId} style={styles.memberCard}>
-              <Text style={styles.memberName}>{member.name}</Text>
-              <StatusBadge label={member.submitted ? '제출 완료' : '미제출'} tone={member.submitted ? 'success' : 'danger'} />
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function RemoteAudioPlayer({
   audioId,
   activeAudioId,
@@ -1383,8 +1281,8 @@ function SubmissionTilePlayer({
 
 function ActionRow({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable style={styles.actionRow} onPress={onPress}>
-      <Ionicons name={icon} size={19} color={theme.colors.primary} />
+    <Pressable style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]} onPress={onPress}>
+      <Ionicons name={icon} size={20} color={theme.colors.primaryDark} />
       <Text style={styles.actionText}>{label}</Text>
       <View style={styles.actionArrow}>
         <Ionicons name="arrow-forward" size={13} color="#fff" />
@@ -1837,6 +1735,9 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  mainPanel: {
+    gap: 16,
+  },
   panelTitle: {
     color: theme.colors.text,
     fontSize: 18,
@@ -1846,6 +1747,64 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     lineHeight: 20,
     fontWeight: '600',
+  },
+  rangeHighlight: {
+    minHeight: 124,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  rangeHighlightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rangeHighlightIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: theme.colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rangeHighlightLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  rangeHighlightValue: {
+    color: theme.colors.text,
+    fontSize: 30,
+    fontWeight: '900',
+  },
+  memoBlock: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingHorizontal: 4,
+    paddingTop: 15,
+    gap: 9,
+  },
+  memoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  memoLabel: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  memoText: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  memoTextEmpty: {
+    color: theme.colors.textMuted,
   },
   infoRow: {
     flexDirection: 'row',
@@ -1866,13 +1825,18 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   actionRow: {
-    minHeight: 48,
+    minHeight: 52,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primarySoft,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingHorizontal: 15,
+    gap: 11,
+  },
+  actionRowPressed: {
+    backgroundColor: '#e5e0ff',
   },
   actionText: {
     flex: 1,
@@ -1881,9 +1845,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   actionArrow: {
-    width: 28,
-    height: 18,
-    borderRadius: 999,
+    width: 30,
+    height: 24,
+    borderRadius: 8,
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2276,20 +2240,5 @@ const styles = StyleSheet.create({
   submissionItemText: {
     color: theme.colors.text,
     fontWeight: '800',
-  },
-  memberGrid: {
-    gap: 10,
-  },
-  memberCard: {
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    backgroundColor: '#fff',
-    padding: 12,
-    gap: 8,
-  },
-  memberName: {
-    color: theme.colors.text,
-    fontWeight: '900',
   },
 });

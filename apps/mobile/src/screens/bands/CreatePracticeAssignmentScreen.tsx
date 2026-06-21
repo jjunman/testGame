@@ -148,12 +148,7 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
         startSec: startSec ? Number(startSec) : undefined,
         endSec: endSec ? Number(endSec) : undefined,
       });
-      Alert.alert('과제 생성 완료', '연습 과제가 만들어졌습니다.', [
-        {
-          text: '확인',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      navigation.goBack();
     } catch (error) {
       Alert.alert('생성 실패', error instanceof Error ? error.message : '연습 과제를 만들지 못했어요.');
     } finally {
@@ -165,7 +160,7 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
     <Screen>
       <HeroBanner
         title="연습 과제 만들기"
-        subtitle="리더가 연습 구간과 마감일을 정하면 멤버들이 바로 연습을 시작할 수 있어요."
+        subtitle="연습 구간과 마감일을 정하고 바로 연습을 시작해요."
       />
 
       <SectionCard title="과제 정보">

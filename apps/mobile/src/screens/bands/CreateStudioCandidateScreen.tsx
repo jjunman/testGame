@@ -31,6 +31,8 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeStudioIndex, setActiveStudioIndex] = useState(0);
+  const studioCardWidth = width - 32;
+  const studioCardGap = 12;
 
   const loadStudios = useCallback(async () => {
     setLoading(true);
@@ -75,8 +77,18 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
     }
   };
 
-  const selectStudio = (studio: StudioDto) => {
+  const selectStudio = (studio: StudioDto, syncList = false) => {
     setSelectedStudioId(studio.id);
+    const studioIndex = studios.findIndex((item) => item.id === studio.id);
+    if (studioIndex >= 0) {
+      setActiveStudioIndex(studioIndex);
+      if (syncList) {
+        studioListRef.current?.scrollTo({
+          x: studioIndex * (studioCardWidth + studioCardGap),
+          animated: true,
+        });
+      }
+    }
     if (hasCoordinate(studio)) {
       const nextRegion = toRegion(studio);
       mapRef.current?.animateToRegion(nextRegion, 350);
@@ -88,8 +100,6 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const mapStudios = [...locatedStudios].sort((a, b) => {
     return Number(a.id === selectedStudioId) - Number(b.id === selectedStudioId);
   });
-  const studioCardWidth = width - 32;
-  const studioCardGap = 12;
   const onStudioScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (studioCardWidth + studioCardGap));
     const clampedIndex = Math.max(0, Math.min(studios.length - 1, rawIndex));
@@ -148,7 +158,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
                   description={studio.address ?? undefined}
                   pinColor={selected ? '#ef4444' : '#7b8496'}
                   zIndex={selected ? 10 : 1}
-                  onPress={() => selectStudio(studio)}
+                  onPress={() => selectStudio(studio, true)}
                 />
                 );
               })}

@@ -2,7 +2,6 @@ import {
   ArrayUnique,
   IsArray,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -17,11 +16,6 @@ export class UpdateSettlementDto {
   @IsInt()
   @Min(0)
   customTotalPrice?: number | null;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.5)
-  expectedHours?: number;
 
   @IsOptional()
   @IsArray()

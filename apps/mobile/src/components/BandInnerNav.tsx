@@ -61,7 +61,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
-        label="곡"
+        label="연습"
         active={active === 'song'}
         icon={
           <MaterialCommunityIcons
@@ -73,7 +73,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'library' })}
       />
       <NavItem
-        label="투표"
+        label="곡투표"
         active={active === 'vote'}
         icon={<Ionicons name={active === 'vote' ? 'checkbox' : 'checkbox-outline'} size={21} color={active === 'vote' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'vote' })}
