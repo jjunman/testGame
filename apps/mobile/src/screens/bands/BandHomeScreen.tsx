@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { BandHomeDto, PracticeAssignmentDto, TodoItemDto } from '@band/shared-types';
+import { BandHomeDto, PracticeAssignmentDto, ScheduleProposalDto, ScheduleSummaryDto, SettlementOverviewDto, TodoItemDto } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
+import { getCurrentWeekDates, isScheduleHour, toMinute } from '../../components/ScheduleAvailability';
 import { Screen } from '../../components/Screen';
-import { EmptyState, LoadingState } from '../../components/UI';
+import { EmptyState, ErrorState, LoadingState } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
+import { useAuth } from '../../store/AuthContext';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -15,14 +17,25 @@ type Props = NativeStackScreenProps<BandsStackParamList, 'BandHome'>;
 
 export function BandHomeScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
+  const { user } = useAuth();
   const { setCurrentBand } = useCurrentBand();
   const [detail, setDetail] = useState<BandHomeDto | null>(null);
+  const [settlement, setSettlement] = useState<SettlementOverviewDto | null>(null);
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummaryDto[]>([]);
+  const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduleProposalDto[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showAllTodos, setShowAllTodos] = useState(false);
+  const weekDates = useMemo(() => getCurrentWeekDates(), []);
 
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      const result = await api.get<BandHomeDto>(`/bands/${bandId}`);
+      const [result, settlementResult, summaryResult, schedulesResult] = await Promise.all([
+        api.get<BandHomeDto>(`/bands/${bandId}`),
+        api.get<SettlementOverviewDto>(`/bands/${bandId}/settlement`).catch(() => null),
+        api.get<ScheduleSummaryDto[]>(`/bands/${bandId}/schedule-summary`).catch(() => []),
+        api.get<ScheduleProposalDto[]>(`/bands/${bandId}/schedule-events`).catch(() => []),
+      ]);
       const thumbnailUrl = toApiAssetUrl(result.thumbnailUrl);
       const profileImageUrl = toApiAssetUrl(result.myMembership?.profileImageUrl);
       const myMembership = result.myMembership
@@ -54,10 +67,21 @@ export function BandHomeScreen({ route, navigation }: Props) {
         voteSummary: result.voteSummary ?? { song: 'none', schedule: 'none', studio: 'none' },
         songCards: Array.isArray(result.songCards) ? result.songCards : [],
       });
+      setSettlement(settlementResult);
+      setScheduleSummary(summaryResult);
+      setUpcomingSchedules(schedulesResult);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : '밴드 정보를 불러오지 못했어요.');
     }
   }, [bandId, setCurrentBand]);
+
+  const allAvailableSlotKeys = useMemo(() => {
+    return new Set(
+      scheduleSummary
+        .filter((item) => item.allAvailable && weekDates.includes(item.date) && isScheduleHour(Math.floor(toMinute(item.startTime) / 60)))
+        .map((item) => `${item.date}-${Math.floor(toMinute(item.startTime) / 60)}`),
+    );
+  }, [scheduleSummary, weekDates]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', load);
@@ -91,13 +115,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
     return (
       <Screen>
         {loadError ? (
-          <View style={styles.loadingCard}>
-            <Text style={styles.loadingTitle}>불러오기 실패</Text>
-            <Text style={styles.loadingBody}>{loadError}</Text>
-            <Pressable style={styles.retryButton} onPress={() => void load()}>
-              <Text style={styles.retryText}>다시 시도</Text>
-            </Pressable>
-          </View>
+          <ErrorState description={loadError} onRetry={() => void load()} />
         ) : (
           <LoadingState />
         )}
@@ -105,11 +123,10 @@ export function BandHomeScreen({ route, navigation }: Props) {
     );
   }
 
-  const todos = Array.isArray(detail.todos) ? detail.todos : [];
+  const todos = Array.isArray(detail.todos) ? detail.todos.filter((todo) => !isStudioTodo(todo)) : [];
   const primaryTodo = todos[0];
-  const moreTodos = todos.slice(1, 3);
+  const moreTodos = showAllTodos ? todos.slice(1) : todos.slice(1, 3);
   const hiddenTodoCount = Math.max(0, todos.length - 3);
-  const shortcutCards = buildShortcutCards(detail);
 
   const openTodo = async (todo: TodoItemDto) => {
     if (todo.type === 'submit_practice') {
@@ -120,26 +137,25 @@ export function BandHomeScreen({ route, navigation }: Props) {
       return;
     }
     if (todo.type === 'submit_schedule' || todo.shortcut === 'schedule') {
-      navigation.navigate('Schedule', { bandId });
-      return;
-    }
-    if (todo.shortcut === 'studio' || todo.type === 'vote_studio' || todo.type === 'start_studio') {
-      navigation.navigate('Studios', { bandId });
+      navigation.navigate('ScheduleEdit', { bandId });
       return;
     }
     if (todo.shortcut === 'song_round' || todo.type === 'vote_song' || todo.type === 'start_song_round') {
-      navigation.navigate('SongRound', { bandId, initialTab: 'vote' });
+      navigation.navigate('SongVote', { bandId });
       return;
     }
     navigation.navigate('BandHome', { bandId });
   };
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
+    <Screen
+      contentContainerStyle={styles.homeContent}
+      fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}
+    >
       <View style={styles.dashboardHero}>
         <Image source={{ uri: detail.thumbnailUrl || fallbackBandImage }} style={styles.bandImage} />
         <View style={styles.heroText}>
-          <Text style={styles.bandName} numberOfLines={1}>{detail.name}</Text>
+          <Text style={styles.bandName} numberOfLines={2}>{detail.name}</Text>
           <Text style={styles.memberMeta} numberOfLines={1}>
             {detail.myMembership.role === 'leader' ? '리더' : '멤버'} · {detail.myMembership.positionLabel || '파트 미정'} · 멤버 {detail.memberCount}명
           </Text>
@@ -148,7 +164,7 @@ export function BandHomeScreen({ route, navigation }: Props) {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>오늘 할 일</Text>
+          <Text style={styles.sectionTitle}>내 할 일</Text>
           {todos.length > 0 ? <Text style={styles.sectionMeta}>{todos.length}개</Text> : null}
         </View>
 
@@ -161,51 +177,130 @@ export function BandHomeScreen({ route, navigation }: Props) {
                   <CompactTodoItem key={`${todo.type}-${todo.targetId ?? index}`} todo={todo} onPress={() => void openTodo(todo)} />
                 ))}
                 {hiddenTodoCount > 0 ? (
-                  <Text style={styles.moreTodoText}>+{hiddenTodoCount}개 더 있음</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setShowAllTodos((current) => !current)}
+                    style={({ pressed }) => [styles.moreTodoButton, pressed && styles.moreTodoButtonPressed]}
+                  >
+                    <Text style={styles.moreTodoText}>{showAllTodos ? '접기' : `할 일 ${hiddenTodoCount}개 더 보기`}</Text>
+                    <Ionicons name={showAllTodos ? 'chevron-up' : 'chevron-down'} size={15} color={theme.colors.primaryDark} />
+                  </Pressable>
                 ) : null}
               </View>
             ) : null}
           </View>
         ) : (
-          <EmptyState title="지금 처리할 일이 없어요" description="곡 투표, 일정 응답, 연습 제출이 생기면 여기에서 바로 확인할 수 있어요." />
+          <EmptyState title="지금 할 일이 없어요" description="할 일이 생기면 여기에서 바로 확인할 수 있어요." />
         )}
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>기능</Text>
+          <Text style={styles.sectionTitle}>다음 합주</Text>
+          <HeaderIconAction
+            icon="add"
+            label="다음 합주 등록"
+            onPress={() => navigation.navigate('CreateScheduleSlot', { bandId })}
+          />
         </View>
-        <View style={styles.flowGrid}>
-          <NextRehearsalCard rehearsal={detail.nextRehearsal} />
-          {shortcutCards.map((item) => (
-            <FlowCard
-              key={item.key}
-              item={item}
-              onPress={() => {
-                if (item.key === 'song') {
-                  navigation.navigate('SongRound', { bandId, initialTab: 'vote' });
-                  return;
-                }
-                if (item.key === 'practice') {
-                  navigation.navigate('SongRound', { bandId, initialTab: 'library' });
-                  return;
-                }
-                if (item.key === 'schedule') {
-                  navigation.navigate('Schedule', { bandId });
-                  return;
-                }
-                if (item.key === 'settlement') {
-                  navigation.navigate('Settlement', { bandId });
-                  return;
-                }
-                navigation.navigate('Studios', { bandId });
-              }}
-            />
-          ))}
+        <NextRehearsalCard
+          rehearsal={detail.nextRehearsal}
+          studioName={detail.confirmedStudioName}
+        />
+        {getAdditionalSchedules(upcomingSchedules, detail.nextRehearsal).map((schedule) => (
+          <View key={schedule.id} style={styles.additionalScheduleRow}>
+            <Text style={styles.additionalScheduleDate}>{formatScheduleDate(schedule.date)}</Text>
+            <Text style={styles.additionalScheduleTime}>{formatRehearsalTime(schedule.startTime)}~{formatRehearsalTime(schedule.endTime)}</Text>
+          </View>
+        ))}
+        <View style={styles.scheduleSubHeader}>
+          <Text style={styles.scheduleSubTitle}>우리의 가능 시간</Text>
+          <HeaderIconAction
+            icon="create-outline"
+            label="수정"
+            onPress={() => navigation.navigate('ScheduleEdit', { bandId })}
+          />
         </View>
+        <View style={styles.scheduleLegend}>
+          <View style={styles.scheduleLegendItem}>
+            <View style={[styles.scheduleLegendSwatch, styles.scheduleLegendAvailable]} />
+            <Text style={styles.scheduleLegendText}>모든 멤버 가능</Text>
+          </View>
+        </View>
+        <AvailabilityTable weekDates={weekDates} allAvailableSlotKeys={allAvailableSlotKeys} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>내 정산</Text>
+        <MySettlementCard
+          settlement={settlement}
+          userId={user?.id ?? null}
+          onPress={() => navigation.navigate('Settlement', { bandId })}
+        />
       </View>
     </Screen>
   );
+}
+
+function MySettlementCard({
+  settlement,
+  userId,
+  onPress,
+}: {
+  settlement: SettlementOverviewDto | null;
+  userId: string | null;
+  onPress: () => void;
+}) {
+  const amounts = getMySettlementAmounts(settlement, userId);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="정산 바로가기"
+      style={({ pressed }) => [styles.mySettlementCard, pressed && styles.mySettlementCardPressed]}
+      onPress={onPress}
+    >
+      <View style={styles.mySettlementText}>
+        <Text style={styles.mySettlementLabel}>내가 낼 금액</Text>
+      </View>
+      <View style={styles.mySettlementAction}>
+        <View style={styles.mySettlementAmountGroup}>
+          <Text style={styles.mySettlementAmount} numberOfLines={1}>{formatPrice(amounts.total)}</Text>
+          <Text style={styles.mySettlementAmountGuide} numberOfLines={1}>{formatKoreanAmount(amounts.total)}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={17} color={theme.colors.textMuted} />
+      </View>
+    </Pressable>
+  );
+}
+
+function getMySettlementAmounts(settlement: SettlementOverviewDto | null, userId: string | null) {
+  if (!settlement || !userId) {
+    return { current: 0, outstanding: 0, total: 0 };
+  }
+  const openRounds = [...settlement.activeRounds, ...settlement.outstandingRounds];
+  const unpaidAmounts = openRounds.flatMap((round) => round.participants)
+    .filter((participant) => participant.userId === userId && !participant.paid)
+    .map((participant) => participant.amount);
+  const total = unpaidAmounts.reduce((sum, amount) => sum + amount, 0);
+  return { current: total, outstanding: 0, total };
+}
+
+function formatPrice(value: number) {
+  return `${Math.max(0, Math.round(value)).toLocaleString('ko-KR')}원`;
+}
+
+function formatKoreanAmount(value: number) {
+  const amount = Math.max(0, Math.floor(value));
+  const man = Math.floor(amount / 10_000);
+  const cheon = Math.floor((amount % 10_000) / 1_000);
+  const won = amount % 1_000;
+  const parts: string[] = [];
+
+  if (man > 0) parts.push(`${man.toLocaleString('ko-KR')}만`);
+  if (cheon > 0) parts.push(`${cheon}천`);
+  if (won > 0 || parts.length === 0) parts.push(won.toLocaleString('ko-KR'));
+
+  return `${parts.join(' ')}원`;
 }
 
 function PrimaryTodoCard({ todo, onPress }: { todo: TodoItemDto; onPress: () => void }) {
@@ -245,8 +340,8 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
         <Ionicons name={iconName} size={17} color={theme.colors.primaryDark} />
       </View>
       <View style={styles.compactTodoText}>
-        <Text style={styles.compactTodoTitle} numberOfLines={1}>{todo.title}</Text>
-        <Text style={styles.compactTodoDescription} numberOfLines={1}>{todo.description}</Text>
+        <Text style={styles.compactTodoTitle} numberOfLines={2}>{todo.title}</Text>
+        <Text style={styles.compactTodoDescription} numberOfLines={2}>{todo.description}</Text>
       </View>
       <View style={styles.compactTodoGo}>
         <Text style={styles.compactTodoDeadline}>{todoDeadlineLabel(todo)}</Text>
@@ -256,45 +351,109 @@ function CompactTodoItem({ todo, onPress }: { todo: TodoItemDto; onPress: () => 
   );
 }
 
-function FlowCard({
-  item,
-  onPress,
+function NextRehearsalCard({
+  rehearsal,
+  studioName,
 }: {
-  item: ReturnType<typeof buildShortcutCards>[number];
-  onPress: () => void;
+  rehearsal: BandHomeDto['nextRehearsal'];
+  studioName: string | null;
 }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.flowCard,
-        pressed && styles.flowCardPressed,
-      ]}
-      onPress={onPress}
-    >
-      <View style={styles.flowIcon}>
-        <Ionicons name={item.icon} size={18} color={theme.colors.primaryDark} />
-      </View>
-      <View style={styles.flowText}>
-        <View style={styles.flowTitleRow}>
-          <Text style={styles.flowTitle} numberOfLines={1}>{item.label}</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-        </View>
-        <Text style={styles.flowDescription} numberOfLines={1}>{item.description}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function NextRehearsalCard({ rehearsal }: { rehearsal: BandHomeDto['nextRehearsal'] }) {
   const display = getNextRehearsalDisplay(rehearsal);
 
   return (
     <View style={styles.nextRehearsalCard}>
-      <Text style={styles.nextRehearsalDday}>{display.dDay}</Text>
-      <Text style={styles.nextRehearsalDate}>{display.date}</Text>
-      <Text style={styles.nextRehearsalTime}>{display.time}</Text>
+      <View style={styles.nextRehearsalTop}>
+        <View style={styles.nextRehearsalWhen}>
+          <Text style={styles.nextRehearsalDate}>{display.date}</Text>
+          <Text style={styles.nextRehearsalTime}>{display.time}</Text>
+        </View>
+        <Text style={styles.nextRehearsalDday}>{display.dDay}</Text>
+      </View>
+      <View style={styles.nextRehearsalDivider} />
+      <View style={styles.nextRehearsalLocation}>
+        <Text style={styles.nextRehearsalLocationLabel}>장소</Text>
+        <Text style={styles.nextRehearsalLocationValue} numberOfLines={2}>{studioName ?? '아직 정해지지 않았어요'}</Text>
+      </View>
     </View>
   );
+}
+
+function HeaderIconAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={styles.headerIconAction} onPress={onPress}>
+      <Ionicons name={icon} size={icon === 'add' ? 18 : 16} color={theme.colors.primaryDark} />
+      <Text style={styles.headerIconActionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function AvailabilityTable({ weekDates, allAvailableSlotKeys }: { weekDates: string[]; allAvailableSlotKeys: Set<string> }) {
+  return (
+    <View style={styles.scheduleTable}>
+      <View style={styles.weekdayColumn}>
+        <View style={styles.tableCorner} />
+        {weekDates.map((date) => (
+          <View key={date} style={styles.weekdayCell}>
+            <Text style={styles.weekdayText}>{weekdayLabel(date)}</Text>
+          </View>
+        ))}
+      </View>
+      <ScrollView style={styles.scheduleScroll} horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+        <View style={styles.tableGrid}>
+          <View style={styles.tableRow}>
+            {SCHEDULE_HOURS.map((hour) => (
+              <View key={hour} style={styles.hourCell}>
+                <Text style={styles.hourText}>{String(hour).padStart(2, '0')}시</Text>
+              </View>
+            ))}
+          </View>
+          {weekDates.map((date) => (
+            <View key={date} style={styles.tableRow}>
+              {SCHEDULE_HOURS.map((hour) => (
+                <View
+                  key={`${date}-${hour}`}
+                  style={[styles.scheduleCell, allAvailableSlotKeys.has(`${date}-${hour}`) && styles.scheduleCellAvailable]}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const SCHEDULE_HOURS = Array.from({ length: 15 }, (_, index) => index + 7);
+
+function weekdayLabel(date: string) {
+  const labels = ['일', '월', '화', '수', '목', '금', '토'];
+  return labels[new Date(`${date.slice(0, 10)}T00:00:00`).getDay()];
+}
+
+function getAdditionalSchedules(schedules: ScheduleProposalDto[], rehearsal: BandHomeDto['nextRehearsal']) {
+  return schedules.filter((schedule) => {
+    if (!rehearsal) {
+      return true;
+    }
+    return !(
+      schedule.date.slice(0, 10) === rehearsal.date.slice(0, 10) &&
+      schedule.startTime.slice(0, 5) === rehearsal.startTime.slice(0, 5) &&
+      schedule.endTime.slice(0, 5) === rehearsal.endTime.slice(0, 5)
+    );
+  });
+}
+
+function formatScheduleDate(date: string) {
+  const parsed = new Date(`${date.slice(0, 10)}T00:00:00`);
+  return `${parsed.getMonth() + 1}/${parsed.getDate()} ${weekdayLabel(date)}`;
 }
 
 function todoDeadlineLabel(todo: TodoItemDto) {
@@ -325,9 +484,6 @@ function todoActionLabel(todo: TodoItemDto) {
   if (todo.type === 'vote_schedule_proposal' || todo.shortcut === 'schedule') {
     return '일정 응답하기';
   }
-  if (todo.type === 'vote_studio' || todo.type === 'start_studio' || todo.shortcut === 'studio') {
-    return '합주실 확인하기';
-  }
   if (todo.type === 'vote_song' || todo.type === 'start_song_round' || todo.shortcut === 'song_round') {
     return '곡 투표하기';
   }
@@ -341,10 +497,12 @@ function todoIconName(todo: TodoItemDto): keyof typeof Ionicons.glyphMap {
   if (todo.type === 'submit_schedule' || todo.type === 'vote_schedule_proposal' || todo.shortcut === 'schedule') {
     return 'calendar-outline';
   }
-  if (todo.type === 'vote_studio' || todo.shortcut === 'studio') {
-    return 'location-outline';
-  }
   return 'musical-notes-outline';
+}
+
+function isStudioTodo(todo: TodoItemDto) {
+  const rawTodo = todo as unknown as { shortcut?: string; type: string };
+  return rawTodo.shortcut === 'studio' || rawTodo.type === 'vote_studio' || rawTodo.type === 'start_studio';
 }
 
 async function findFirstPendingPracticeId(bandId: string) {
@@ -353,41 +511,6 @@ async function findFirstPendingPracticeId(bandId: string) {
     .filter((assignment) => assignment.status === 'open' && !assignment.hasSubmitted)
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
   return pending[0]?.id ?? null;
-}
-
-function buildShortcutCards(detail: BandHomeDto) {
-  return [
-    {
-      key: 'song' as const,
-      label: '곡 정하기',
-      description: detail.voteSummary.song === 'needed' ? '투표 진행 중' : '후보와 투표',
-      icon: 'musical-notes-outline' as const,
-    },
-    {
-      key: 'practice' as const,
-      label: '연습',
-      description: detail.openPracticeCount > 0 ? `${detail.openPracticeCount}개 제출 필요` : '과제와 제출',
-      icon: 'mic-outline' as const,
-    },
-    {
-      key: 'schedule' as const,
-      label: '일정',
-      description: detail.openScheduleSlotCount > 0 ? '가능 시간 확인' : '시간 맞추기',
-      icon: 'calendar-outline' as const,
-    },
-    {
-      key: 'studio' as const,
-      label: '합주실',
-      description: detail.voteSummary.studio === 'needed' ? '후보 투표 중' : '후보와 지도',
-      icon: 'location-outline' as const,
-    },
-    {
-      key: 'settlement' as const,
-      label: '정산',
-      description: '합주 비용 정리',
-      icon: 'card-outline' as const,
-    },
-  ];
 }
 
 function getNextRehearsalDisplay(rehearsal: BandHomeDto['nextRehearsal']) {
@@ -414,21 +537,8 @@ function formatRehearsalTime(value: string) {
 }
 
 const styles = StyleSheet.create({
-  loadingCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    padding: 18,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  loadingTitle: {
-    color: theme.colors.text,
-    fontWeight: '800',
-    fontSize: 18,
-  },
-  loadingBody: {
-    color: theme.colors.textMuted,
+  homeContent: {
+    gap: 28,
   },
   memberHeaderButton: {
     width: 40,
@@ -463,33 +573,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryButton: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  retryText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
   dashboardHero: {
-    minHeight: 96,
+    minHeight: 84,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 13,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    padding: 14,
+    paddingHorizontal: 2,
   },
   bandImage: {
-    width: 58,
-    height: 58,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.md,
     resizeMode: 'cover',
     backgroundColor: theme.colors.surfaceMuted,
@@ -501,16 +594,17 @@ const styles = StyleSheet.create({
   },
   bandName: {
     color: theme.colors.text,
-    fontSize: 23,
-    fontWeight: '900',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '800',
   },
   memberMeta: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
   },
   section: {
-    gap: 9,
+    gap: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -520,30 +614,26 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 19,
+    fontWeight: '800',
   },
   sectionMeta: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '600',
   },
   todoStack: {
     gap: 8,
   },
   primaryTodoCard: {
-    minHeight: 162,
+    minHeight: 150,
     borderRadius: theme.radius.md,
     padding: 15,
     gap: 10,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 2,
+    ...theme.shadow.card,
   },
   primaryTodoCardPressed: {
     backgroundColor: theme.colors.primarySoft,
@@ -568,7 +658,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     color: theme.colors.primaryDark,
     backgroundColor: theme.colors.primarySoft,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -578,13 +668,13 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 19,
     lineHeight: 24,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   todoDescription: {
     color: theme.colors.textMuted,
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
+    lineHeight: 20,
+    fontWeight: '400',
   },
   todoAction: {
     alignSelf: 'flex-start',
@@ -599,19 +689,28 @@ const styles = StyleSheet.create({
   },
   todoActionText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   compactTodoList: {
     gap: 7,
   },
+  moreTodoButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  moreTodoButtonPressed: {
+    opacity: 0.68,
+  },
   moreTodoText: {
-    alignSelf: 'flex-end',
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-    paddingTop: 2,
-    paddingHorizontal: 2,
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '700',
   },
   compactTodoItem: {
     flexDirection: 'row',
@@ -622,7 +721,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
     paddingHorizontal: 11,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   compactTodoItemPressed: {
     backgroundColor: theme.colors.primarySoft,
@@ -644,13 +743,15 @@ const styles = StyleSheet.create({
   },
   compactTodoTitle: {
     color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '800',
   },
   compactTodoDescription: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
   },
   compactTodoGo: {
     flexDirection: 'row',
@@ -659,92 +760,256 @@ const styles = StyleSheet.create({
   },
   compactTodoDeadline: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '900',
     minWidth: 34,
     textAlign: 'right',
   },
-  flowGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  nextRehearsalCard: {
+    width: '100%',
+    minHeight: 132,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
+    padding: 12,
+    gap: 10,
   },
-  flowCard: {
-    width: '48.8%',
-    minHeight: 104,
+  nextRehearsalTop: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  nextRehearsalWhen: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 3,
+  },
+  nextRehearsalDday: {
+    color: theme.colors.primaryDark,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '900',
+    textAlignVertical: 'center',
+  },
+  nextRehearsalDate: {
+    color: theme.colors.text,
+    fontSize: 27,
+    lineHeight: 31,
+    fontWeight: '900',
+  },
+  nextRehearsalTime: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
+  nextRehearsalDivider: {
+    height: 1,
+    backgroundColor: '#d8d2ff',
+    marginVertical: 2,
+  },
+  nextRehearsalLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  nextRehearsalLocationLabel: {
+    width: 32,
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  nextRehearsalLocationValue: {
+    flex: 1,
+    minWidth: 0,
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  additionalScheduleRow: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    paddingHorizontal: 4,
+  },
+  additionalScheduleDate: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  additionalScheduleTime: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  headerIconAction: {
+    minHeight: 32,
+    flexDirection: 'row',
+    gap: 4,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primarySoft,
+    paddingHorizontal: 9,
+  },
+  headerIconActionText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  scheduleSubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+  },
+  scheduleSubTitle: {
+    color: theme.colors.text,
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  scheduleLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  scheduleLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  scheduleLegendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+  },
+  scheduleLegendAvailable: {
+    backgroundColor: '#159a78',
+  },
+  scheduleLegendText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  scheduleTable: {
+    flexDirection: 'row',
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: '#f1f3f6',
+    padding: 9,
+  },
+  scheduleScroll: {
+    flex: 1,
+  },
+  weekdayColumn: {
+    width: 30,
+    gap: 4,
+    marginRight: 7,
+    zIndex: 1,
+  },
+  tableCorner: {
+    height: 20,
+  },
+  weekdayCell: {
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayText: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  tableGrid: {
+    gap: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  hourCell: {
+    width: 32,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hourText: {
+    color: theme.colors.textMuted,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  scheduleCell: {
+    width: 32,
+    height: 30,
+    borderRadius: 5,
+    backgroundColor: '#e3e7ec',
+  },
+  scheduleCellAvailable: {
+    backgroundColor: '#159a78',
+  },
+  mySettlementCard: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    padding: 12,
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  nextRehearsalCard: {
-    width: '48.8%',
-    minHeight: 104,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primarySoft,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  nextRehearsalDday: {
-    alignSelf: 'flex-end',
-    overflow: 'hidden',
-    color: '#fff',
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  nextRehearsalDate: {
-    color: theme.colors.text,
-    fontSize: 28,
-    lineHeight: 32,
-    fontWeight: '900',
-  },
-  nextRehearsalTime: {
-    alignSelf: 'flex-end',
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  flowCardPressed: {
-    backgroundColor: theme.colors.primarySoft,
-    borderColor: theme.colors.primary,
-    transform: [{ scale: 0.985 }],
-  },
-  flowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: theme.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flowText: {
+  mySettlementText: {
+    flex: 1,
     minWidth: 0,
-    gap: 2,
-  },
-  flowTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 4,
   },
-  flowTitle: {
-    flex: 1,
+  mySettlementCardPressed: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+    transform: [{ scale: 0.99 }],
+  },
+  mySettlementLabel: {
     color: theme.colors.text,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
-  flowDescription: {
+  mySettlementDetail: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  mySettlementAmount: {
+    color: theme.colors.primaryDark,
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  mySettlementAmountGroup: {
+    alignItems: 'flex-end',
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  mySettlementAmountGuide: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '400',
+    textAlign: 'right',
+  },
+  mySettlementAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
 });

@@ -6,7 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BandHomeDto, BandSongCardDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, HeroBanner, Label, PrimaryButton, SectionCard } from '../../components/UI';
+import { EmptyState, Field, Label, PrimaryButton, SectionCard } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -158,17 +158,12 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <HeroBanner
-        title="연습 과제 만들기"
-        subtitle="연습 구간과 마감일을 정하고 바로 연습을 시작해요."
-      />
-
       <SectionCard title="과제 정보">
         {songCandidateId && selectedSong ? (
           <View style={styles.linkedSongBox}>
             <Text style={styles.linkedSongLabel}>연습 곡</Text>
-            <Text style={styles.linkedSongTitle} numberOfLines={1}>{selectedSong.title}</Text>
-            <Text style={styles.linkedSongArtist} numberOfLines={1}>{selectedSong.artist}</Text>
+            <Text style={styles.linkedSongTitle} numberOfLines={2}>{selectedSong.title}</Text>
+            <Text style={styles.linkedSongArtist} numberOfLines={2}>{selectedSong.artist}</Text>
           </View>
         ) : (
           <>
@@ -194,10 +189,10 @@ export function CreatePracticeAssignmentScreen({ route, navigation }: Props) {
                   }}
                 >
                   <View style={styles.songOptionBody}>
-                    <Text style={[styles.songTitle, selected && styles.songTitleSelected]} numberOfLines={1}>
+                    <Text style={[styles.songTitle, selected && styles.songTitleSelected]} numberOfLines={2}>
                       {song.title}
                     </Text>
-                    <Text style={[styles.songArtist, selected && styles.songArtistSelected]} numberOfLines={1}>
+                    <Text style={[styles.songArtist, selected && styles.songArtistSelected]} numberOfLines={2}>
                       {song.artist}
                     </Text>
                   </View>
@@ -296,7 +291,7 @@ const styles = StyleSheet.create({
   },
   linkedSongLabel: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
   },
   linkedSongTitle: {
@@ -306,7 +301,7 @@ const styles = StyleSheet.create({
   },
   linkedSongArtist: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   songOption: {
@@ -340,7 +335,7 @@ const styles = StyleSheet.create({
   },
   songArtist: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   songArtistSelected: {
@@ -407,7 +402,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

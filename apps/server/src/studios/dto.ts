@@ -52,11 +52,6 @@ export class CreateStudioCandidateDto {
 
 }
 
-export class VoteStudioCandidateDto {
-  @IsString()
-  candidateId: string;
-}
-
 export class SaveStudioLocationDto {
   @IsLatitude()
   latitude: number;

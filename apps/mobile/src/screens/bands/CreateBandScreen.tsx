@@ -7,7 +7,7 @@ import { PositionType } from '@band/shared-types';
 import { api } from '../../api/client';
 import { PositionSelector } from '../../components/PositionSelector';
 import { Screen } from '../../components/Screen';
-import { ErrorText, Field, Label, PrimaryButton, SectionCard } from '../../components/UI';
+import { ErrorText, Field, Label, PrimaryButton } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -67,7 +67,7 @@ export function CreateBandForm({ onComplete }: { onComplete: () => void }) {
       return;
     }
     if (positionType === 'custom' && trimmedCustomPosition.length === 0) {
-      setError('직접 입력 포지션을 작성해 주세요.');
+      setError('직접 포지션을 작성해 주세요.');
       return;
     }
 
@@ -99,7 +99,7 @@ export function CreateBandForm({ onComplete }: { onComplete: () => void }) {
   };
 
   return (
-    <SectionCard>
+    <View style={styles.form}>
         <View style={styles.thumbnailRow}>
           <ImageBackground
             source={{ uri: thumbnail?.uri ?? fallbackBandImage }}
@@ -109,8 +109,7 @@ export function CreateBandForm({ onComplete }: { onComplete: () => void }) {
             <View style={styles.thumbnailOverlay} />
           </ImageBackground>
           <View style={styles.thumbnailCopy}>
-            <Text style={styles.thumbnailTitle}>밴드 썸네일</Text>
-            <Text style={styles.thumbnailSubtitle}>밴드 대표 사진을 골라 주세요.</Text>
+            <Text style={styles.thumbnailTitle}>밴드 썸네일 설정</Text>
           </View>
           <Pressable
             accessibilityLabel="갤러리에서 밴드 썸네일 선택"
@@ -122,7 +121,7 @@ export function CreateBandForm({ onComplete }: { onComplete: () => void }) {
           </Pressable>
         </View>
         <Label>밴드 이름</Label>
-        <Field value={name} onChangeText={setName} placeholder="예: 합주 매니지먼트 밴드" />
+        <Field value={name} onChangeText={setName} placeholder="예: 데일밴드" />
         <PositionSelector
           value={positionType}
           onChange={setPositionType}
@@ -131,11 +130,14 @@ export function CreateBandForm({ onComplete }: { onComplete: () => void }) {
         />
         {error ? <ErrorText>{error}</ErrorText> : null}
         <PrimaryButton label="밴드 만들기" onPress={submit} loading={loading} />
-    </SectionCard>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  form: {
+    gap: 14,
+  },
   thumbnailRow: {
     minHeight: 104,
     flexDirection: 'row',
@@ -172,8 +174,8 @@ const styles = StyleSheet.create({
   },
   thumbnailSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
   },
   galleryButton: {
     width: 42,

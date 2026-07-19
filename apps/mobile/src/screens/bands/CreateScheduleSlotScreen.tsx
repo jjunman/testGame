@@ -7,7 +7,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScheduleSummaryDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { HeroBanner, Label, PrimaryButton, SectionCard } from '../../components/UI';
+import { Field, Label, PrimaryButton } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -36,7 +36,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<ScheduleSlotTab>('recommended');
   const [segmentWidth, setSegmentWidth] = useState(0);
-  const [iosPickerTarget, setIosPickerTarget] = useState<'date' | 'start' | 'end' | null>(null);
+  const [showIosDatePicker, setShowIosDatePicker] = useState(false);
   const [bookmarkedKeys, setBookmarkedKeys] = useState<Set<string>>(new Set());
   const indicatorProgress = useRef(new Animated.Value(0)).current;
   const indicatorWidth = segmentWidth > 0 ? (segmentWidth - 8) / 2 : 0;
@@ -73,8 +73,8 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
   }, [bookmarkStorageKey]);
 
   const recommendedItems = useMemo(
-    () => takeBestRecommendationPerDate(buildRecommendations(summary, durationHours)).slice(0, 3),
-    [durationHours, summary],
+    () => buildRecommendations(summary, durationHours, selectedDate).slice(0, 3),
+    [durationHours, selectedDate, summary],
   );
   const allAvailableRecommendedItems = useMemo(
     () => recommendedItems.filter((item) => item.allAvailable),
@@ -84,7 +84,6 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     if (activeTab === 'recommended' && recommended) {
-      setSelectedDate(recommended.date);
       setStartTime(recommended.startTime);
       setEndTime(recommended.endTime);
     }
@@ -106,7 +105,13 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
       return;
     }
     if (!isTimeValue(startTime) || !isTimeValue(endTime)) {
-      Alert.alert('형식 확인', '시간은 19:00 형식으로 입력해 주세요.');
+      Alert.alert('시간 확인', '시작과 종료 시간을 숫자로 입력해 주세요.');
+      return;
+    }
+    const startHour = Math.floor(toMinute(startTime) / 60);
+    const endHour = Math.floor(toMinute(endTime) / 60);
+    if (startHour < 7 || startHour > 21 || endHour < 8 || endHour > 22) {
+      Alert.alert('시간 확인', '합주 시간은 07시부터 22시 사이로 입력해 주세요.');
       return;
     }
     if (toMinute(endTime) <= toMinute(startTime)) {
@@ -125,40 +130,6 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const applyPickedTime = (target: 'start' | 'end', pickedDate: Date) => {
-    const value = formatTimeValue(pickedDate);
-    if (target === 'start') {
-      setStartTime(value);
-      if (toMinute(endTime) <= toMinute(value)) {
-        setEndTime(formatMinuteValue(Math.min(toMinute(value) + 120, 23 * 60 + 59)));
-      }
-      return;
-    }
-    setEndTime(value);
-  };
-
-  const openTimePicker = (target: 'start' | 'end') => {
-    const currentValue = target === 'start' ? startTime : endTime;
-    const current = timeValueToDate(currentValue);
-
-    if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: current,
-        mode: 'time',
-        is24Hour: true,
-        minuteInterval: 30,
-        onChange: (event, pickedDate) => {
-          if (event.type === 'set' && pickedDate) {
-            applyPickedTime(target, pickedDate);
-          }
-        },
-      });
-      return;
-    }
-
-    setIosPickerTarget(target);
   };
 
   const openDatePicker = () => {
@@ -180,7 +151,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
       return;
     }
 
-    setIosPickerTarget('date');
+    setShowIosDatePicker(true);
   };
 
   const toggleBookmark = (key: string) => {
@@ -198,8 +169,6 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <HeroBanner title="합주 일정 등록" subtitle="가능한 시간을 추천받거나 직접 골라 바로 등록해요." />
-
       <View
         style={styles.segment}
         onLayout={(event) => setSegmentWidth(event.nativeEvent.layout.width)}
@@ -238,7 +207,39 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
       </View>
 
       {activeTab === 'recommended' ? (
-        <SectionCard title="추천 시간">
+        <View style={styles.formPanel}>
+          <Text style={styles.formTitle}>추천 시간</Text>
+          <View style={styles.recommendDateSection}>
+            <Label>날짜</Label>
+            <Pressable accessibilityRole="button" accessibilityLabel="추천 날짜 선택" style={styles.datePickerButton} onPress={openDatePicker}>
+              <View style={styles.datePickerIcon}>
+                <Ionicons name="calendar-outline" size={20} color={theme.colors.primaryDark} />
+              </View>
+              <View style={styles.datePickerBody}>
+                <Text style={styles.datePickerTitle}>{formatDateLabel(selectedDate)}</Text>
+                <Text style={styles.datePickerWeekday}>{WEEK_LABELS[dateToWeekdayIndex(selectedDate)]}요일</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+            {showIosDatePicker ? (
+              <View style={styles.iosPickerBox}>
+                <DateTimePicker
+                  value={new Date(`${selectedDate}T00:00:00`)}
+                  mode="date"
+                  display="inline"
+                  minimumDate={new Date()}
+                  onChange={(_, pickedDate) => {
+                    if (pickedDate) {
+                      setSelectedDate(toDateValue(pickedDate));
+                    }
+                  }}
+                />
+                <Pressable style={styles.iosPickerDone} onPress={() => setShowIosDatePicker(false)}>
+                  <Text style={styles.iosPickerDoneText}>완료</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
           <View style={styles.durationSection}>
             <Label>합주 길이</Label>
             <View style={styles.durationRow}>
@@ -304,15 +305,13 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
           ) : (
             <Text style={styles.emptyText}>모두가 {durationHours}시간 연속으로 가능한 시간이 아직 없어요. 직접 등록에서 시간을 골라 주세요.</Text>
           )}
-          {allAvailableRecommendedItems.length > 0 ? (
-            <RegistrationSummary date={selectedDate} startTime={startTime} endTime={endTime} />
-          ) : null}
           <PrimaryButton label="이 시간으로 등록" onPress={submit} loading={submitting} disabled={allAvailableRecommendedItems.length === 0} />
-        </SectionCard>
+        </View>
       ) : null}
 
       {activeTab === 'manual' ? (
-        <SectionCard title="직접 등록">
+        <View style={styles.formPanel}>
+          <Text style={styles.formTitle}>직접 등록</Text>
           <Label>날짜</Label>
           <Pressable accessibilityRole="button" accessibilityLabel="합주 날짜 선택" style={styles.datePickerButton} onPress={openDatePicker}>
             <View style={styles.datePickerIcon}>
@@ -324,7 +323,7 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </Pressable>
-          {iosPickerTarget === 'date' ? (
+          {showIosDatePicker ? (
             <View style={styles.iosPickerBox}>
               <DateTimePicker
                 value={new Date(`${selectedDate}T00:00:00`)}
@@ -337,37 +336,19 @@ export function CreateScheduleSlotScreen({ route, navigation }: Props) {
                   }
                 }}
               />
-              <Pressable style={styles.iosPickerDone} onPress={() => setIosPickerTarget(null)}>
+              <Pressable style={styles.iosPickerDone} onPress={() => setShowIosDatePicker(false)}>
                 <Text style={styles.iosPickerDoneText}>완료</Text>
               </Pressable>
             </View>
           ) : null}
           <Label>시간</Label>
           <View style={styles.timePickerRow}>
-            <TimePickerButton label="시작" value={startTime} onPress={() => openTimePicker('start')} />
+            <HourInput label="시작" value={startTime} onChange={setStartTime} />
             <Ionicons name="arrow-forward" size={18} color={theme.colors.textMuted} />
-            <TimePickerButton label="종료" value={endTime} onPress={() => openTimePicker('end')} />
+            <HourInput label="종료" value={endTime} onChange={setEndTime} />
           </View>
-          {iosPickerTarget === 'start' || iosPickerTarget === 'end' ? (
-            <View style={styles.iosPickerBox}>
-              <DateTimePicker
-                value={timeValueToDate(iosPickerTarget === 'start' ? startTime : endTime)}
-                mode="time"
-                display="spinner"
-                minuteInterval={30}
-                onChange={(_, pickedDate) => {
-                  if (pickedDate) {
-                    applyPickedTime(iosPickerTarget, pickedDate);
-                  }
-                }}
-              />
-              <Pressable style={styles.iosPickerDone} onPress={() => setIosPickerTarget(null)}>
-                <Text style={styles.iosPickerDoneText}>완료</Text>
-              </Pressable>
-            </View>
-          ) : null}
           <PrimaryButton label="일정 등록하기" onPress={submit} loading={submitting} />
-        </SectionCard>
+        </View>
       ) : null}
     </Screen>
   );
@@ -392,39 +373,47 @@ function SegmentLabel({
   );
 }
 
-function TimePickerButton({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+function HourInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const inputValue = value ? String(Number(value.split(':')[0])) : '';
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 시간 ${value}`} style={styles.timePickerButton} onPress={onPress}>
-      <Ionicons name="time-outline" size={17} color={theme.colors.primaryDark} />
-      <Text style={styles.timePickerLabel}>{label}</Text>
-      <Text style={styles.timePickerValue}>{value}</Text>
-    </Pressable>
-  );
-}
-
-function RegistrationSummary({ date, startTime, endTime }: { date: string; startTime: string; endTime: string }) {
-  return (
-    <View style={styles.registrationSummary}>
-      <Ionicons name="calendar-outline" size={19} color={theme.colors.primaryDark} />
-      <View style={styles.registrationSummaryBody}>
-        <Text style={styles.registrationSummaryDate}>{formatDateLabel(date)} · {WEEK_LABELS[dateToWeekdayIndex(date)]}요일</Text>
-        <Text style={styles.registrationSummaryTime}>{startTime} - {endTime}</Text>
+    <View style={styles.hourInputGroup}>
+      <Text style={styles.hourInputLabel}>{label}</Text>
+      <View style={styles.hourInputShell}>
+        <Field
+          value={inputValue}
+          keyboardType="number-pad"
+          maxLength={2}
+          selectTextOnFocus
+          style={styles.hourInput}
+          onChangeText={(text) => {
+            const digits = text.replace(/\D/g, '').slice(0, 2);
+            onChange(digits ? toHourValue(Number(digits)) : '');
+          }}
+        />
+        <Text style={styles.hourInputSuffix}>시</Text>
       </View>
     </View>
   );
 }
 
-function buildRecommendations(summary: ScheduleSummaryDto[], durationHours: DurationHour): Recommendation[] {
+function buildRecommendations(summary: ScheduleSummaryDto[], durationHours: DurationHour, targetDate: string): Recommendation[] {
   const durationMinutes = durationHours * 60;
+  const now = new Date();
+  const today = toDateValue(now);
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  const targetWeekday = dateToWeekdayIndex(targetDate);
   const byDate = new Map<string, ScheduleSummaryDto[]>();
   for (const item of summary) {
+    if (dateToWeekdayIndex(item.date) !== targetWeekday) {
+      continue;
+    }
     const items = byDate.get(item.date) ?? [];
     items.push(item);
     byDate.set(item.date, items);
   }
 
   const recommendations: Recommendation[] = [];
-  for (const [date, items] of byDate) {
+  for (const items of byDate.values()) {
     const sorted = [...items].sort((a, b) => toMinute(a.startTime) - toMinute(b.startTime));
     for (let index = 0; index < sorted.length; index += 1) {
       const start = sorted[index];
@@ -444,10 +433,13 @@ function buildRecommendations(summary: ScheduleSummaryDto[], durationHours: Dura
         allAvailable = allAvailable && next.allAvailable;
       }
 
-      if (cursor - toMinute(start.startTime) >= durationMinutes) {
+      if (
+        cursor - toMinute(start.startTime) >= durationMinutes &&
+        (targetDate !== today || toMinute(start.startTime) > currentMinute)
+      ) {
         recommendations.push({
-          key: `${date}-${start.startTime}-${endTime}`,
-          date,
+          key: `${targetDate}-${start.startTime}-${endTime}`,
+          date: targetDate,
           startTime: start.startTime,
           endTime,
           allAvailable,
@@ -457,7 +449,7 @@ function buildRecommendations(summary: ScheduleSummaryDto[], durationHours: Dura
     }
   }
 
-  return recommendations.sort((a, b) => {
+  const sortedRecommendations = recommendations.sort((a, b) => {
     if (Number(b.allAvailable) !== Number(a.allAvailable)) {
       return Number(b.allAvailable) - Number(a.allAvailable);
     }
@@ -466,17 +458,8 @@ function buildRecommendations(summary: ScheduleSummaryDto[], durationHours: Dura
     }
     return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
   });
-}
 
-function takeBestRecommendationPerDate(items: Recommendation[]) {
-  const seenDates = new Set<string>();
-  return items.filter((item) => {
-    if (seenDates.has(item.date)) {
-      return false;
-    }
-    seenDates.add(item.date);
-    return true;
-  });
+  return Array.from(new Map(sortedRecommendations.map((item) => [item.key, item])).values());
 }
 
 function isTimeValue(value: string) {
@@ -488,21 +471,8 @@ function toMinute(value: string) {
   return hour * 60 + minute;
 }
 
-function timeValueToDate(value: string) {
-  const date = new Date();
-  const [hour, minute] = value.split(':').map(Number);
-  date.setHours(hour, minute, 0, 0);
-  return date;
-}
-
-function formatTimeValue(date: Date) {
-  return formatMinuteValue(date.getHours() * 60 + date.getMinutes());
-}
-
-function formatMinuteValue(minutes: number) {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+function toHourValue(hour: number) {
+  return `${String(hour).padStart(2, '0')}:00`;
 }
 
 function formatDateLabel(value: string) {
@@ -523,6 +493,15 @@ function toDateValue(date: Date) {
 }
 
 const styles = StyleSheet.create({
+  formPanel: {
+    gap: 16,
+  },
+  formTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.sectionTitle,
+    lineHeight: 22,
+    fontWeight: '800',
+  },
   segment: {
     flexDirection: 'row',
     backgroundColor: theme.colors.surfaceMuted,
@@ -558,16 +537,18 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: theme.colors.primaryDark,
   },
+  recommendDateSection: {
+    gap: 8,
+    marginBottom: 8,
+  },
   durationRow: {
     flexDirection: 'row',
     gap: 8,
   },
   durationSection: {
     gap: 8,
-    paddingBottom: 14,
-    marginBottom: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    paddingBottom: 18,
+    marginBottom: 4,
   },
   durationChip: {
     flex: 1,
@@ -619,7 +600,7 @@ const styles = StyleSheet.create({
   recommendDate: {
     flex: 1,
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   recommendDateSelected: {
@@ -633,7 +614,7 @@ const styles = StyleSheet.create({
   recommendStatus: {
     alignSelf: 'flex-start',
     color: theme.colors.success,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
   },
   emptyText: {
@@ -670,7 +651,7 @@ const styles = StyleSheet.create({
   },
   datePickerWeekday: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   timePickerRow: {
@@ -678,47 +659,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  timePickerButton: {
+  hourInputGroup: {
     flex: 1,
-    minHeight: 78,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
+    minWidth: 0,
+    gap: 6,
   },
-  timePickerLabel: {
+  hourInputLabel: {
     color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  timePickerValue: {
-    color: theme.colors.text,
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '900',
+    textAlign: 'center',
   },
-  registrationSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+  hourInputShell: {
+    position: 'relative',
+    justifyContent: 'center',
   },
-  registrationSummaryBody: {
-    flex: 1,
-    gap: 2,
-  },
-  registrationSummaryDate: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  registrationSummaryTime: {
+  hourInput: {
+    minHeight: 58,
+    paddingRight: 34,
+    backgroundColor: theme.colors.surfaceMuted,
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  hourInputSuffix: {
+    position: 'absolute',
+    right: 14,
+    color: theme.colors.textMuted,
+    fontSize: 14,
     fontWeight: '900',
   },
   iosPickerBox: {

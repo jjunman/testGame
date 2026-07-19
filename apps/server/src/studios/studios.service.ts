@@ -9,11 +9,9 @@ import { BandMember } from '../bands/band-member.entity';
 import { BandsService } from '../bands/bands.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
-import { UsersService } from '../users/users.service';
 import { findAnsanLocation } from './ansan-locations';
 import { CreateStudioCandidateDto, SaveStudioLocationDto } from './dto';
 import { StudioCandidate } from './studio-candidate.entity';
-import { StudioVote } from './studio-vote.entity';
 import { Studio } from './studio.entity';
 
 const ANSAN_REGION = '안산';
@@ -103,15 +101,12 @@ export class StudiosService {
     private readonly studiosRepository: Repository<Studio>,
     @InjectRepository(StudioCandidate)
     private readonly candidatesRepository: Repository<StudioCandidate>,
-    @InjectRepository(StudioVote)
-    private readonly votesRepository: Repository<StudioVote>,
     @InjectRepository(ScheduleProposal)
     private readonly scheduleProposalsRepository: Repository<ScheduleProposal>,
     @InjectRepository(BandMember)
     private readonly membersRepository: Repository<BandMember>,
     private readonly bandsService: BandsService,
     private readonly notificationsService: NotificationsService,
-    private readonly usersService: UsersService,
   ) {}
 
   async listCandidates(userId: string, bandId: string) {
@@ -119,7 +114,7 @@ export class StudiosService {
     const [candidates, members, expectedHours] = await Promise.all([
       this.candidatesRepository.find({
         where: { band: { id: bandId } },
-        relations: ['votes', 'votes.user', 'band'],
+        relations: ['band'],
         order: { createdAt: 'ASC' },
       }),
       this.getBandMembers(bandId),
@@ -130,7 +125,7 @@ export class StudiosService {
 
     return candidates
       .filter((candidate) => !this.isDeprecatedStudio(candidate.studio))
-      .map((candidate) => this.toCandidateDto(candidate, userId, memberCount, expectedHours, distanceStats.get(candidate.id)))
+      .map((candidate) => this.toCandidateDto(candidate, memberCount, expectedHours, distanceStats.get(candidate.id)))
       .sort((a, b) => {
         if (Number(b.status === 'confirmed') !== Number(a.status === 'confirmed')) {
           return Number(b.status === 'confirmed') - Number(a.status === 'confirmed');
@@ -140,9 +135,6 @@ export class StudiosService {
         }
         if (a.recommendationRank !== null || b.recommendationRank !== null) {
           return a.recommendationRank === null ? 1 : -1;
-        }
-        if (b.voteCount !== a.voteCount) {
-          return b.voteCount - a.voteCount;
         }
         return a.createdAt.localeCompare(b.createdAt);
       });
@@ -205,13 +197,13 @@ export class StudiosService {
     }
     await this.ensureAppProvidedStudios();
     const studio = await this.getStudioOrThrow(dto.studioId);
-    await this.clearConfirmedCandidates(bandId);
-
     const duplicated = await this.candidatesRepository.findOne({
       where: { band: { id: bandId }, studio: { id: studio.id } },
+      relations: ['band'],
     });
     if (duplicated) {
-      throw new BadRequestException('이미 후보로 등록된 합주실입니다.');
+      duplicated.note = this.clean(dto.note);
+      return this.candidatesRepository.save(duplicated);
     }
 
     const candidate = await this.candidatesRepository.save(
@@ -228,71 +220,46 @@ export class StudiosService {
       bandId,
       {
         title: membership.band.name,
-        body: '합주실 투표가 열렸어요. 후보를 확인해 주세요.',
-        data: { type: 'studio_vote', bandId, candidateId: candidate.id },
+        body: `${studio.name}이(가) 합주실 후보로 추가됐어요.`,
+        data: { type: 'studio_candidate_added', bandId, candidateId: candidate.id },
       },
     );
     return candidate;
   }
 
-  async vote(userId: string, bandId: string, candidateId: string) {
-    await this.bandsService.requireMembership(userId, bandId);
+  async registerCandidate(userId: string, bandId: string, candidateId: string) {
+    const membership = await this.bandsService.requireMembership(userId, bandId);
     const candidate = await this.candidatesRepository.findOne({
       where: { id: candidateId },
-      relations: ['band'],
+      relations: ['band', 'studio'],
     });
     if (!candidate || candidate.band.id !== bandId) {
       throw new NotFoundException('합주실 후보를 찾을 수 없습니다.');
     }
-    const existingVotes = await this.votesRepository.find({
-      where: { user: { id: userId } },
-      relations: ['candidate', 'candidate.band'],
-    });
-    const bandVotes = existingVotes.filter((vote) => vote.candidate.band.id === bandId);
-    if (bandVotes.length > 0) {
-      await this.votesRepository.remove(bandVotes);
-    }
 
-    const user = await this.usersService.findById(userId);
-    return this.votesRepository.save(
-      this.votesRepository.create({
-        candidate,
-        user: user!,
-      }),
+    candidate.status = 'confirmed';
+    candidate.voteDeadlineAt = null;
+    await this.candidatesRepository.save(candidate);
+    await this.unconfirmOtherCandidates(bandId, candidate.id);
+
+    await this.notificationsService.notifyBandMembers(
+      bandId,
+      {
+        title: membership.band.name,
+        body: `${candidate.studio.name}이(가) 합주실로 등록됐어요.`,
+        data: { type: 'studio_registered', bandId, candidateId: candidate.id },
+      },
     );
-  }
-
-  async finalize(userId: string, bandId: string) {
-    await this.bandsService.requireLeader(userId, bandId);
-    const candidates = await this.candidatesRepository.find({
-      where: { band: { id: bandId } },
-      relations: ['votes', 'band'],
-      order: { createdAt: 'ASC' },
-    });
-    if (candidates.length === 0) {
-      throw new BadRequestException('확정할 합주실 후보가 없습니다.');
-    }
-
-    const winner = [...candidates].sort((a, b) => {
-      const voteDiff = (b.votes?.length ?? 0) - (a.votes?.length ?? 0);
-      if (voteDiff !== 0) {
-        return voteDiff;
-      }
-      return a.createdAt.getTime() - b.createdAt.getTime();
-    })[0];
-
-    winner.status = 'confirmed';
-    await this.candidatesRepository.save(winner);
-
-    const losers = candidates.filter((candidate) => candidate.id !== winner.id);
-    if (losers.length > 0) {
-      await this.candidatesRepository.remove(losers);
-    }
 
     return this.candidatesRepository.findOne({
-      where: { id: winner.id },
-      relations: ['votes', 'votes.user', 'band'],
+      where: { id: candidate.id },
+      relations: ['band'],
     });
+  }
+
+  async registerStudio(userId: string, bandId: string, studioId: string) {
+    const candidate = await this.createCandidate(userId, bandId, { studioId });
+    return this.registerCandidate(userId, bandId, candidate.id);
   }
 
   async importAnsan(userId: string, bandId: string) {
@@ -340,6 +307,20 @@ export class StudiosService {
     }
   }
 
+  private async unconfirmOtherCandidates(bandId: string, confirmedCandidateId: string) {
+    const candidates = await this.candidatesRepository.find({
+      where: { band: { id: bandId } },
+      relations: ['band'],
+    });
+    const others = candidates.filter((candidate) => candidate.id !== confirmedCandidateId && candidate.status === 'confirmed');
+    if (others.length > 0) {
+      others.forEach((candidate) => {
+        candidate.status = 'open';
+      });
+      await this.candidatesRepository.save(others);
+    }
+  }
+
   private async getExpectedHours(bandId: string) {
     const proposal = await this.scheduleProposalsRepository.findOne({
       where: { band: { id: bandId }, confirmed: true },
@@ -359,7 +340,6 @@ export class StudiosService {
 
   private toCandidateDto(
     candidate: StudioCandidate,
-    userId: string,
     memberCount: number,
     expectedHours: number,
     distance?: { total: number | null; average: number | null; missing: number; rank: number | null },
@@ -374,8 +354,8 @@ export class StudiosService {
       createdByName: candidate.createdByUser.name,
       note: candidate.note,
       status: candidate.status,
-      voteCount: candidate.votes?.length ?? 0,
-      didVote: candidate.votes?.some((vote) => vote.user.id === userId) ?? false,
+      voteCount: 0,
+      didVote: false,
       expectedHours,
       estimatedTotalPrice: total,
       estimatedPerMemberPrice: total === null ? null : Math.ceil(total / memberCount),

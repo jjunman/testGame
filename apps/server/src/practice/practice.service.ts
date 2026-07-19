@@ -14,10 +14,12 @@ import ffmpegPath from 'ffmpeg-static';
 import { Repository } from 'typeorm';
 import { BandsService } from '../bands/bands.service';
 import { PositionType, PracticeAssignmentStatus, PracticeSubmissionStatus } from '../common/enums';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { UsersService } from '../users/users.service';
-import { CreatePracticeAssignmentDto } from './dto';
+import { CreatePracticeAssignmentDto, CreatePracticeFeedbackDto, UpdatePracticeFeedbackDto } from './dto';
 import { PracticeAssignment } from './practice-assignment.entity';
+import { PracticeFeedback } from './practice-feedback.entity';
 import { PracticeSubmission } from './practice-submission.entity';
 
 const execFileAsync = promisify(execFile);
@@ -29,11 +31,14 @@ export class PracticeService {
     private readonly assignmentsRepository: Repository<PracticeAssignment>,
     @InjectRepository(PracticeSubmission)
     private readonly submissionsRepository: Repository<PracticeSubmission>,
+    @InjectRepository(PracticeFeedback)
+    private readonly feedbackRepository: Repository<PracticeFeedback>,
     @InjectRepository(SongCandidate)
     private readonly candidatesRepository: Repository<SongCandidate>,
     private readonly bandsService: BandsService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async listAssignments(userId: string, bandId: string) {
@@ -237,8 +242,107 @@ export class PracticeService {
       userName: submission.user.name,
       positionLabel: memberByUserId.get(submission.user.id)?.positionLabel ?? '파트 미정',
       audioUrl: submission.audioUrl,
+      durationSec: submission.durationSec,
       submittedAt: submission.submittedAt.toISOString(),
     }));
+  }
+
+  async getFeedback(userId: string, assignmentId: string) {
+    const assignment = await this.assignmentsRepository.findOne({
+      where: { id: assignmentId },
+      relations: ['band'],
+    });
+    if (!assignment) {
+      throw new NotFoundException('연습 과제를 찾을 수 없습니다.');
+    }
+
+    await this.bandsService.requireMembership(userId, assignment.band.id);
+    this.requireClosedAssignment(assignment);
+
+    const feedback = await this.feedbackRepository.find({
+      where: { submission: { assignment: { id: assignmentId } } },
+      relations: ['submission'],
+      order: { createdAt: 'ASC' },
+    });
+    return feedback.map((item) => this.toFeedbackDto(item));
+  }
+
+  async createFeedback(userId: string, submissionId: string, dto: CreatePracticeFeedbackDto) {
+    const submission = await this.submissionsRepository.findOne({
+      where: { id: submissionId },
+      relations: ['assignment', 'assignment.band', 'user'],
+    });
+    if (!submission) {
+      throw new NotFoundException('녹음본을 찾을 수 없습니다.');
+    }
+
+    await this.bandsService.requireMembership(userId, submission.assignment.band.id);
+    this.requireClosedAssignment(submission.assignment);
+    if (submission.user.id === userId) {
+      throw new ForbiddenException('내 녹음본에는 피드백을 남길 수 없습니다.');
+    }
+
+    const content = this.validateFeedbackContent(dto.content);
+    const author = await this.usersService.findById(userId);
+    if (!author) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+    const saved = await this.feedbackRepository.save(this.feedbackRepository.create({
+      submission,
+      author,
+      content,
+      timestampMs: 0,
+      acknowledgedAt: null,
+    }));
+
+    void this.notificationsService.notifyUser(submission.user.id, {
+      title: '새 연습 피드백',
+      body: `${author.name}님이 피드백을 남겼어요.`,
+      data: {
+        type: 'practice_feedback',
+        bandId: submission.assignment.band.id,
+        assignmentId: submission.assignment.id,
+        submissionId: submission.id,
+      },
+    }).catch(() => undefined);
+
+    return this.toFeedbackDto(saved);
+  }
+
+  async updateFeedback(userId: string, feedbackId: string, dto: UpdatePracticeFeedbackDto) {
+    const feedback = await this.findFeedbackWithContext(feedbackId);
+    await this.bandsService.requireMembership(userId, feedback.submission.assignment.band.id);
+    if (feedback.author.id !== userId) {
+      throw new ForbiddenException('내가 작성한 피드백만 수정할 수 있습니다.');
+    }
+
+    feedback.content = this.validateFeedbackContent(dto.content);
+    return this.toFeedbackDto(await this.feedbackRepository.save(feedback));
+  }
+
+  async deleteFeedback(userId: string, feedbackId: string) {
+    const feedback = await this.findFeedbackWithContext(feedbackId);
+    await this.bandsService.requireMembership(userId, feedback.submission.assignment.band.id);
+    if (feedback.author.id !== userId) {
+      throw new ForbiddenException('내가 작성한 피드백만 삭제할 수 있습니다.');
+    }
+
+    await this.feedbackRepository.remove(feedback);
+    return { id: feedbackId };
+  }
+
+  async acknowledgeFeedback(userId: string, feedbackId: string) {
+    const feedback = await this.findFeedbackWithContext(feedbackId);
+    await this.bandsService.requireMembership(userId, feedback.submission.assignment.band.id);
+    if (feedback.submission.user.id !== userId) {
+      throw new ForbiddenException('녹음본 주인만 피드백을 확인 처리할 수 있습니다.');
+    }
+
+    if (!feedback.acknowledgedAt) {
+      feedback.acknowledgedAt = new Date();
+      await this.feedbackRepository.save(feedback);
+    }
+    return this.toFeedbackDto(feedback);
   }
 
   async generateMix(userId: string, assignmentId: string) {
@@ -327,6 +431,44 @@ export class PracticeService {
       mixAudioUrl: assignment.mixAudioUrl,
       mixGeneratedAt: assignment.mixGeneratedAt.toISOString(),
       submissionCount: submissions.length,
+    };
+  }
+
+  private async findFeedbackWithContext(feedbackId: string) {
+    const feedback = await this.feedbackRepository.findOne({
+      where: { id: feedbackId },
+      relations: ['submission', 'submission.user', 'submission.assignment', 'submission.assignment.band'],
+    });
+    if (!feedback) {
+      throw new NotFoundException('피드백을 찾을 수 없습니다.');
+    }
+    return feedback;
+  }
+
+  private requireClosedAssignment(assignment: PracticeAssignment) {
+    if (assignment.dueAt.getTime() >= Date.now()) {
+      throw new BadRequestException('연습이 마감된 뒤에 피드백을 사용할 수 있습니다.');
+    }
+  }
+
+  private validateFeedbackContent(value: string) {
+    const content = value.trim();
+    if (content.length === 0 || content.length > 120) {
+      throw new BadRequestException('피드백은 1자 이상 120자 이하로 입력해 주세요.');
+    }
+    return content;
+  }
+
+  private toFeedbackDto(feedback: PracticeFeedback) {
+    return {
+      id: feedback.id,
+      submissionId: feedback.submission.id,
+      authorId: feedback.author.id,
+      authorName: feedback.author.name,
+      content: feedback.content,
+      acknowledgedAt: feedback.acknowledgedAt?.toISOString() ?? null,
+      createdAt: feedback.createdAt.toISOString(),
+      updatedAt: feedback.updatedAt.toISOString(),
     };
   }
 

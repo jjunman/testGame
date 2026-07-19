@@ -3,6 +3,7 @@ import { Band } from '../bands/band.entity';
 import { BandMember } from '../bands/band-member.entity';
 import { PracticeAssignment } from '../practice/practice-assignment.entity';
 import { PracticeSubmission } from '../practice/practice-submission.entity';
+import { PracticeFeedback } from '../practice/practice-feedback.entity';
 import { ScheduleAvailability } from '../schedule/schedule-availability.entity';
 import { ScheduleProposalVote } from '../schedule/schedule-proposal-vote.entity';
 import { ScheduleProposal } from '../schedule/schedule-proposal.entity';
@@ -10,14 +11,14 @@ import { ScheduleSlot } from '../schedule/schedule-slot.entity';
 import { StudioCandidate } from '../studios/studio-candidate.entity';
 import { StudioVote } from '../studios/studio-vote.entity';
 import { Studio } from '../studios/studio.entity';
-import { Settlement } from '../settlement/settlement.entity';
+import { SettlementRound } from '../settlement/settlement-round.entity';
 import { SongCandidate } from '../songs/song-candidate.entity';
 import { SongCatalog } from '../songs/song-catalog.entity';
 import { SongRound } from '../songs/song-round.entity';
 import { SongVote } from '../songs/song-vote.entity';
 import { User } from '../users/user.entity';
 
-export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
+export const typeOrmConfig = (databaseUrl: string, synchronize: boolean): TypeOrmModuleOptions => ({
   type: 'postgres' as const,
   url: databaseUrl || undefined,
   host: databaseUrl ? undefined : process.env.DB_HOST ?? 'localhost',
@@ -25,7 +26,7 @@ export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
   username: databaseUrl ? undefined : process.env.DB_USERNAME ?? 'postgres',
   password: databaseUrl ? undefined : process.env.DB_PASSWORD ?? 'postgres',
   database: databaseUrl ? undefined : process.env.DB_NAME ?? 'band_management',
-  synchronize: true,
+  synchronize,
   entities: [
     User,
     Band,
@@ -36,6 +37,7 @@ export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
     SongVote,
     PracticeAssignment,
     PracticeSubmission,
+    PracticeFeedback,
     ScheduleSlot,
     ScheduleAvailability,
     ScheduleProposal,
@@ -43,6 +45,6 @@ export const typeOrmConfig = (databaseUrl: string): TypeOrmModuleOptions => ({
     Studio,
     StudioCandidate,
     StudioVote,
-    Settlement,
+    SettlementRound,
   ],
 });

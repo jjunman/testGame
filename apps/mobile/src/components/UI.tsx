@@ -78,7 +78,13 @@ export function TextButton({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.textButton, disabled && styles.textButtonDisabled, style]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.textButton, pressed && styles.textButtonPressed, disabled && styles.textButtonDisabled, style]}
+    >
       <Text style={[styles.textButtonText, tone === 'danger' && styles.textButtonDanger]}>{label}</Text>
     </Pressable>
   );
@@ -89,12 +95,22 @@ export function Label({ children }: { children: React.ReactNode }) {
 }
 
 export function Field(props: React.ComponentProps<typeof TextInput>) {
+  const [focused, setFocused] = React.useState(false);
+
   return (
     <TextInput
-      style={[styles.input, props.multiline && styles.inputMultiline, props.style]}
+      {...props}
+      style={[styles.input, focused && styles.inputFocused, props.multiline && styles.inputMultiline, props.style]}
       placeholderTextColor={theme.colors.textMuted}
       selectionColor={theme.colors.primary}
-      {...props}
+      onFocus={(event) => {
+        setFocused(true);
+        props.onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        props.onBlur?.(event);
+      }}
     />
   );
 }
@@ -113,7 +129,14 @@ export function PrimaryButton({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Pressable onPress={onPress} disabled={disabled || loading} style={[styles.button, disabled && styles.buttonDisabled, style]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
+      onPress={onPress}
+      disabled={disabled || loading}
+      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, (disabled || loading) && styles.buttonDisabled, style]}
+    >
       {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{label}</Text>}
     </Pressable>
   );
@@ -138,6 +161,9 @@ export function ActionCardButton({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
@@ -148,11 +174,11 @@ export function ActionCardButton({
       ]}
     >
       <View style={styles.actionIconBox}>
-        {loading ? <ActivityIndicator color={theme.colors.primaryDark} /> : <Ionicons name={icon} size={20} color={theme.colors.primaryDark} />}
+        {loading ? <ActivityIndicator color={theme.colors.primaryDark} /> : <Ionicons name={icon} size={22} color={theme.colors.primaryDark} />}
       </View>
       <View style={styles.actionTextBlock}>
-        <Text style={styles.actionTitle} numberOfLines={1}>{title}</Text>
-        {subtitle ? <Text style={styles.actionSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
+        <Text style={styles.actionTitle} numberOfLines={2}>{title}</Text>
+        {subtitle ? <Text style={styles.actionSubtitle} numberOfLines={2}>{subtitle}</Text> : null}
       </View>
       <Ionicons name="chevron-forward" size={17} color={theme.colors.textMuted} />
     </Pressable>
@@ -171,7 +197,7 @@ export function SecondaryButton({
   textStyle?: StyleProp<TextStyle>;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.secondaryButton, style]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed, style]}>
       <Text style={[styles.secondaryText, textStyle]}>{label}</Text>
     </Pressable>
   );
@@ -229,7 +255,12 @@ export function OptionRow({
   trailing?: React.ReactNode;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.optionRow, selected && styles.optionRowSelected]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(selected) }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.optionRow, selected && styles.optionRowSelected, pressed && styles.optionRowPressed]}
+    >
       <View style={styles.optionCheck}>
         {selected ? <Ionicons name="checkmark" size={15} color={theme.colors.primaryDark} /> : null}
       </View>
@@ -251,6 +282,145 @@ export function EmptyState({ title, description }: { title: string; description:
   );
 }
 
+export function ErrorState({
+  title = '불러오기 실패',
+  description,
+  actionLabel = '다시 시도',
+  onRetry,
+}: {
+  title?: string;
+  description: string;
+  actionLabel?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <View style={styles.errorState}>
+      <View style={styles.errorIconBox}>
+        <Ionicons name="alert-circle-outline" size={22} color={theme.colors.danger} />
+      </View>
+      <View style={styles.errorStateCopy}>
+        <Text style={styles.errorStateTitle}>{title}</Text>
+        <Text style={styles.errorStateDescription}>{description}</Text>
+      </View>
+      {onRetry ? <SecondaryButton label={actionLabel} onPress={onRetry} style={styles.errorRetryButton} /> : null}
+    </View>
+  );
+}
+
+export function IconButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+  tone = 'default',
+  size = 38,
+  style,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  tone?: 'default' | 'danger' | 'plain';
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      hitSlop={6}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconButton,
+        { width: size, height: size },
+        tone === 'danger' && styles.iconButtonDanger,
+        tone === 'plain' && styles.iconButtonPlain,
+        pressed && !disabled && styles.iconButtonPressed,
+        disabled && styles.iconButtonDisabled,
+        style,
+      ]}
+    >
+      <Ionicons name={icon} size={Math.round(size * 0.52)} color={tone === 'danger' ? theme.colors.danger : theme.colors.primaryDark} />
+    </Pressable>
+  );
+}
+
+export function ListRow({
+  title,
+  subtitle,
+  icon,
+  onPress,
+  trailing,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
+}) {
+  const content = (
+    <>
+      {icon ? (
+        <View style={styles.listRowIcon}>
+          <Ionicons name={icon} size={18} color={theme.colors.primaryDark} />
+        </View>
+      ) : null}
+      <View style={styles.listRowBody}>
+        <Text style={styles.listRowTitle} numberOfLines={2}>{title}</Text>
+        {subtitle ? <Text style={styles.listRowSubtitle} numberOfLines={2}>{subtitle}</Text> : null}
+      </View>
+      {trailing ?? (onPress ? <Ionicons name="chevron-forward" size={17} color={theme.colors.textMuted} /> : null)}
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.listRow}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => [styles.listRow, pressed && styles.listRowPressed]}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+export function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <View style={styles.segmented}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="tab"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(option.value)}
+            style={({ pressed }) => [styles.segment, active && styles.segmentActive, pressed && styles.segmentPressed]}
+          >
+            <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={2}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return <Text style={styles.error}>{children}</Text>;
 }
@@ -267,18 +437,18 @@ export function LoadingState({ fullScreen = false }: { fullScreen?: boolean }) {
 
 const styles = StyleSheet.create({
   hero: {
-    minHeight: 56,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   heroCentered: {
     justifyContent: 'center',
   },
   heroThumb: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     overflow: 'hidden',
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surfaceMuted,
@@ -292,7 +462,7 @@ const styles = StyleSheet.create({
   },
   heroTextBlock: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   heroTitleRow: {
     flexDirection: 'row',
@@ -304,7 +474,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     color: theme.colors.textMuted,
     backgroundColor: theme.colors.primarySoft,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -313,13 +483,15 @@ const styles = StyleSheet.create({
   heroTitle: {
     flexShrink: 1,
     color: theme.colors.text,
-    fontSize: 22,
+    fontSize: 23,
+    lineHeight: 30,
     fontWeight: '900',
   },
   heroSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
   },
   center: {
     alignItems: 'center',
@@ -330,10 +502,11 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    padding: 14,
-    gap: 10,
+    padding: 20,
+    gap: 18,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    ...theme.shadow.card,
   },
   cardPurple: {
     backgroundColor: theme.colors.surface,
@@ -342,38 +515,53 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: theme.typography.sectionTitle,
+    lineHeight: 26,
+    fontWeight: '800',
     color: theme.colors.text,
   },
   label: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '700',
-    color: theme.colors.textMuted,
+    color: theme.colors.text,
     letterSpacing: 0,
   },
   input: {
-    borderWidth: 1,
+    minHeight: 60,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
+    borderRadius: theme.radius.md,
     backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 16,
+  },
+  inputFocused: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    shadowColor: theme.colors.primary,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   inputMultiline: {
-    minHeight: 108,
+    minHeight: 124,
     textAlignVertical: 'top',
   },
   button: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.sm,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    minHeight: 48,
+    borderRadius: theme.radius.md,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    minHeight: 58,
+  },
+  buttonPressed: {
+    backgroundColor: theme.colors.primaryDark,
+    transform: [{ scale: 0.985 }],
   },
   buttonDisabled: {
     opacity: 0.55,
@@ -381,16 +569,16 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 17,
   },
   actionCard: {
-    minHeight: 60,
+    minHeight: 84,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -403,9 +591,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   actionIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -417,13 +605,15 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
   },
   actionSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   secondaryButton: {
     alignItems: 'center',
@@ -432,13 +622,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  secondaryButtonPressed: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.primary,
+    transform: [{ scale: 0.985 }],
   },
   secondaryText: {
     color: theme.colors.text,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
   },
   metricPill: {
     flex: 1,
@@ -459,18 +654,18 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
   },
   badge: {
     alignSelf: 'flex-start',
     overflow: 'hidden',
-    backgroundColor: theme.colors.surfaceMuted,
+    backgroundColor: '#eef0f3',
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: theme.radius.pill,
   },
   badgeSuccess: {
@@ -489,8 +684,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -500,9 +695,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primarySoft,
     borderColor: theme.colors.primary,
   },
+  optionRowPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.88,
+  },
   optionCheck: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderRadius: 7,
     borderWidth: 1.5,
     borderColor: theme.colors.primary,
@@ -516,43 +715,176 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
   },
   optionTitleSelected: {
     color: theme.colors.text,
   },
   optionSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 20,
   },
   optionSubtitleSelected: {
     color: theme.colors.textMuted,
   },
   empty: {
     borderRadius: theme.radius.md,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    paddingVertical: 28,
+    paddingHorizontal: 18,
+    backgroundColor: theme.colors.surfaceMuted,
     alignItems: 'flex-start',
     gap: 6,
   },
   emptyTitle: {
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
   },
   emptyDescription: {
     color: theme.colors.textMuted,
     textAlign: 'left',
+    lineHeight: 23,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  errorState: {
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: '#f0c7c7',
+    backgroundColor: '#fff7f7',
+    padding: 18,
+    gap: 14,
+  },
+  errorIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffe7e7',
+  },
+  errorStateCopy: {
+    gap: 5,
+  },
+  errorStateTitle: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  errorStateDescription: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '600',
+  },
+  errorRetryButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.surface,
+  },
+  iconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  iconButtonDanger: {
+    backgroundColor: '#fff1f1',
+    borderColor: '#f0c7c7',
+  },
+  iconButtonPlain: {
+    backgroundColor: theme.colors.surface,
+  },
+  iconButtonPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
+  },
+  iconButtonDisabled: {
+    opacity: 0.45,
+  },
+  listRow: {
+    minHeight: 74,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  listRowPressed: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+  },
+  listRowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primarySoft,
+  },
+  listRowBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  listRowTitle: {
+    color: theme.colors.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  listRowSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
     lineHeight: 20,
-    fontSize: 13,
+    fontWeight: '600',
+  },
+  segmented: {
+    minHeight: 56,
+    flexDirection: 'row',
+    borderRadius: theme.radius.sm,
+    padding: 4,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  segment: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+  },
+  segmentActive: {
+    backgroundColor: theme.colors.surface,
+    ...theme.shadow.card,
+  },
+  segmentPressed: {
+    opacity: 0.72,
+  },
+  segmentText: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    lineHeight: 19,
+    textAlign: 'center',
+    fontWeight: '800',
+  },
+  segmentTextActive: {
+    color: theme.colors.text,
   },
   error: {
     color: theme.colors.danger,
     fontWeight: '600',
+    fontSize: 14,
   },
   loadingState: {
     minHeight: 180,
@@ -583,12 +915,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 2,
   },
+  textButtonPressed: {
+    opacity: 0.62,
+  },
   textButtonDisabled: {
     opacity: 0.45,
   },
   textButtonText: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
   textButtonDanger: {

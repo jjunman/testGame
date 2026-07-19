@@ -10,7 +10,7 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CreateStudioCandidateDto, SaveStudioLocationDto, VoteStudioCandidateDto } from './dto';
+import { CreateStudioCandidateDto, SaveStudioLocationDto } from './dto';
 import { StudiosService } from './studios.service';
 
 @UseGuards(JwtAuthGuard)
@@ -70,25 +70,26 @@ export class StudiosController {
     return this.studiosService.createCandidate(user.userId, bandId, dto);
   }
 
-  @Post('studio-votes')
-  vote(
+  @Post('studio-candidates/:candidateId/register')
+  registerCandidate(
     @CurrentUser() user: { userId: string },
     @Param('bandId') bandId: string,
-    @Body() dto: VoteStudioCandidateDto,
+    @Param('candidateId') candidateId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    res.locals.message = '합주실 투표를 저장했습니다.';
-    return this.studiosService.vote(user.userId, bandId, dto.candidateId);
+    res.locals.message = '합주실을 등록했습니다.';
+    return this.studiosService.registerCandidate(user.userId, bandId, candidateId);
   }
 
-  @Post('studio-candidates/finalize')
-  finalize(
+  @Post('studios/:studioId/register')
+  registerStudio(
     @CurrentUser() user: { userId: string },
     @Param('bandId') bandId: string,
+    @Param('studioId') studioId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    res.locals.message = '합주실을 확정했습니다.';
-    return this.studiosService.finalize(user.userId, bandId);
+    res.locals.message = '합주실을 등록했습니다.';
+    return this.studiosService.registerStudio(user.userId, bandId, studioId);
   }
 
   @Post('studios/import-ansan')

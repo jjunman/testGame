@@ -7,7 +7,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
-import { MAX_VOTES_PER_USER } from '../common/constants';
 import { SongRoundStatus } from '../common/enums';
 import { BandsService } from '../bands/bands.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -102,11 +101,6 @@ export class SongsService {
       where: { round: { id: round.id } },
       relations: ['songCatalog', 'createdByUser'],
     });
-
-    const alreadySubmittedByUser = existingCandidate.some((candidate) => candidate.createdByUser.id === userId);
-    if (alreadySubmittedByUser) {
-      throw new BadRequestException('후보곡은 한 사람당 한 곡만 올릴 수 있습니다.');
-    }
 
     const duplicated = existingCandidate.some(
       (candidate) =>
@@ -253,6 +247,7 @@ export class SongsService {
     }
 
     if (existingRound?.status === SongRoundStatus.POSTED) {
+      await this.clearVotesForRound(existingRound.id);
       existingRound.status = SongRoundStatus.VOTING;
       existingRound.votingDeadlineAt = new Date(deadlineAt);
       const savedRound = await this.roundsRepository.save(existingRound);
@@ -308,13 +303,6 @@ export class SongsService {
     }
     if (candidate.round.status !== SongRoundStatus.VOTING) {
       throw new BadRequestException('투표 단계에서만 투표할 수 있습니다.');
-    }
-
-    const count = await this.votesRepository.count({
-      where: { user: { id: userId }, candidate: { round: { id: candidate.round.id } } },
-    });
-    if (count >= MAX_VOTES_PER_USER) {
-      throw new BadRequestException(`최대 ${MAX_VOTES_PER_USER}곡까지 투표할 수 있습니다.`);
     }
 
     const existing = await this.votesRepository.findOne({
@@ -428,6 +416,7 @@ export class SongsService {
 
     const deadlineAt = this.getDefaultVotingDeadline();
     if (existingRound?.status === SongRoundStatus.POSTED) {
+      await this.clearVotesForRound(existingRound.id);
       existingRound.status = SongRoundStatus.VOTING;
       existingRound.votingDeadlineAt = deadlineAt;
       const savedRound = await this.roundsRepository.save(existingRound);
@@ -452,6 +441,17 @@ export class SongsService {
     deadline.setDate(deadline.getDate() + DEFAULT_SONG_VOTE_DAYS);
     deadline.setHours(23, 59, 0, 0);
     return deadline;
+  }
+
+  private async clearVotesForRound(roundId: string) {
+    const candidates = await this.candidatesRepository.find({
+      where: { round: { id: roundId } },
+      relations: ['votes'],
+    });
+    const votes = candidates.flatMap((candidate) => candidate.votes ?? []);
+    if (votes.length > 0) {
+      await this.votesRepository.remove(votes);
+    }
   }
 
   private notifySongVoteStarted(membership: BandMember, roundId: string) {

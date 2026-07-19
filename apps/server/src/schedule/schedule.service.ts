@@ -223,13 +223,14 @@ export class ScheduleService {
       relations: ['createdByUser'],
       order: { date: 'ASC', startTime: 'ASC' },
     });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.toLocalDateValue(new Date());
 
     return schedules
-      .filter((schedule) => schedule.date >= today)
-      .map((schedule) => ({
+      .map((schedule) => ({ schedule, date: this.normalizeDateValue(schedule.date) }))
+      .filter(({ date }) => date >= today)
+      .map(({ schedule, date }) => ({
         id: schedule.id,
-        date: schedule.date,
+        date,
         startTime: schedule.startTime,
         endTime: schedule.endTime,
         createdByUserId: schedule.createdByUser.id,
@@ -246,16 +247,22 @@ export class ScheduleService {
 
   async registerSchedule(userId: string, bandId: string, dto: CreateScheduleProposalDto) {
     const membership = await this.bandsService.requireMembership(userId, bandId);
+    const date = dto.date.slice(0, 10);
+    const now = new Date();
+    const today = this.toLocalDateValue(now);
 
     if (this.toMinute(dto.endTime) <= this.toMinute(dto.startTime)) {
       throw new BadRequestException('종료 시간은 시작 시간보다 늦어야 합니다.');
+    }
+    if (date < today || (date === today && this.toMinute(dto.startTime) <= now.getHours() * 60 + now.getMinutes())) {
+      throw new BadRequestException('이미 지난 시간은 합주 일정으로 등록할 수 없습니다.');
     }
 
     const schedule = await this.proposalsRepository.save(
       this.proposalsRepository.create({
         band: membership.band,
         createdByUser: membership.user,
-        date: dto.date.slice(0, 10),
+        date,
         startTime: dto.startTime,
         endTime: dto.endTime,
         active: false,
@@ -386,5 +393,22 @@ export class ScheduleService {
   private toMinute(value: string) {
     const [hour, minute] = value.split(':').map(Number);
     return hour * 60 + minute;
+  }
+
+  private normalizeDateValue(value: string | Date) {
+    if (value instanceof Date) {
+      return this.toLocalDateValue(value);
+    }
+    if (value.includes('T')) {
+      return this.toLocalDateValue(new Date(value));
+    }
+    return value.slice(0, 10);
+  }
+
+  private toLocalDateValue(value: Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }

@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PracticeAssignmentDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, HeroBanner, PrimaryButton, SectionCard, StatusBadge } from '../../components/UI';
+import { EmptyState, PrimaryButton, SectionCard, StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -25,11 +25,6 @@ export function PracticeAssignmentListScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <HeroBanner
-        title="개인 연습"
-        subtitle="연습 마감일과 제출 상태를 한 번에 확인해요."
-      />
-
       <PrimaryButton
           label="연습 과제 만들기"
           onPress={() => navigation.navigate('CreatePracticeAssignment', { bandId })}

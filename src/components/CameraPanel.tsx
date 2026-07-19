@@ -8,7 +8,7 @@ const liveChoiceLabelMap: Record<Choice, string> = {
 };
 
 interface CameraPanelProps {
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   cameraState: "idle" | "loading" | "ready" | "error";
   cameraMessage: string;
   liveChoice: Choice | null;

@@ -16,15 +16,16 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignupDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.usersService.findByEmail(email);
     if (existing) {
       throw new ConflictException('이미 사용 중인 이메일입니다.');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.usersService.create({
-      email: dto.email,
-      name: dto.name,
+      email,
+      name: dto.name.trim(),
       passwordHash,
     });
 
@@ -35,7 +36,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmail(dto.email.trim().toLowerCase());
     if (!user) {
       throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }

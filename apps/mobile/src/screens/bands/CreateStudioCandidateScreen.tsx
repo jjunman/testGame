@@ -2,19 +2,21 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Region } from 'react-native-maps';
 import { StudioDto } from '@band/shared-types';
 import { api } from '../../api/client';
+import { OpenStreetMapHandle, OpenStreetMapMarker, OpenStreetMapView, OSMRegion } from '../../components/OpenStreetMapView';
 import { Screen } from '../../components/Screen';
-import { EmptyState, Field, Label, PrimaryButton } from '../../components/UI';
+import { Field, Label, PrimaryButton } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<BandsStackParamList, 'CreateStudioCandidate'>;
 type Coordinate = { latitude: number; longitude: number };
+function Marker(_: any) { return null; }
+const mapsEnabled = true;
 
 const ANSAN_CENTER: Coordinate = { latitude: 37.3219, longitude: 126.8309 };
-const DEFAULT_REGION: Region = {
+const DEFAULT_REGION: OSMRegion = {
   ...ANSAN_CENTER,
   latitudeDelta: 0.08,
   longitudeDelta: 0.08,
@@ -22,7 +24,7 @@ const DEFAULT_REGION: Region = {
 
 export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<OpenStreetMapHandle | null>(null);
   const studioListRef = useRef<ScrollView | null>(null);
   const { width } = useWindowDimensions();
   const [studios, setStudios] = useState<StudioDto[]>([]);
@@ -100,6 +102,16 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
   const mapStudios = [...locatedStudios].sort((a, b) => {
     return Number(a.id === selectedStudioId) - Number(b.id === selectedStudioId);
   });
+  const mapMarkers: OpenStreetMapMarker[] = mapStudios.map((studio) => {
+    const selected = studio.id === selectedStudioId;
+    return {
+      id: studio.id,
+      coordinate: { latitude: studio.latitude!, longitude: studio.longitude! },
+      title: studio.name,
+      description: studio.address,
+      color: selected ? '#ef4444' : '#7b8496',
+    };
+  });
   const onStudioScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const rawIndex = Math.round(event.nativeEvent.contentOffset.x / (studioCardWidth + studioCardGap));
     const clampedIndex = Math.max(0, Math.min(studios.length - 1, rawIndex));
@@ -127,10 +139,10 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
     <Screen>
       <View style={styles.content}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>합주실 후보</Text>
+          <Text style={styles.sectionTitle}>후보 선택</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="합주실 후보 목록 새로고침"
+            accessibilityLabel="합주실 목록 새로고침"
             disabled={loading}
             onPress={loadStudios}
             style={[styles.refreshButton, loading && styles.refreshButtonDisabled]}
@@ -138,16 +150,25 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
             <Ionicons name={loading ? 'hourglass-outline' : 'refresh'} size={19} color={theme.colors.primaryDark} />
           </Pressable>
         </View>
-        {studios.length > 0 ? (
-          <Text style={styles.countText}>
-            {`제공 중인 합주실 ${studios.length}곳`}
-          </Text>
-        ) : null}
         {studios.length === 0 ? (
-          <EmptyState title="제공 목록이 비어 있어요" description="잠시 후 다시 불러와 주세요." />
+          <View style={styles.emptyListCard}>
+            <Text style={styles.emptyListTitle}>제공 목록이 비어 있어요</Text>
+          </View>
         ) : (
           <>
-            <MapView ref={mapRef} style={styles.map} initialRegion={DEFAULT_REGION}>
+            {mapsEnabled ? (
+            <OpenStreetMapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={DEFAULT_REGION}
+              markers={mapMarkers}
+              onMarkerPress={(studioId) => {
+                const studio = studios.find((item) => item.id === studioId);
+                if (studio) {
+                  selectStudio(studio, true);
+                }
+              }}
+            >
               {mapStudios.map((studio) => {
                 const selected = studio.id === selectedStudioId;
                 return (
@@ -162,7 +183,13 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
                 />
                 );
               })}
-            </MapView>
+            </OpenStreetMapView>
+            ) : (
+              <View style={styles.mapUnavailable}>
+                <Ionicons name="map-outline" size={28} color={theme.colors.primary} />
+                <Text style={styles.mapUnavailableTitle}>지도 설정이 없어 목록으로 표시해요</Text>
+              </View>
+            )}
             {selectedStudio ? <Text style={styles.selectedText}>선택됨: {selectedStudio.name}</Text> : null}
             <ScrollView
               ref={studioListRef}
@@ -187,7 +214,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
             <View style={styles.carouselNav}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="이전 합주실 후보"
+                accessibilityLabel="이전 합주실"
                 disabled={activeStudioIndex === 0}
                 onPress={() => scrollToStudioIndex(activeStudioIndex - 1)}
                 style={[styles.carouselArrow, activeStudioIndex === 0 && styles.carouselArrowDisabled]}
@@ -197,7 +224,7 @@ export function CreateStudioCandidateScreen({ route, navigation }: Props) {
               <Text style={styles.carouselCount}>{`${activeStudioIndex + 1}/${studios.length}`}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="다음 합주실 후보"
+                accessibilityLabel="다음 합주실"
                 disabled={activeStudioIndex >= studios.length - 1}
                 onPress={() => scrollToStudioIndex(activeStudioIndex + 1)}
                 style={[styles.carouselArrow, activeStudioIndex >= studios.length - 1 && styles.carouselArrowDisabled]}
@@ -272,7 +299,7 @@ function hasCoordinate(studio: StudioDto) {
   return studio.latitude !== null && studio.longitude !== null;
 }
 
-function toRegion(studio: StudioDto): Region {
+function toRegion(studio: StudioDto): OSMRegion {
   return {
     latitude: studio.latitude ?? ANSAN_CENTER.latitude,
     longitude: studio.longitude ?? ANSAN_CENTER.longitude,
@@ -283,7 +310,7 @@ function toRegion(studio: StudioDto): Region {
 
 const styles = StyleSheet.create({
   content: {
-    gap: 10,
+    gap: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -323,15 +350,42 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 12,
   },
-  countText: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 8,
+  mapUnavailable: {
+    minHeight: 220,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    padding: 18,
+    marginTop: 12,
+  },
+  mapUnavailableTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  emptyListCard: {
+    minHeight: 96,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  emptyListTitle: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '900',
   },
   selectedText: {
     color: theme.colors.primaryDark,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     marginTop: 10,
   },
@@ -360,7 +414,7 @@ const styles = StyleSheet.create({
   },
   carouselCount: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
     minWidth: 46,
@@ -422,14 +476,14 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
   },
   infoValue: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 20,
   },
   optionMetaSelected: {
     color: theme.colors.textMuted,

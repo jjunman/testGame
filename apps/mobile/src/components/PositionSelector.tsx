@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   triggerLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: theme.colors.textMuted,
   },

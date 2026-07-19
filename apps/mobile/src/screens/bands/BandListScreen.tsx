@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BandSummary } from '@band/shared-types';
 import { api, toApiAssetUrl } from '../../api/client';
 import { Screen } from '../../components/Screen';
-import { EmptyState, StatusBadge } from '../../components/UI';
+import { EmptyState, IconButton, StatusBadge } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
 import { BandsStackParamList } from '../../types/navigation';
@@ -36,36 +36,35 @@ export function BandListScreen({ navigation }: Props) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable style={styles.userButton} onPress={() => navigation.navigate('Profile')}>
-          <Ionicons name="person-outline" size={20} color={theme.colors.primaryDark} />
-        </Pressable>
+        <IconButton icon="person-outline" label="프로필" onPress={() => navigation.navigate('Profile')} />
       ),
     });
   }, [navigation]);
 
   return (
-    <Screen>
-
-      {bands.length === 0 ? (
-        <EmptyState
-          title="아직 가입한 밴드가 없어요"
-          description="밴드를 만들거나 초대코드로 참여하면 여기서 바로 홈 흐름이 시작돼요."
-        />
-      ) : null}
-
-      <View style={styles.listWrap}>
-        {bands.map((band) => {
+    <Screen scrollEnabled={false} contentContainerStyle={styles.listScreen}>
+      <FlatList
+        data={bands}
+        keyExtractor={(band) => band.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={(
+          <EmptyState
+            title="아직 가입한 밴드가 없어요"
+            description="밴드를 만들거나 초대코드로 참여해주세요"
+          />
+        )}
+        renderItem={({ item: band }) => {
           const selected = currentBand?.id === band.id;
           const todoCount = band.todoCount ?? 0;
 
           return (
             <Pressable
-              key={band.id}
               onPress={() => {
                 setCurrentBand(band);
                 navigation.navigate('BandHome', { bandId: band.id });
               }}
-              style={[styles.cardWrap, selected && styles.cardWrapSelected]}
+              style={({ pressed }) => [styles.cardWrap, selected && styles.cardWrapSelected, pressed && styles.cardWrapPressed]}
             >
               {todoCount > 0 ? (
                 <View style={styles.todoBadge}>
@@ -85,34 +84,35 @@ export function BandListScreen({ navigation }: Props) {
               </ImageBackground>
             </Pressable>
           );
-        })}
-        <Pressable style={styles.addBandCard} onPress={() => navigation.navigate('BandAdd')}>
-          <View style={styles.addBandRow}>
-            <View style={styles.addBandIcon}>
-              <Ionicons name="add" size={26} color="#fff" />
+        }}
+        ListFooterComponent={(
+          <Pressable accessibilityRole="button" accessibilityLabel="밴드 추가하기" style={styles.addBandCard} onPress={() => navigation.navigate('BandAdd')}>
+            <View style={styles.addBandRow}>
+              <View style={styles.addBandIcon}>
+                <Ionicons name="add" size={26} color="#fff" />
+              </View>
+              <View style={styles.addBandTextWrap}>
+                <Text style={styles.addBandTitle}>밴드 추가하기</Text>
+                <Text style={styles.addBandSubtitle}>또는 초대코드 입력</Text>
+              </View>
             </View>
-            <View style={styles.addBandTextWrap}>
-              <Text style={styles.addBandTitle}>밴드 가입하기</Text>
-              <Text style={styles.addBandSubtitle}>만들기 또는 초대코드 입력</Text>
-            </View>
-          </View>
-        </Pressable>
-      </View>
+          </Pressable>
+        )}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  userButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.primarySoft,
+  listScreen: {
+    flex: 1,
+    paddingBottom: 0,
   },
-  listWrap: {
+  listContent: {
     gap: 14,
+    paddingTop: 10,
+    paddingHorizontal: 8,
+    paddingBottom: 28,
   },
   cardWrap: {
     borderRadius: theme.radius.md,
@@ -123,6 +123,10 @@ const styles = StyleSheet.create({
   cardWrapSelected: {
     borderColor: theme.colors.primary,
   },
+  cardWrapPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.88,
+  },
   bandCard: {
     minHeight: 132,
     justifyContent: 'space-between',
@@ -132,25 +136,27 @@ const styles = StyleSheet.create({
   },
   todoBadge: {
     position: 'absolute',
-    top: -7,
-    right: -7,
+    top: -10,
+    right: -6,
     zIndex: 5,
     elevation: 5,
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
-    paddingHorizontal: 6,
+    minWidth: 34,
+    height: 34,
+    borderRadius: 17,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.danger,
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: '#fff',
   },
   todoBadgeText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '900',
-    lineHeight: 14,
+    lineHeight: 22,
+    includeFontPadding: false,
+    textAlign: 'center',
   },
   cardTop: {
     flexDirection: 'row',
@@ -180,7 +186,7 @@ const styles = StyleSheet.create({
   },
   inviteCode: {
     color: 'rgba(255,255,255,0.88)',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.4,
   },
@@ -192,6 +198,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     padding: 14,
     justifyContent: 'center',
+    ...theme.shadow.card,
   },
   addBandRow: {
     flexDirection: 'row',
@@ -217,7 +224,7 @@ const styles = StyleSheet.create({
   },
   addBandSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

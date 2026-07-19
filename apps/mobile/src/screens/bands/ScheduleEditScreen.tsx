@@ -14,7 +14,7 @@ import {
   WEEK_LABELS,
 } from '../../components/ScheduleAvailability';
 import { Screen } from '../../components/Screen';
-import { HeroBanner, PrimaryButton } from '../../components/UI';
+import { PrimaryButton } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -168,9 +168,7 @@ export function ScheduleEditScreen({ route, navigation }: Props) {
   };
 
   return (
-    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="calendar" navigation={navigation} />}>
-      <HeroBanner title="가능한 시간 등록" align="center" />
-
+    <Screen fixedFooter={<BandInnerNav bandId={bandId} active="home" navigation={navigation} />}>
       <View style={styles.section}>
         <View style={styles.dayTabs}>
           {weekDates.map((date, index) => {
@@ -347,7 +345,7 @@ const styles = StyleSheet.create({
   },
   dayTabCountText: {
     color: theme.colors.primaryDark,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '900',
   },
   dayTabCountTextSelected: {
@@ -398,7 +396,7 @@ const styles = StyleSheet.create({
   },
   timeChipSubtext: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   availableAvatarStack: {

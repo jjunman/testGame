@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ImageBackground, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,7 +49,7 @@ export function BandMembersScreen({ route, navigation }: Props) {
   const pickProfileImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('권한 필요', '프로필 사진을 고르려면 사진 보관함 접근 권한이 필요해요.');
+      Alert.alert('권한 필요', '프로필 사진을 고르려면 이미지 권한이 필요해요.');
       return;
     }
 
@@ -161,6 +162,35 @@ export function BandMembersScreen({ route, navigation }: Props) {
     ]);
   };
 
+  const shareInviteLink = async () => {
+    if (!bandDetail) {
+      return;
+    }
+
+    const inviteLink = createInviteLink(bandDetail.inviteCode);
+    try {
+      await Share.share({
+        url: inviteLink,
+        message: `${bandDetail.name} 밴드에 초대합니다.\n${inviteLink}\n초대코드: ${bandDetail.inviteCode}`,
+      });
+    } catch (error) {
+      Alert.alert('공유 실패', error instanceof Error ? error.message : '초대 링크를 공유하지 못했어요.');
+    }
+  };
+
+  const copyInviteCode = async () => {
+    if (!bandDetail) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(bandDetail.inviteCode);
+      Alert.alert('복사 완료', '초대코드를 복사했어요.');
+    } catch (error) {
+      Alert.alert('복사 실패', error instanceof Error ? error.message : '초대코드를 복사하지 못했어요.');
+    }
+  };
+
   return (
     <Screen fixedFooter={<BandInnerNav bandId={route.params.bandId} active="home" navigation={navigation} />}>
       {bandDetail ? (
@@ -174,7 +204,6 @@ export function BandMembersScreen({ route, navigation }: Props) {
             <Ionicons name="musical-notes-outline" size={22} color="#fff" />
           </ImageBackground>
           <View style={styles.bandInfoBody}>
-            <Text style={styles.bandInfoLabel}>밴드 정보</Text>
             <Text style={styles.bandInfoName} numberOfLines={1}>{bandDetail.name}</Text>
             <Text style={styles.bandInfoMeta} numberOfLines={1}>
               {(bandDetail.myMembership.positionLabel || '파트 미정')} · {bandDetail.myMembership.role === 'leader' ? '리더' : '멤버'}
@@ -182,7 +211,28 @@ export function BandMembersScreen({ route, navigation }: Props) {
           </View>
           <View style={styles.bandInfoStats}>
             <InfoPill label="멤버" value={`${bandDetail.memberCount}명`} />
-            <InfoPill label="초대코드" value={bandDetail.inviteCode} />
+            <View style={styles.inviteCodeRow}>
+              <View style={styles.inviteCodeText}>
+                <Text style={styles.infoPillLabel}>초대코드</Text>
+                <Text style={styles.infoPillValue} numberOfLines={1}>{bandDetail.inviteCode}</Text>
+              </View>
+              <Pressable
+                accessibilityLabel="초대코드 복사"
+                accessibilityRole="button"
+                onPress={copyInviteCode}
+                style={({ pressed }) => [styles.inviteActionButton, pressed && styles.inviteActionButtonPressed]}
+              >
+                <Ionicons name="copy-outline" size={14} color={theme.colors.primaryDark} />
+              </Pressable>
+              <Pressable
+                accessibilityLabel="초대 링크 공유"
+                accessibilityRole="button"
+                onPress={shareInviteLink}
+                style={({ pressed }) => [styles.inviteActionButton, pressed && styles.inviteActionButtonPressed]}
+              >
+                <Ionicons name="share-social-outline" size={14} color={theme.colors.primaryDark} />
+              </Pressable>
+            </View>
           </View>
         </View>
       ) : null}
@@ -326,7 +376,7 @@ function MemberRow({
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.transferButtonText}>리더 권한 넘기기</Text>
+            <Text style={styles.transferButtonText}>리더 넘기기</Text>
           )}
         </Pressable>
       ) : null}
@@ -339,6 +389,15 @@ function formatJoinDate(value: string) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+function createInviteLink(inviteCode: string) {
+  const inviteBaseUrl = process.env.EXPO_PUBLIC_INVITE_BASE_URL?.trim().replace(/\/$/, '');
+  if (inviteBaseUrl) {
+    return `${inviteBaseUrl}/join/${encodeURIComponent(inviteCode)}`;
+  }
+
+  return `bandmanagement://join/${encodeURIComponent(inviteCode)}`;
 }
 
 const styles = StyleSheet.create({
@@ -375,11 +434,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 3,
   },
-  bandInfoLabel: {
-    color: theme.colors.primaryDark,
-    fontSize: 11,
-    fontWeight: '900',
-  },
   bandInfoName: {
     color: theme.colors.text,
     fontSize: 19,
@@ -387,12 +441,42 @@ const styles = StyleSheet.create({
   },
   bandInfoMeta: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   bandInfoStats: {
-    width: 88,
+    width: 148,
     gap: 7,
+  },
+  inviteCodeRow: {
+    minHeight: 42,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surfaceMuted,
+    paddingLeft: 8,
+    paddingRight: 5,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  inviteCodeText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  inviteActionButton: {
+    width: 27,
+    height: 27,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteActionButtonPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.96 }],
   },
   infoPill: {
     borderRadius: theme.radius.sm,
@@ -403,12 +487,12 @@ const styles = StyleSheet.create({
   },
   infoPillLabel: {
     color: theme.colors.textMuted,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '900',
   },
   infoPillValue: {
     color: theme.colors.text,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   myCard: {
@@ -495,7 +579,7 @@ const styles = StyleSheet.create({
   },
   miniStatLabel: {
     color: theme.colors.textMuted,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '900',
   },
   miniStatValue: {
@@ -514,12 +598,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
   },
   averageText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   rosterList: {
@@ -571,7 +655,7 @@ const styles = StyleSheet.create({
   },
   memberMeta: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   transferButton: {
@@ -588,7 +672,7 @@ const styles = StyleSheet.create({
   },
   transferButtonText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
   },
   emptyRoster: {
@@ -603,8 +687,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     fontWeight: '700',
   },

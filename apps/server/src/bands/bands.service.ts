@@ -258,14 +258,20 @@ export class BandsService {
     const todayInKorea = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Seoul',
     }).format(new Date());
-    const nextRehearsal = await this.scheduleProposalsRepository.findOne({
-      where: {
-        band: { id: bandId },
-        confirmed: true,
-        date: MoreThanOrEqual(todayInKorea),
-      },
-      order: { date: 'ASC', startTime: 'ASC' },
-    });
+    const [nextRehearsal, confirmedStudio] = await Promise.all([
+      this.scheduleProposalsRepository.findOne({
+        where: {
+          band: { id: bandId },
+          confirmed: true,
+          date: MoreThanOrEqual(todayInKorea),
+        },
+        order: { date: 'ASC', startTime: 'ASC' },
+      }),
+      this.studioCandidatesRepository.findOne({
+        where: { band: { id: bandId }, status: 'confirmed' },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
 
     return {
       id: membership.band.id,
@@ -300,6 +306,7 @@ export class BandsService {
             endTime: nextRehearsal.endTime,
           }
         : null,
+      confirmedStudioName: confirmedStudio?.studio.name ?? null,
         todos: await this.getTodos(userId, bandId),
         voteSummary: await this.getVoteSummary(userId, bandId),
         songCards,
@@ -346,7 +353,7 @@ export class BandsService {
       description: string;
       dueLabel: string;
       dueAt?: string | null;
-      shortcut: 'song_round' | 'practice' | 'schedule' | 'studio';
+      shortcut: 'song_round' | 'practice' | 'schedule';
       targetId?: string | null;
     }> = [];
 
@@ -369,7 +376,7 @@ export class BandsService {
       todos.push({
         type: 'vote_song',
         title: '합주곡 투표하기',
-        description: '후보 곡 중 최대 2곡을 골라 제출해 주세요.',
+        description: '마음에 드는 후보곡에 투표해 주세요.',
         dueLabel: this.formatTodoDueLabel(dueAt),
         dueAt: dueAt.toISOString(),
         shortcut: 'song_round',
@@ -385,44 +392,12 @@ export class BandsService {
         todos.push({
           type: 'start_song_round',
           title: '합주곡 정하기',
-          description: '후보 곡을 모으고 투표를 시작해 주세요.',
+          description: '후보 곡을 모아 투표를 시작해 주세요.',
           dueLabel: '시작 필요',
           dueAt: null,
           shortcut: 'song_round',
         });
       }
-    }
-
-    const studioCandidates = await this.studioCandidatesRepository.find({
-      where: { band: { id: bandId } },
-      relations: ['votes', 'votes.user'],
-      order: { createdAt: 'ASC' },
-    });
-    const activeStudioCandidates = studioCandidates.filter((candidate) => candidate.status === 'open' && !this.isStudioVoteClosed(candidate));
-    const confirmedStudio = studioCandidates.some((candidate) => candidate.status === 'confirmed');
-    if (
-      activeStudioCandidates.length > 0 &&
-      !activeStudioCandidates.some((candidate) => candidate.votes?.some((vote) => vote.user.id === userId))
-    ) {
-      const dueAt = this.earliestStudioVoteDueAt(activeStudioCandidates);
-      todos.push({
-        type: 'vote_studio',
-        title: '합주실 투표하기',
-        description: '부원들이 올린 합주실 후보 중 하나를 선택해 주세요.',
-        dueLabel: this.formatTodoDueLabel(dueAt),
-        dueAt: dueAt.toISOString(),
-        shortcut: 'studio',
-      });
-    }
-    if (studioCandidates.length === 0 && !confirmedStudio) {
-      todos.push({
-        type: 'start_studio',
-        title: '합주실 잡기',
-        description: '집 위치를 등록하고 합주실 후보를 정해 주세요.',
-        dueLabel: '시작 필요',
-        dueAt: null,
-        shortcut: 'studio',
-      });
     }
 
     const urgentPractice = await this.practiceRepository
@@ -440,7 +415,7 @@ export class BandsService {
       todos.push({
         type: 'submit_practice',
         title: `${urgentPractice.title} 제출하기`,
-        description: '가장 가까운 마감 과제예요. 녹음본을 제출해 주세요.',
+        description: '마감 전 녹음본을 제출해 주세요.',
         dueLabel: this.formatTodoDueLabel(urgentPractice.dueAt),
         dueAt: urgentPractice.dueAt.toISOString(),
         shortcut: 'practice',
@@ -456,7 +431,7 @@ export class BandsService {
       todos.push({
         type: 'submit_schedule',
         title: '일정 등록하기',
-        description: '가능한 합주 시간대를 입력해 주세요.',
+        description: '가능한 합주 시간을 입력해 주세요.',
         dueLabel: '등록 필요',
         dueAt: null,
         shortcut: 'schedule',
@@ -471,9 +446,7 @@ export class BandsService {
       vote_song: 10,
       submit_practice: 20,
       vote_schedule_proposal: 30,
-      vote_studio: 40,
       submit_schedule: 50,
-      start_studio: 60,
     };
 
     return priorities[type] ?? 999;
@@ -503,20 +476,6 @@ export class BandsService {
     date.setDate(date.getDate() + days);
     date.setHours(23, 59, 0, 0);
     return date;
-  }
-
-  private earliestStudioVoteDueAt(candidates: StudioCandidate[]) {
-    const dueTimes = candidates.map((candidate) => {
-      if (candidate.voteDeadlineAt) {
-        return candidate.voteDeadlineAt.getTime();
-      }
-      const fallback = new Date(candidate.createdAt);
-      fallback.setDate(fallback.getDate() + 3);
-      fallback.setHours(23, 59, 0, 0);
-      return fallback.getTime();
-    });
-
-    return new Date(Math.min(...dueTimes));
   }
 
   private async getVoteSummary(userId: string, bandId: string) {
@@ -560,18 +519,11 @@ export class BandsService {
       order: { createdAt: 'ASC' },
     });
     const confirmedStudio = studioCandidates.some((candidate) => candidate.status === 'confirmed');
-    const openStudioCandidates = studioCandidates.filter((candidate) => candidate.status === 'open' && !this.isStudioVoteClosed(candidate));
     const studio = confirmedStudio
       ? 'done'
-      : openStudioCandidates.length === 0
-        ? 'none'
-        : 'needed';
+      : 'needed';
 
     return { song, schedule, studio };
-  }
-
-  private isStudioVoteClosed(candidate: StudioCandidate) {
-    return candidate.voteDeadlineAt !== null && candidate.voteDeadlineAt.getTime() < Date.now();
   }
 
   async requireMembership(userId: string, bandId: string) {

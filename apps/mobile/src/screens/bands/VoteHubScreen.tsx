@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SongRoundDto, StudioCandidateDto } from '@band/shared-types';
 import { api } from '../../api/client';
 import { BandInnerNav } from '../../components/BandInnerNav';
 import { Screen } from '../../components/Screen';
-import { HeroBanner, StatusBadge } from '../../components/UI';
+import { StatusBadge } from '../../components/UI';
 import { theme } from '../../constants/theme';
 import { BandsStackParamList } from '../../types/navigation';
 
@@ -16,10 +17,8 @@ export function VoteHubScreen({ route, navigation }: Props) {
   const { bandId } = route.params;
   const [round, setRound] = useState<SongRoundDto | null>(null);
   const [studios, setStudios] = useState<StudioCandidateDto[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const [nextRound, nextStudios] = await Promise.all([
         api.get<SongRoundDto | null>(`/bands/${bandId}/song-round`),
@@ -29,8 +28,6 @@ export function VoteHubScreen({ route, navigation }: Props) {
       setStudios(nextStudios);
     } catch (error) {
       Alert.alert('투표 불러오기 실패', error instanceof Error ? error.message : '투표 현황을 불러오지 못했어요.');
-    } finally {
-      setLoading(false);
     }
   }, [bandId]);
 
@@ -42,9 +39,6 @@ export function VoteHubScreen({ route, navigation }: Props) {
   const cards = useMemo(() => {
     const songVoting = round?.status === 'voting';
     const songVoted = round?.candidates.some((candidate) => candidate.didVote) ?? false;
-    const activeStudioCandidates = studios.filter((candidate) => candidate.status === 'open');
-    const hasStudioCandidates = activeStudioCandidates.length > 0;
-    const studioVoted = activeStudioCandidates.some((candidate) => candidate.didVote);
     const studioConfirmed = studios.some((candidate) => candidate.status === 'confirmed');
 
     return [
@@ -53,25 +47,21 @@ export function VoteHubScreen({ route, navigation }: Props) {
         description: songVoting
           ? songVoted
             ? '내 선택이 반영되어 있어요. 투표가 끝나기 전까지 바꿀 수 있어요.'
-            : '후보곡 중 최대 2곡을 골라 주세요.'
+            : '마음에 드는 후보곡에 투표해 주세요.'
           : round?.status === 'done'
             ? '투표가 끝났어요. 새 후보곡을 추가해 다음 투표를 시작할 수 있어요.'
             : '진행 중인 합주곡 투표가 없어요.',
         status: songVoting ? (songVoted ? '변경 가능' : '투표 필요') : round?.status === 'done' ? '후보 추가' : '진행 없음',
         tone: songVoting ? (songVoted ? 'changeable' : 'need') : round?.status === 'done' ? 'changeable' : 'none',
-        onPress: () => navigation.navigate('SongRound', { bandId, initialTab: 'vote' }),
+        onPress: () => navigation.navigate('SongVote', { bandId }),
       },
       {
-        title: '합주실 투표',
+        title: '합주실 등록',
         description: studioConfirmed
-          ? '합주실이 확정되었어요. 필요하면 합주실 변경을 열 수 있어요.'
-          : hasStudioCandidates
-            ? studioVoted
-              ? '내 합주실 선택이 반영되어 있어요. 확정 전까지 다른 후보로 바꿀 수 있어요.'
-              : '후보 합주실 중 하나를 선택해 주세요.'
-            : '아직 합주실 후보가 없어요.',
-        status: studioConfirmed ? '확정됨' : hasStudioCandidates ? (studioVoted ? '변경 가능' : '투표 필요') : '진행 없음',
-        tone: studioConfirmed ? 'done' : hasStudioCandidates ? (studioVoted ? 'changeable' : 'need') : 'none',
+          ? '합주실이 등록되었어요. 필요하면 다른 합주실로 변경할 수 있어요.'
+          : '아직 등록된 합주실이 없어요. 사용할 합주실을 등록해 주세요.',
+        status: studioConfirmed ? '등록됨' : '등록 필요',
+        tone: studioConfirmed ? 'done' : 'need',
         onPress: () => navigation.navigate('Studios', { bandId }),
       },
     ] satisfies Array<{
@@ -83,25 +73,24 @@ export function VoteHubScreen({ route, navigation }: Props) {
     }>;
   }, [bandId, navigation, round, studios]);
 
-  const needCount = cards.filter((card) => card.tone === 'need').length;
-
   return (
     <Screen fixedFooter={<BandInnerNav bandId={bandId} active="vote" navigation={navigation} />}>
-      <HeroBanner
-        title="투표 모아보기"
-        subtitle={loading ? '투표 현황을 불러오는 중이에요.' : needCount > 0 ? `${needCount}개 투표가 기다리고 있어요.` : '지금 필요한 투표를 모두 확인했어요.'}
-        align="center"
-      />
-
       <View style={styles.list}>
         {cards.map((card) => (
-          <Pressable key={card.title} style={[styles.card, card.tone === 'need' && styles.cardNeed]} onPress={card.onPress}>
+          <Pressable
+            key={card.title}
+            style={({ pressed }) => [styles.card, card.tone === 'need' && styles.cardNeed, pressed && styles.cardPressed]}
+            onPress={card.onPress}
+          >
             <View style={styles.cardTop}>
               <Text style={styles.cardTitle}>{card.title}</Text>
               <StatusBadge label={card.status} tone={toBadgeTone(card.tone)} />
             </View>
             <Text style={styles.cardDescription}>{card.description}</Text>
-            <Text style={styles.cardAction}>바로가기</Text>
+            <View style={styles.cardAction}>
+              <Text style={styles.cardActionText}>바로가기</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.primaryDark} />
+            </View>
           </Pressable>
         ))}
       </View>
@@ -124,19 +113,24 @@ function toBadgeTone(tone: VoteTone) {
 
 const styles = StyleSheet.create({
   list: {
-    gap: 12,
+    gap: 14,
   },
   card: {
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 16,
-    gap: 10,
+    padding: 18,
+    gap: 12,
+    ...theme.shadow.card,
   },
   cardNeed: {
     borderColor: theme.colors.primary,
-    backgroundColor: '#f8f8ff',
+    backgroundColor: theme.colors.primarySoft,
+  },
+  cardPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.82,
   },
   cardTop: {
     flexDirection: 'row',
@@ -147,18 +141,24 @@ const styles = StyleSheet.create({
   cardTitle: {
     flex: 1,
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
   },
   cardDescription: {
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
     lineHeight: 19,
   },
   cardAction: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 2,
+  },
+  cardActionText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

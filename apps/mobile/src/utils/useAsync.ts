@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export function useAsyncAction<TArgs extends unknown[]>(fn: (...args: TArgs) => Promise<void>) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const run = async (...args: TArgs) => {
+  const run = useCallback(async (...args: TArgs) => {
+    if (loading) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -14,7 +17,7 @@ export function useAsyncAction<TArgs extends unknown[]>(fn: (...args: TArgs) => 
     } finally {
       setLoading(false);
     }
-  };
+  }, [fn, loading]);
 
   return { run, loading, error };
 }

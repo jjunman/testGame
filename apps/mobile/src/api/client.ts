@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 
 const API_BASE_URL = getApiBaseUrl();
 const TOKEN_KEY = 'band_management_token';
+const REQUEST_TIMEOUT_MS = 10000;
 
 export const tokenStorage = {
   get: () => AsyncStorage.getItem(TOKEN_KEY),
@@ -14,16 +15,38 @@ export const tokenStorage = {
 async function request<T>(path: string, init: RequestInit = {}) {
   const token = await tokenStorage.get();
   const isFormData = init.body instanceof FormData;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const json = await response.json();
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('서버 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const responseText = await response.text();
+  let json: { success?: boolean; message?: string | string[]; data?: T } = {};
+  try {
+    json = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    throw new Error(response.ok
+      ? '서버 응답을 처리하지 못했어요.'
+      : `서버 요청에 실패했어요. (${response.status})`);
+  }
   if (!response.ok || !json.success) {
     const rawMessage = json?.message;
     const message = Array.isArray(rawMessage)
@@ -77,6 +100,11 @@ export function toApiAssetUrl(value: string | null | undefined) {
 }
 
 function getApiBaseUrl() {
+  const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim().replace(/\/$/, '');
+  if (configured) {
+    return configured;
+  }
+
   const constants = Constants as typeof Constants & {
     manifest2?: { extra?: { expoClient?: { hostUri?: string } } };
   };
@@ -85,11 +113,6 @@ function getApiBaseUrl() {
 
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
     return `http://${host}:4000`;
-  }
-
-  const configured = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (configured) {
-    return configured;
   }
 
   return 'http://localhost:4000';

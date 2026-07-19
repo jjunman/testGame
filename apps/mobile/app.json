@@ -2,7 +2,15 @@
   "expo": {
     "name": "합주 매니지먼트",
     "slug": "band-management",
+    "scheme": "bandmanagement",
     "version": "1.0.0",
+    "description": "친구들과 합주곡, 연습 과제, 일정과 정산을 함께 관리하는 앱",
+    "icon": "./assets/app-icon.png",
+    "splash": {
+      "image": "./assets/app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F6F2FF"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -20,12 +28,25 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone."
+          "microphonePermission": "연습 과제 녹음과 합주 믹스 생성을 위해 마이크를 사용합니다."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "android": {
-      "package": "com.anonymous.bandmanagement"
-    }
+      "package": "com.jjunm.bandmanagement",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c1fcf093-2129-4db2-a82a-b151d45dcdf9"
+      }
+    },
+    "owner": "hanjunman"
   }
 }

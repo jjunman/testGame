@@ -11,6 +11,9 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { StudiosModule } from './studios/studios.module';
 import { SettlementModule } from './settlement/settlement.module';
 import { typeOrmConfig } from './database/typeorm.config';
+import { HealthController } from './health.controller';
+import { AppLinksController } from './app-links.controller';
+import { KakaoMapController } from './kakao-map.controller';
 
 @Module({
   imports: [
@@ -21,7 +24,10 @@ import { typeOrmConfig } from './database/typeorm.config';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>
-        typeOrmConfig(configService.get<string>('databaseUrl') ?? ''),
+        typeOrmConfig(
+          configService.get<string>('databaseUrl') ?? '',
+          configService.get<boolean>('databaseSynchronize') ?? false,
+        ),
     }),
     AuthModule,
     UsersModule,
@@ -32,5 +38,6 @@ import { typeOrmConfig } from './database/typeorm.config';
     StudiosModule,
     SettlementModule,
   ],
+  controllers: [HealthController, AppLinksController, KakaoMapController],
 })
 export class AppModule {}

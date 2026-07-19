@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BandMember } from '../bands/band-member.entity';
+import { User } from '../users/user.entity';
 
 type PushPayload = {
   title: string;
@@ -21,6 +22,8 @@ export class NotificationsService {
   constructor(
     @InjectRepository(BandMember)
     private readonly membersRepository: Repository<BandMember>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
   ) {}
 
   async notifyBandMembers(
@@ -54,6 +57,22 @@ export class NotificationsService {
     }
 
     return { sent: tokens.length };
+  }
+
+  async notifyUser(userId: string, payload: PushPayload) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user || !this.isExpoPushToken(user.expoPushToken)) {
+      return { sent: 0 };
+    }
+
+    await this.sendExpoPushChunk([{
+      to: user.expoPushToken,
+      sound: 'default',
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+    }]);
+    return { sent: 1 };
   }
 
   private isExpoPushToken(token?: string | null): token is string {

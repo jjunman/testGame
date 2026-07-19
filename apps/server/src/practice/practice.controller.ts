@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Res,
   UploadedFile,
@@ -10,13 +12,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CreatePracticeAssignmentDto } from './dto';
+import { CreatePracticeAssignmentDto, CreatePracticeFeedbackDto, UpdatePracticeFeedbackDto } from './dto';
 import { PracticeService } from './practice.service';
+import { audioUploadOptions } from '../common/upload';
 
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -56,15 +57,7 @@ export class PracticeController {
 
   @Post('practice-assignments/:assignmentId/submission')
   @UseInterceptors(
-    FileInterceptor('audio', {
-      storage: diskStorage({
-        destination: 'uploads',
-        filename: (_req, file, callback) => {
-          const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extname(file.originalname)}`;
-          callback(null, name);
-        },
-      }),
-    }),
+    FileInterceptor('audio', audioUploadOptions),
   )
   submit(
     @CurrentUser() user: { userId: string },
@@ -106,5 +99,57 @@ export class PracticeController {
   ) {
     res.locals.message = '합주 믹스 파일을 생성했습니다.';
     return this.practiceService.generateMix(user.userId, assignmentId);
+  }
+
+  @Get('practice-assignments/:assignmentId/feedback')
+  feedback(
+    @CurrentUser() user: { userId: string },
+    @Param('assignmentId') assignmentId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '연습 피드백을 불러왔습니다.';
+    return this.practiceService.getFeedback(user.userId, assignmentId);
+  }
+
+  @Post('practice-submissions/:submissionId/feedback')
+  createFeedback(
+    @CurrentUser() user: { userId: string },
+    @Param('submissionId') submissionId: string,
+    @Body() dto: CreatePracticeFeedbackDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '피드백을 남겼습니다.';
+    return this.practiceService.createFeedback(user.userId, submissionId, dto);
+  }
+
+  @Patch('practice-feedback/:feedbackId')
+  updateFeedback(
+    @CurrentUser() user: { userId: string },
+    @Param('feedbackId') feedbackId: string,
+    @Body() dto: UpdatePracticeFeedbackDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '피드백을 수정했습니다.';
+    return this.practiceService.updateFeedback(user.userId, feedbackId, dto);
+  }
+
+  @Delete('practice-feedback/:feedbackId')
+  deleteFeedback(
+    @CurrentUser() user: { userId: string },
+    @Param('feedbackId') feedbackId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '피드백을 삭제했습니다.';
+    return this.practiceService.deleteFeedback(user.userId, feedbackId);
+  }
+
+  @Post('practice-feedback/:feedbackId/acknowledge')
+  acknowledgeFeedback(
+    @CurrentUser() user: { userId: string },
+    @Param('feedbackId') feedbackId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.locals.message = '피드백을 확인했습니다.';
+    return this.practiceService.acknowledgeFeedback(user.userId, feedbackId);
   }
 }

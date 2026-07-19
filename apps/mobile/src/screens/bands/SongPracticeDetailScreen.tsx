@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   heroKicker: {
     color: '#d8d2ff',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
   },
   heroTitle: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   },
   assignmentMeta: {
     color: theme.colors.primaryDark,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
   },
   historyToggle: {
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   historyMeta: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 3,
   },

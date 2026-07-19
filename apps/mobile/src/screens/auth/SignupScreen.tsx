@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Screen } from '../../components/Screen';
-import { ErrorText, Field, HeroBanner, Label, PrimaryButton, SecondaryButton, SectionCard } from '../../components/UI';
+import { ErrorText, Field, HeroBanner, Label, PrimaryButton, SecondaryButton } from '../../components/UI';
+import { theme } from '../../constants/theme';
 import { useAuth } from '../../store/AuthContext';
 import { AuthStackParamList } from '../../types/navigation';
 import { useAsyncAction } from '../../utils/useAsync';
@@ -29,22 +31,33 @@ export function SignupScreen({ navigation }: Props) {
   });
 
   return (
-    <Screen>
+    <Screen safeAreaTop>
       <HeroBanner
         title="새 밴드 시작"
         subtitle="먼저 계정을 만들고, 원하는 밴드에 참여하거나 직접 밴드를 만들어보세요."
       />
-      <SectionCard title="회원가입">
+      <View style={styles.form}>
+        <Text style={styles.formTitle}>회원가입</Text>
         <Label>이름</Label>
-        <Field value={name} onChangeText={setName} placeholder="표시될 이름" />
+        <Field value={name} onChangeText={setName} autoComplete="name" placeholder="표시될 이름" />
         <Label>이메일</Label>
-        <Field value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="name@example.com" />
+        <Field value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" placeholder="name@example.com" />
         <Label>비밀번호</Label>
-        <Field value={password} onChangeText={setPassword} secureTextEntry placeholder="비밀번호를 입력하세요" />
+        <Field value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" placeholder="6자 이상 입력하세요" onSubmitEditing={() => run()} />
         {error ? <ErrorText>{error}</ErrorText> : null}
         <PrimaryButton label="계정 만들기" onPress={() => run()} loading={loading} />
         <SecondaryButton label="로그인으로 돌아가기" onPress={() => navigation.goBack()} />
-      </SectionCard>
+      </View>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  form: { gap: 14 },
+  formTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.sectionTitle,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+});

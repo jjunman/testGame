@@ -1,6 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { PracticeFeedbackDto } from '@band/shared-types';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import {
   AudioModule,
   createAudioPlayer,
@@ -18,64 +31,30 @@ import { Screen } from '../../components/Screen';
 import { EmptyState, PrimaryButton, StatusBadge } from '../../components/UI';
 import { fallbackBandImage, theme } from '../../constants/theme';
 import { useCurrentBand } from '../../store/CurrentBandContext';
+import { useAuth } from '../../store/AuthContext';
 import { BandsStackParamList } from '../../types/navigation';
+import {
+  buildDurationMessage,
+  DraftRecording,
+  formatDateOnly,
+  formatRange,
+  formatSeconds,
+  getFallbackYoutubeVideoId,
+  getLegacyTakeNumber,
+  getNextTakeNumber,
+  getPracticeProgress,
+  getRequiredRecordingSec,
+  getSourcePlaybackPlan,
+  getYoutubeVideoId,
+  isLongEnoughForAssignment,
+  meteringToWaveHeight,
+  normalizeWaveform,
+  PracticeDetailDto,
+  PracticeMode,
+  PracticeSubmissionDto,
+} from './practiceDetailUtils';
 
 type Props = NativeStackScreenProps<BandsStackParamList, 'PracticeAssignmentDetail'>;
-
-type PracticeDetailDto = {
-  id: string;
-  bandId: string;
-  title: string;
-  description: string | null;
-  dueAt: string;
-  status: string;
-  startSec: number | null;
-  endSec: number | null;
-  song: {
-    title: string;
-    artist: string;
-    youtubeUrl: string | null;
-  } | null;
-  mySubmission: {
-    id: string;
-    audioUrl: string;
-    positionLabel: string;
-    submittedAt: string;
-  } | null;
-  isClosed: boolean;
-  memberStatuses: Array<{
-    userId: string;
-    name: string;
-    role: string;
-    positionLabel: string;
-    submitted: boolean;
-    submittedAt: string | null;
-  }>;
-  mixAudioUrl: string | null;
-  mixGeneratedAt: string | null;
-};
-
-type PracticeSubmissionDto = {
-  id: string;
-  userId: string;
-  userName: string;
-  positionLabel: string;
-  audioUrl: string;
-  submittedAt: string;
-};
-
-type DraftRecording = {
-  id: string;
-  uri: string;
-  createdAt: string;
-  source: 'recorded' | 'picked';
-  takeNumber?: number;
-  durationSec?: number | null;
-  syncOffsetMs?: number | null;
-  waveform?: number[];
-};
-
-type PracticeMode = 'main' | 'practice' | 'submit';
 
 const MAX_DRAFTS = 5;
 const RECORDING_COUNTDOWN_SECONDS = 7;
@@ -85,8 +64,10 @@ const AUDIO_PLAYER_OPTIONS = { keepAudioSessionActive: true };
 export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   const { assignmentId, bandId } = route.params;
   const { currentBand } = useCurrentBand();
+  const { user } = useAuth();
   const [detail, setDetail] = useState<PracticeDetailDto | null>(null);
   const [submissions, setSubmissions] = useState<PracticeSubmissionDto[]>([]);
+  const [feedback, setFeedback] = useState<PracticeFeedbackDto[]>([]);
   const [drafts, setDrafts] = useState<DraftRecording[]>([]);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [mode, setMode] = useState<PracticeMode>('main');
@@ -131,11 +112,21 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
   );
 
   const load = useCallback(async () => {
-    setDetail(await api.get<PracticeDetailDto>(`/practice-assignments/${assignmentId}`));
+    const nextDetail = await api.get<PracticeDetailDto>(`/practice-assignments/${assignmentId}`);
+    setDetail(nextDetail);
     try {
       setSubmissions(await api.get<PracticeSubmissionDto[]>(`/practice-assignments/${assignmentId}/submissions`));
     } catch {
       setSubmissions([]);
+    }
+    if (nextDetail.isClosed) {
+      try {
+        setFeedback(await api.get<PracticeFeedbackDto[]>(`/practice-assignments/${assignmentId}/feedback`));
+      } catch {
+        setFeedback([]);
+      }
+    } else {
+      setFeedback([]);
     }
     await loadDrafts();
   }, [assignmentId, loadDrafts]);
@@ -473,8 +464,14 @@ export function PracticeAssignmentDetailScreen({ route, navigation }: Props) {
           title={songTitle}
           artist={artist}
           imageUrl={coverImage}
-          mySubmission={detail.mySubmission}
           submissions={submissions}
+          feedback={feedback}
+          currentUserId={user?.id ?? ''}
+          onFeedbackUpsert={(item) => setFeedback((current) =>
+            [...current.filter((existing) => existing.id !== item.id), item]
+              .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()),
+          )}
+          onFeedbackDelete={(feedbackId) => setFeedback((current) => current.filter((item) => item.id !== feedbackId))}
           isLeader={isLeader}
           mixAudioUrl={detail.mixAudioUrl}
           mixGeneratedAt={detail.mixGeneratedAt}
@@ -544,8 +541,11 @@ function ClosedPracticeResult({
   title,
   artist,
   imageUrl,
-  mySubmission,
   submissions,
+  feedback,
+  currentUserId,
+  onFeedbackUpsert,
+  onFeedbackDelete,
   isLeader,
   mixAudioUrl,
   mixGeneratedAt,
@@ -555,8 +555,11 @@ function ClosedPracticeResult({
   title: string;
   artist: string;
   imageUrl: string;
-  mySubmission: PracticeDetailDto['mySubmission'];
   submissions: PracticeSubmissionDto[];
+  feedback: PracticeFeedbackDto[];
+  currentUserId: string;
+  onFeedbackUpsert: (feedback: PracticeFeedbackDto) => void;
+  onFeedbackDelete: (feedbackId: string) => void;
   isLeader: boolean;
   mixAudioUrl: string | null;
   mixGeneratedAt: string | null;
@@ -564,16 +567,7 @@ function ClosedPracticeResult({
   onGenerateMix: () => void;
 }) {
   const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
-  const playableSubmissions = isLeader ? submissions : mySubmission ? [
-    {
-      id: mySubmission.id,
-      userId: 'me',
-      userName: '내 녹음본',
-      positionLabel: mySubmission.positionLabel,
-      audioUrl: mySubmission.audioUrl,
-      submittedAt: mySubmission.submittedAt,
-    },
-  ] : [];
+  const playableSubmissions = submissions;
 
   return (
     <View style={styles.closedResult}>
@@ -622,6 +616,11 @@ function ClosedPracticeResult({
                 title={submission.userName}
                 positionLabel={submission.positionLabel}
                 dateLabel={formatDateOnly(submission.submittedAt)}
+                ownerId={submission.userId}
+                currentUserId={currentUserId}
+                feedback={feedback.filter((item) => item.submissionId === submission.id)}
+                onFeedbackUpsert={onFeedbackUpsert}
+                onFeedbackDelete={onFeedbackDelete}
               />
             ))}
           </View>
@@ -863,7 +862,6 @@ function PracticePanel({
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.panelTitle}>연습하기</Text>
       <View style={styles.youtubeBox}>
         {youtubeVideoId ? (
           <YoutubePlayer
@@ -1190,6 +1188,11 @@ function SubmissionTilePlayer({
   title,
   positionLabel,
   dateLabel,
+  ownerId,
+  currentUserId,
+  feedback,
+  onFeedbackUpsert,
+  onFeedbackDelete,
 }: {
   audioId: string;
   activeAudioId: string | null;
@@ -1198,10 +1201,20 @@ function SubmissionTilePlayer({
   title: string;
   positionLabel: string;
   dateLabel: string;
+  ownerId: string;
+  currentUserId: string;
+  feedback: PracticeFeedbackDto[];
+  onFeedbackUpsert: (feedback: PracticeFeedbackDto) => void;
+  onFeedbackDelete: (feedbackId: string) => void;
 }) {
   const playerRef = useRef<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const canWrite = ownerId !== currentUserId;
+  const unreadCount = ownerId === currentUserId
+    ? feedback.filter((item) => !item.acknowledgedAt).length
+    : 0;
 
   useEffect(() => {
     return () => {
@@ -1242,23 +1255,9 @@ function SubmissionTilePlayer({
 
     setLoading(true);
     try {
-      if (!playerRef.current) {
-        const audioUri = toApiAssetUrl(uri) ?? uri;
-        const player = await withTimeout<AudioPlayer>(
-          createReadyAudioPlayer(audioUri),
-          AUDIO_LOAD_TIMEOUT_MS,
-          '녹음본을 불러오지 못했어요. 서버 주소와 네트워크를 확인해 주세요.',
-        );
-        player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setPlaying(false);
-            void player.seekTo(0).catch(() => undefined);
-          }
-        });
-        playerRef.current = player;
-      }
+      await ensurePlayer();
       onActiveAudioChange(audioId);
-      playerRef.current.play();
+      playerRef.current!.play();
       setPlaying(true);
     } catch (error) {
       Alert.alert('재생 실패', error instanceof Error ? error.message : '녹음본을 재생하지 못했어요.');
@@ -1267,15 +1266,283 @@ function SubmissionTilePlayer({
     }
   };
 
+  const ensurePlayer = async () => {
+    if (playerRef.current) {
+      return playerRef.current;
+    }
+    const audioUri = toApiAssetUrl(uri) ?? uri;
+    const player = await withTimeout<AudioPlayer>(
+      createReadyAudioPlayer(audioUri),
+      AUDIO_LOAD_TIMEOUT_MS,
+      '녹음본을 불러오지 못했어요. 서버 주소와 네트워크를 확인해 주세요.',
+    );
+    player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
+      if (status.isLoaded && status.didJustFinish) {
+        setPlaying(false);
+        void player.seekTo(0).catch(() => undefined);
+      }
+    });
+    playerRef.current = player;
+    return player;
+  };
+
+  const openFeedbackList = () => {
+    setSheetVisible(true);
+  };
+
   return (
-    <Pressable style={[styles.submissionTile, playing && styles.submissionTileActive]} onPress={() => void togglePlayback()} disabled={loading}>
-      <View style={[styles.submissionTileIcon, playing && styles.submissionTileIconActive]}>
-        <Ionicons name={loading ? 'hourglass-outline' : playing ? 'stop' : 'play'} size={20} color={playing ? '#fff' : theme.colors.primary} />
+    <View style={[styles.submissionTile, playing && styles.submissionTileActive]}>
+      <View style={styles.submissionTileMain}>
+        <View style={styles.submissionTileIdentity}>
+          <Text style={styles.submissionTileTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.submissionTilePosition} numberOfLines={1}>{positionLabel} · {dateLabel}</Text>
+        </View>
+        <Pressable
+          accessibilityLabel={playing ? `${title} 녹음 정지` : `${title} 녹음 재생`}
+          style={[styles.submissionTileIcon, playing && styles.submissionTileIconActive]}
+          onPress={() => void togglePlayback()}
+          disabled={loading}
+        >
+          <Ionicons name={loading ? 'hourglass-outline' : playing ? 'stop' : 'play'} size={19} color={playing ? '#fff' : theme.colors.primary} />
+        </Pressable>
+        <Pressable style={styles.feedbackCountButton} onPress={openFeedbackList}>
+          <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.colors.primaryDark} />
+          <Text style={styles.feedbackCountText}>피드백 {feedback.length}</Text>
+          {unreadCount > 0 ? <View style={styles.feedbackUnreadDot}><Text style={styles.feedbackUnreadText}>{unreadCount}</Text></View> : null}
+        </Pressable>
       </View>
-      <Text style={styles.submissionTileTitle} numberOfLines={2}>{title}</Text>
-      <Text style={styles.submissionTilePosition} numberOfLines={1}>{positionLabel}</Text>
-      <Text style={styles.submissionTileMeta} numberOfLines={1}>{dateLabel}</Text>
-    </Pressable>
+      <FeedbackSheet
+        visible={sheetVisible}
+        feedback={feedback}
+        ownerId={ownerId}
+        currentUserId={currentUserId}
+        submissionId={audioId}
+        canWrite={canWrite}
+        onClose={() => setSheetVisible(false)}
+        onFeedbackUpsert={onFeedbackUpsert}
+        onFeedbackDelete={onFeedbackDelete}
+      />
+    </View>
+  );
+}
+
+function FeedbackSheet({
+  visible,
+  feedback,
+  ownerId,
+  currentUserId,
+  submissionId,
+  canWrite,
+  onClose,
+  onFeedbackUpsert,
+  onFeedbackDelete,
+}: {
+  visible: boolean;
+  feedback: PracticeFeedbackDto[];
+  ownerId: string;
+  currentUserId: string;
+  submissionId: string;
+  canWrite: boolean;
+  onClose: () => void;
+  onFeedbackUpsert: (feedback: PracticeFeedbackDto) => void;
+  onFeedbackDelete: (feedbackId: string) => void;
+}) {
+  const [content, setContent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [editingSaving, setEditingSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setContent('');
+    }
+  }, [visible]);
+
+  const save = async () => {
+    const trimmed = content.trim();
+    if (!trimmed || trimmed.length > 120) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await api.post<PracticeFeedbackDto>(`/practice-submissions/${submissionId}/feedback`, { content: trimmed });
+      onFeedbackUpsert(saved);
+      setContent('');
+    } catch (error) {
+      Alert.alert('피드백 저장 실패', error instanceof Error ? error.message : '피드백을 저장하지 못했어요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const acknowledge = async (item: PracticeFeedbackDto) => {
+    try {
+      onFeedbackUpsert(await api.post<PracticeFeedbackDto>(`/practice-feedback/${item.id}/acknowledge`));
+    } catch (error) {
+      Alert.alert('확인 처리 실패', error instanceof Error ? error.message : '피드백을 확인 처리하지 못했어요.');
+    }
+  };
+
+  const saveEdit = async () => {
+    const trimmed = editingContent.trim();
+    if (!editingId || !trimmed || trimmed.length > 120) {
+      return;
+    }
+    setEditingSaving(true);
+    try {
+      const updated = await api.patch<PracticeFeedbackDto>(`/practice-feedback/${editingId}`, { content: trimmed });
+      onFeedbackUpsert(updated);
+      setEditingId(null);
+      setEditingContent('');
+    } catch (error) {
+      Alert.alert('피드백 수정 실패', error instanceof Error ? error.message : '피드백을 수정하지 못했어요.');
+    } finally {
+      setEditingSaving(false);
+    }
+  };
+
+  const remove = (item: PracticeFeedbackDto) => {
+    Alert.alert('피드백을 삭제할까요?', '삭제한 피드백은 되돌릴 수 없어요.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/practice-feedback/${item.id}`);
+            onFeedbackDelete(item.id);
+          } catch (error) {
+            Alert.alert('삭제 실패', error instanceof Error ? error.message : '피드백을 삭제하지 못했어요.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const showComposer = canWrite;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.feedbackModalRoot} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={styles.feedbackBackdrop} onPress={onClose} />
+        <View style={styles.feedbackSheet}>
+          <View style={styles.feedbackSheetHandle} />
+          <View style={styles.feedbackSheetHeader}>
+            <View>
+              <Text style={styles.feedbackSheetTitle}>피드백</Text>
+              <Text style={styles.feedbackSheetSubtitle}>{feedback.length}개의 피드백</Text>
+            </View>
+            <Pressable style={styles.feedbackCloseButton} onPress={onClose}>
+              <Ionicons name="close" size={21} color={theme.colors.text} />
+            </Pressable>
+          </View>
+
+          {showComposer ? (
+            <View style={styles.feedbackComposer}>
+              <View style={styles.feedbackComposerHeader}>
+                <Text style={styles.feedbackTimestampBadge}>
+                  피드백 남기기
+                </Text>
+                <Text style={styles.feedbackCharacterCount}>{content.length}/120</Text>
+              </View>
+              <TextInput
+                value={content}
+                onChangeText={setContent}
+                placeholder="짧고 구체적으로 남겨주세요"
+                placeholderTextColor={theme.colors.textMuted}
+                maxLength={120}
+                style={styles.feedbackInput}
+                returnKeyType="done"
+                onSubmitEditing={() => void save()}
+              />
+              <View style={styles.feedbackComposerActions}>
+                <Pressable
+                  style={[styles.feedbackSaveButton, (!content.trim() || saving) && styles.feedbackSaveButtonDisabled]}
+                  onPress={() => void save()}
+                  disabled={!content.trim() || saving}
+                >
+                  <Text style={styles.feedbackSaveText}>{saving ? '저장 중' : '남기기'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          <ScrollView style={styles.feedbackList} contentContainerStyle={styles.feedbackListContent} keyboardShouldPersistTaps="handled">
+            {feedback.length === 0 ? (
+              <View style={styles.feedbackEmpty}>
+                <Ionicons name="chatbubble-outline" size={25} color={theme.colors.textMuted} />
+                <Text style={styles.feedbackEmptyTitle}>아직 피드백이 없어요</Text>
+                <Text style={styles.feedbackEmptyText}>아직 남겨진 피드백이 없어요.</Text>
+              </View>
+            ) : feedback.map((item) => {
+              const isAuthor = item.authorId === currentUserId;
+              const isOwner = ownerId === currentUserId;
+              return (
+                <View key={item.id} style={styles.feedbackItem}>
+                  <View style={styles.feedbackAvatar}>
+                    <Text style={styles.feedbackAvatarText}>{item.authorName.slice(0, 1)}</Text>
+                  </View>
+                  <View style={styles.feedbackItemBody}>
+                    <View style={styles.feedbackItemHeader}>
+                      <Text style={styles.feedbackAuthor}>{item.authorName}</Text>
+                      {item.acknowledgedAt ? (
+                        <View style={styles.feedbackAcknowledged}>
+                          <Ionicons name="checkmark" size={12} color={theme.colors.success} />
+                          <Text style={styles.feedbackAcknowledgedText}>확인</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {editingId === item.id ? (
+                      <View style={styles.feedbackInlineEditor}>
+                        <TextInput
+                          value={editingContent}
+                          onChangeText={setEditingContent}
+                          maxLength={120}
+                          autoFocus
+                          multiline
+                          style={styles.feedbackInlineInput}
+                        />
+                        <View style={styles.feedbackInlineActions}>
+                          <Pressable onPress={() => { setEditingId(null); setEditingContent(''); }}>
+                            <Text style={styles.feedbackInlineCancel}>취소</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => void saveEdit()}
+                            disabled={!editingContent.trim() || editingSaving}
+                          >
+                            <Text style={[styles.feedbackInlineSave, (!editingContent.trim() || editingSaving) && styles.feedbackInlineSaveDisabled]}>
+                              {editingSaving ? '저장 중' : '완료'}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.feedbackContent}>{item.content}</Text>
+                    )}
+                    <View style={styles.feedbackItemActions}>
+                      {isOwner && !item.acknowledgedAt ? (
+                        <Pressable onPress={() => void acknowledge(item)}><Text style={styles.feedbackActionText}>확인했어요</Text></Pressable>
+                      ) : null}
+                      {isAuthor ? (
+                        <>
+                          {editingId !== item.id ? (
+                            <Pressable onPress={() => { setEditingId(item.id); setEditingContent(item.content); }}>
+                              <Text style={styles.feedbackActionText}>수정</Text>
+                            </Pressable>
+                          ) : null}
+                          <Pressable onPress={() => remove(item)}><Text style={[styles.feedbackActionText, styles.feedbackDeleteText]}>삭제</Text></Pressable>
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -1397,24 +1664,6 @@ function Waveform({ samples, active = false }: { samples?: number[]; active?: bo
   );
 }
 
-function meteringToWaveHeight(metering: number) {
-  const clamped = Math.max(-60, Math.min(0, metering));
-  return Math.max(0.08, Math.min(1, (clamped + 60) / 60));
-}
-
-function normalizeWaveform(samples?: number[]) {
-  const fallback = Array.from({ length: 32 }, (_, index) => 0.2 + (((index * 7) % 18) / 24));
-  const source = samples && samples.length > 0 ? samples : fallback;
-
-  return Array.from({ length: 32 }, (_, index) => {
-    const start = Math.floor((index / 32) * source.length);
-    const end = Math.max(start + 1, Math.floor(((index + 1) / 32) * source.length));
-    const chunk = source.slice(start, end);
-    const average = chunk.reduce((sum, value) => sum + value, 0) / chunk.length;
-    return Math.max(0.08, Math.min(1, average));
-  });
-}
-
 function showRecordingReadyAlert() {
   return new Promise<boolean>((resolve) => {
     let settled = false;
@@ -1435,16 +1684,6 @@ function showRecordingReadyAlert() {
   });
 }
 
-function getSourcePlaybackPlan(segmentStartSec: number, countdownSec: number) {
-  const safeSegmentStartSec = Math.max(0, segmentStartSec);
-  const availablePreRollSec = Math.min(countdownSec, safeSegmentStartSec);
-
-  return {
-    sourceStartSec: safeSegmentStartSec - availablePreRollSec,
-    sourceStartDelayMs: (countdownSec - availablePreRollSec) * 1000,
-  };
-}
-
 function FakeTimeline({ startSec, endSec }: { startSec: number | null; endSec: number | null }) {
   const start = Math.max(4, Math.min(78, (startSec ?? 15) / 2));
   const width = Math.max(16, Math.min(58, ((endSec ?? 60) - (startSec ?? 15)) / 2));
@@ -1456,81 +1695,6 @@ function FakeTimeline({ startSec, endSec }: { startSec: number | null; endSec: n
       <View style={[styles.timelineHandle, { left: `${Math.min(94, start + width)}%` }]} />
     </View>
   );
-}
-
-function getRequiredRecordingSec(detail: PracticeDetailDto | null) {
-  if (!detail || detail.startSec === null || detail.endSec === null || detail.endSec <= detail.startSec) {
-    return null;
-  }
-  return detail.endSec - detail.startSec;
-}
-
-function isLongEnoughForAssignment(durationSec: number | null, detail: PracticeDetailDto | null) {
-  const requiredSec = getRequiredRecordingSec(detail);
-  if (requiredSec === null) {
-    return true;
-  }
-  return durationSec !== null && durationSec + 0.75 >= requiredSec;
-}
-
-function buildDurationMessage(detail: PracticeDetailDto | null, durationSec: number | null) {
-  const requiredSec = getRequiredRecordingSec(detail);
-  if (requiredSec === null) {
-    return '녹음 길이를 확인할 수 없습니다. 다시 녹음해 주세요.';
-  }
-  const actual = durationSec === null ? '확인 불가' : formatSeconds(Math.max(0, Math.floor(durationSec)));
-  return `이 과제는 최소 ${formatSeconds(requiredSec)} 녹음해야 저장할 수 있어요. 현재 녹음 길이: ${actual}`;
-}
-
-function getNextTakeNumber(drafts: DraftRecording[]) {
-  return drafts.reduce((max, draft, index) => Math.max(max, draft.takeNumber ?? getLegacyTakeNumber(drafts, index)), 0) + 1;
-}
-
-function getLegacyTakeNumber(drafts: DraftRecording[], index: number) {
-  const ordered = [...drafts].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  const draft = drafts[index];
-  const legacyIndex = ordered.findIndex((item) => item.id === draft.id);
-  return legacyIndex >= 0 ? legacyIndex + 1 : index + 1;
-}
-
-function getYoutubeVideoId(url: string | null) {
-  if (!url) {
-    return null;
-  }
-  const match = url.match(/[?&]v=([^&]+)/) ?? url.match(/youtu\.be\/([^?&]+)/);
-  return match?.[1] ?? null;
-}
-
-function getFallbackYoutubeVideoId(title?: string | null, artist?: string | null) {
-  const key = `${title ?? ''} ${artist ?? ''}`.replace(/\s+/g, '').toLowerCase();
-  if (key.includes('그대에게') || key.includes('신해철')) {
-    return 'gJqCO8E63-s';
-  }
-  return null;
-}
-
-function formatRange(startSec: number | null, endSec: number | null) {
-  if (startSec === null && endSec === null) {
-    return '구간 미정';
-  }
-  return `${formatSeconds(startSec ?? 0)} - ${endSec === null ? '?' : formatSeconds(endSec)}`;
-}
-
-function formatDateOnly(value: string) {
-  return new Date(value).toLocaleDateString('ko-KR');
-}
-
-function formatSeconds(value: number) {
-  const minutes = Math.floor(value / 60);
-  const seconds = String(value % 60).padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-function getPracticeProgress(startSec: number | null, endSec: number | null) {
-  if (startSec === null || endSec === null || endSec <= startSec) {
-    return 20;
-  }
-  return Math.max(10, Math.min(100, Math.round(((endSec - startSec) / 180) * 100)));
 }
 
 const styles = StyleSheet.create({
@@ -1590,13 +1754,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   closedSubmissionList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
   },
   submissionSectionLabel: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     textAlign: 'center',
     marginTop: 4,
@@ -1639,7 +1801,7 @@ const styles = StyleSheet.create({
   },
   closedSubmissionMeta: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   headerOverlay: {
@@ -1661,7 +1823,7 @@ const styles = StyleSheet.create({
   },
   headerMeta: {
     color: 'rgba(255,255,255,0.78)',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   progressTrack: {
@@ -1711,7 +1873,7 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
   },
   stepLabelActive: {
@@ -1772,7 +1934,7 @@ const styles = StyleSheet.create({
   },
   rangeHighlightLabel: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   rangeHighlightValue: {
@@ -1794,7 +1956,7 @@ const styles = StyleSheet.create({
   },
   memoLabel: {
     color: theme.colors.text,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   memoText: {
@@ -1816,12 +1978,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   infoValue: {
     color: theme.colors.primaryDark,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   actionRow: {
@@ -1878,7 +2040,7 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   timelineTrack: {
@@ -1918,12 +2080,12 @@ const styles = StyleSheet.create({
   },
   audioTitle: {
     color: theme.colors.primaryDark,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   audioHint: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   waveform: {
@@ -2007,9 +2169,9 @@ const styles = StyleSheet.create({
   },
   recorderHint: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 18,
+    lineHeight: 20,
     textAlign: 'center',
   },
   cancelPill: {
@@ -2021,7 +2183,7 @@ const styles = StyleSheet.create({
   },
   cancelPillText: {
     color: theme.colors.primaryDark,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
   },
   secondaryAction: {
@@ -2037,7 +2199,7 @@ const styles = StyleSheet.create({
   },
   subtleEndButtonText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   draftList: {
@@ -2081,7 +2243,7 @@ const styles = StyleSheet.create({
   },
   draftMeta: {
     color: theme.colors.textMuted,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -2151,7 +2313,7 @@ const styles = StyleSheet.create({
   },
   remotePlayerMeta: {
     color: 'rgba(255,255,255,0.78)',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -2172,22 +2334,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submissionTile: {
-    width: '31%',
-    aspectRatio: 1,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    padding: 10,
-    justifyContent: 'space-between',
+    padding: 11,
+    gap: 8,
   },
   submissionTileActive: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primarySoft,
   },
+  ...StyleSheet.create({
+  submissionTileMain: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 7,
+  },
+  submissionTileIdentity: {
+    width: '100%',
+    minWidth: 0,
+    gap: 2,
+  },
   submissionTileIcon: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 999,
     backgroundColor: theme.colors.primarySoft,
     alignItems: 'center',
@@ -2200,19 +2372,588 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 13,
     fontWeight: '900',
-    lineHeight: 16,
+    lineHeight: 19,
   },
   submissionTilePosition: {
     color: theme.colors.primaryDark,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
-    lineHeight: 14,
+    lineHeight: 20,
   },
   submissionTileMeta: {
     color: theme.colors.textMuted,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
     lineHeight: 13,
+  },
+  feedbackCountButton: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  feedbackCountText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackUnreadDot: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  feedbackUnreadText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  feedbackAtTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: 7,
+  },
+  feedbackAtTimeText: {
+    color: theme.colors.primaryDark,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  feedbackModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  feedbackBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(14, 12, 30, 0.45)',
+  },
+  feedbackSheet: {
+    maxHeight: '78%',
+    minHeight: 360,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 14,
+  },
+  feedbackSheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.border,
+  },
+  feedbackSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  feedbackSheetTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  feedbackSheetSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  feedbackCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackComposer: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceMuted,
+    padding: 11,
+    gap: 9,
+  },
+  feedbackComposerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  feedbackTimestampBadge: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: theme.colors.primarySoft,
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  feedbackCharacterCount: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  feedbackInput: {
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
+    fontSize: 13,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  feedbackComposerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 7,
+  },
+  feedbackCancelEdit: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  feedbackCancelEditText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackSaveButton: {
+    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  feedbackSaveButtonDisabled: {
+    opacity: 0.45,
+  },
+  feedbackSaveText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackList: {
+    flexGrow: 0,
+  },
+  feedbackListContent: {
+    paddingBottom: 12,
+  },
+  feedbackEmpty: {
+    minHeight: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  feedbackEmptyTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  feedbackEmptyText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  feedbackItem: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    padding: 11,
+    gap: 8,
+  },
+  feedbackItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  feedbackTimestampButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  feedbackTimestampText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackAuthor: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackAcknowledged: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  feedbackAcknowledgedText: {
+    color: theme.colors.success,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackContent: {
+    color: theme.colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '400',
+  },
+  feedbackItemActions: {
+    minHeight: 18,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+  },
+  feedbackActionText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackDeleteText: {
+    color: theme.colors.danger,
+  },
+  }),
+  submissionTileMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  submissionTileIdentity: {
+    flex: 1,
+    gap: 3,
+  },
+  feedbackCountButton: {
+    minHeight: 36,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    backgroundColor: theme.colors.primarySoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  feedbackCountText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackUnreadDot: {
+    minWidth: 17,
+    height: 17,
+    borderRadius: 999,
+    paddingHorizontal: 4,
+    backgroundColor: theme.colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackUnreadText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  feedbackAtTimeButton: {
+    minHeight: 34,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  feedbackAtTimeText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  feedbackBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(17, 24, 39, 0.48)',
+  },
+  feedbackSheet: {
+    height: '82%',
+    minHeight: 360,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 92 : 82,
+  },
+  feedbackSheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: theme.colors.border,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  feedbackSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 13,
+  },
+  feedbackSheetTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  feedbackSheetSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  feedbackCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: theme.colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackComposer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: 72,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  feedbackComposerHeader: {
+    display: 'none',
+  },
+  feedbackTimestampBadge: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackCharacterCount: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  feedbackComposerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedbackSaveButton: {
+    minWidth: 54,
+    minHeight: 38,
+    borderRadius: 19,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  feedbackSaveButtonDisabled: {
+    opacity: 0.45,
+  },
+  feedbackSaveText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackCancelEdit: {
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  feedbackCancelEditText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackList: {
+    flex: 1,
+  },
+  feedbackListContent: {
+    gap: 9,
+    paddingBottom: 8,
+  },
+  feedbackEmpty: {
+    minHeight: 190,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  feedbackEmptyTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  feedbackEmptyText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  feedbackItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  feedbackAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackAvatarText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackItemBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  feedbackItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  feedbackTimestampButton: {
+    borderRadius: 999,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 8,
+    height: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  feedbackTimestampText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackAuthor: {
+    color: theme.colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackAcknowledged: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  feedbackAcknowledgedText: {
+    color: theme.colors.success,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  feedbackContent: {
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '400',
+  },
+  feedbackInlineEditor: {
+    gap: 6,
+  },
+  feedbackInlineInput: {
+    minHeight: 42,
+    maxHeight: 96,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '400',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    textAlignVertical: 'top',
+  },
+  feedbackInlineActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 14,
+  },
+  feedbackInlineCancel: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  feedbackInlineSave: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackInlineSaveDisabled: {
+    opacity: 0.4,
+  },
+  feedbackItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingTop: 2,
+  },
+  feedbackActionText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  feedbackDeleteText: {
+    color: theme.colors.danger,
   },
   submissionBody: {
     flex: 1,
@@ -2224,7 +2965,7 @@ const styles = StyleSheet.create({
   },
   submissionMeta: {
     color: 'rgba(255,255,255,0.82)',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   submissionItem: {

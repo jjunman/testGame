@@ -24,10 +24,8 @@ export type TodoType =
   | 'start_song_round'
   | 'vote_song'
   | 'vote_schedule_proposal'
-  | 'vote_studio'
   | 'submit_practice'
-  | 'submit_schedule'
-  | 'start_studio';
+  | 'submit_schedule';
 
 export type BandSummary = {
   id: string;
@@ -96,6 +94,18 @@ export type PracticeSubmissionDto = {
   positionLabel: string;
   audioUrl: string;
   submittedAt: string;
+  durationSec: number | null;
+};
+
+export type PracticeFeedbackDto = {
+  id: string;
+  submissionId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  acknowledgedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ScheduleSlotDto = {
@@ -191,14 +201,65 @@ export type StudioLocationDto = {
   longitude: number | null;
 };
 
+export type SettlementParticipantDto = {
+  userId: string;
+  memberName: string;
+  profileImageUrl: string | null;
+  amount: number;
+  paid: boolean;
+  paidAt: string | null;
+};
+
+export type SettlementRoundDto = {
+  id: string;
+  status: 'active' | 'outstanding' | 'completed';
+  totalAmount: number;
+  participants: SettlementParticipantDto[];
+  createdByUserId: string;
+  createdByName: string;
+  updatedByUserId: string;
+  updatedByName: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  deadlineAt: string;
+  version: number;
+};
+
+export type SettlementOverviewDto = {
+  activeRounds: SettlementRoundDto[];
+  outstandingRounds: SettlementRoundDto[];
+  outstandingSummary: {
+    totalAmount: number;
+    unpaidCount: number;
+    unpaidMemberCount: number;
+  };
+  recentCompleted: SettlementRoundDto[];
+};
+
+/** @deprecated 이전 정산 화면의 컴파일 호환용입니다. */
 export type SettlementDto = {
   selectedStudioId: string | null;
   customTotalPrice: number | null;
+  priceMode: 'studio' | 'manual';
+  manualHourlyPrice: number | null;
   usageHours: number;
   usageHoursFromSchedule: boolean;
   participantUserIds: string[];
   paidUserIds: string[];
+  outstandingAmountsByUserId: Record<string, number>;
+  outstandingPaymentHistory: OutstandingPaymentHistoryItemDto[];
   updatedAt: string;
+};
+
+export type OutstandingPaymentHistoryItemDto = {
+  id: string;
+  userId: string;
+  memberName: string;
+  amount: number;
+  paidAt: string;
+  markedByUserId: string;
+  markedByName: string;
 };
 
 export type TodoItemDto = {
@@ -207,7 +268,7 @@ export type TodoItemDto = {
   description: string;
   dueLabel?: string | null;
   dueAt?: string | null;
-  shortcut?: 'song_round' | 'practice' | 'schedule' | 'studio';
+  shortcut?: 'song_round' | 'practice' | 'schedule';
   targetId?: string | null;
 };
 
@@ -260,6 +321,7 @@ export type BandHomeDto = {
     startTime: string;
     endTime: string;
   } | null;
+  confirmedStudioName: string | null;
   todos: TodoItemDto[];
   voteSummary: VoteSummaryDto;
   songCards: BandSongCardDto[];

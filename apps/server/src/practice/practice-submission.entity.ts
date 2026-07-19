@@ -3,12 +3,14 @@ import {
   CreateDateColumn,
   Entity,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
 import { PracticeSubmissionStatus } from '../common/enums';
 import { User } from '../users/user.entity';
 import { PracticeAssignment } from './practice-assignment.entity';
+import { PracticeFeedback } from './practice-feedback.entity';
 
 @Entity('practice_submissions')
 @Unique(['assignment', 'user'])
@@ -38,4 +40,7 @@ export class PracticeSubmission {
 
   @Column({ type: 'varchar', default: PracticeSubmissionStatus.SUBMITTED })
   status: PracticeSubmissionStatus;
+
+  @OneToMany(() => PracticeFeedback, (feedback) => feedback.submission)
+  feedback: PracticeFeedback[];
 }

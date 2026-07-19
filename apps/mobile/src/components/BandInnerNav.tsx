@@ -1,21 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../constants/theme';
+import { BandsStackParamList } from '../types/navigation';
 
 type BandInnerNavProps = {
   bandId: string;
-  active: 'home' | 'song' | 'vote' | 'calendar' | 'studio' | 'settlement';
-  navigation: any;
+  active: 'home' | 'song' | 'vote' | 'studio' | 'settlement';
+  navigation: NativeStackNavigationProp<BandsStackParamList>;
 };
 
-let lastActiveIndex = 0;
+const navItemCount = 4;
 
 export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) {
   const [navWidth, setNavWidth] = useState(0);
   const activeIndex = getActiveIndex(active);
-  const indicatorProgress = useRef(new Animated.Value(Math.max(0, lastActiveIndex))).current;
-  const indicatorWidth = navWidth > 0 ? (navWidth - 10) / 6 : 0;
+  const indicatorProgress = useRef(new Animated.Value(activeIndex)).current;
+  const indicatorWidth = navWidth > 0 ? (navWidth - 8) / navItemCount : 0;
   const showIndicator = activeIndex >= 0 && indicatorWidth > 0;
 
   useEffect(() => {
@@ -30,7 +32,6 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       stiffness: 220,
       mass: 0.65,
     }).start();
-    lastActiveIndex = activeIndex;
   }, [activeIndex, indicatorProgress, showIndicator]);
 
   return (
@@ -45,8 +46,8 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
               transform: [
                 {
                   translateX: indicatorProgress.interpolate({
-                    inputRange: [0, 1, 2, 3, 4, 5],
-                    outputRange: [0, indicatorWidth, indicatorWidth * 2, indicatorWidth * 3, indicatorWidth * 4, indicatorWidth * 5],
+                    inputRange: [0, 1, 2, 3],
+                    outputRange: [0, indicatorWidth, indicatorWidth * 2, indicatorWidth * 3],
                   }),
                 },
               ],
@@ -57,32 +58,20 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="홈"
         active={active === 'home'}
-        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={21} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'home' ? 'home' : 'home-outline'} size={26} color={active === 'home' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('BandHome', { bandId })}
       />
       <NavItem
-        label="연습"
-        active={active === 'song'}
+        label="곡·연습"
+        active={active === 'song' || active === 'vote'}
         icon={
           <MaterialCommunityIcons
-            name={active === 'song' ? 'music-note' : 'music-note-outline'}
-            size={21}
-            color={active === 'song' ? theme.colors.primary : inactiveColor}
+            name={active === 'song' || active === 'vote' ? 'music-note' : 'music-note-outline'}
+            size={26}
+            color={active === 'song' || active === 'vote' ? theme.colors.primary : inactiveColor}
           />
         }
-        onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'library' })}
-      />
-      <NavItem
-        label="곡투표"
-        active={active === 'vote'}
-        icon={<Ionicons name={active === 'vote' ? 'checkbox' : 'checkbox-outline'} size={21} color={active === 'vote' ? theme.colors.primary : inactiveColor} />}
-        onPress={() => navigation.navigate('SongRound', { bandId, initialTab: 'vote' })}
-      />
-      <NavItem
-        label="일정"
-        active={active === 'calendar'}
-        icon={<Ionicons name={active === 'calendar' ? 'calendar' : 'calendar-outline'} size={21} color={active === 'calendar' ? theme.colors.primary : inactiveColor} />}
-        onPress={() => navigation.navigate('Schedule', { bandId })}
+        onPress={() => navigation.navigate('SongRound', { bandId })}
       />
       <NavItem
         label="합주실"
@@ -90,7 +79,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
         icon={
           <MaterialCommunityIcons
             name={active === 'studio' ? 'map-marker' : 'map-marker-outline'}
-            size={21}
+            size={26}
             color={active === 'studio' ? theme.colors.primary : inactiveColor}
           />
         }
@@ -99,7 +88,7 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
       <NavItem
         label="정산"
         active={active === 'settlement'}
-        icon={<Ionicons name={active === 'settlement' ? 'card' : 'card-outline'} size={21} color={active === 'settlement' ? theme.colors.primary : inactiveColor} />}
+        icon={<Ionicons name={active === 'settlement' ? 'card' : 'card-outline'} size={26} color={active === 'settlement' ? theme.colors.primary : inactiveColor} />}
         onPress={() => navigation.navigate('Settlement', { bandId })}
       />
     </View>
@@ -109,7 +98,10 @@ export function BandInnerNav({ bandId, active, navigation }: BandInnerNavProps) 
 const inactiveColor = '#7c8491';
 
 function getActiveIndex(active: BandInnerNavProps['active']) {
-  return ['home', 'song', 'vote', 'calendar', 'studio', 'settlement'].indexOf(active);
+  if (active === 'song' || active === 'vote') {
+    return 1;
+  }
+  return active === 'home' ? 0 : active === 'studio' ? 2 : 3;
 }
 
 function NavItem({
@@ -124,9 +116,16 @@ function NavItem({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.item}>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      hitSlop={4}
+      onPress={onPress}
+      style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+    >
       {icon}
-      <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.label, active && styles.labelActive]} numberOfLines={2}>{label}</Text>
     </Pressable>
   );
 }
@@ -134,24 +133,20 @@ function NavItem({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    height: 62,
+    height: 76,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 5,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 2,
+    padding: 4,
+    ...theme.shadow.floating,
     overflow: 'hidden',
   },
   indicator: {
     position: 'absolute',
-    top: 5,
-    bottom: 5,
-    left: 5,
+    top: 4,
+    bottom: 4,
+    left: 4,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primarySoft,
   },
@@ -159,16 +154,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
     borderRadius: theme.radius.md,
     zIndex: 1,
   },
+  itemPressed: {
+    opacity: 0.62,
+    transform: [{ scale: 0.97 }],
+  },
   label: {
     color: inactiveColor,
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '800',
+    lineHeight: 15,
+    minHeight: 30,
+    textAlign: 'center',
   },
   labelActive: {
     color: theme.colors.primaryDark,
+    fontWeight: '800',
   },
 });

@@ -14,8 +14,6 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -23,6 +21,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 import { BandsService } from './bands.service';
 import { CreateBandDto, JoinBandDto, TransferLeaderDto } from './dto';
+import { imageUploadOptions } from '../common/upload';
 
 @UseGuards(JwtAuthGuard)
 @Controller('bands')
@@ -41,15 +40,7 @@ export class BandsController {
 
   @Post()
   @UseInterceptors(
-    FileInterceptor('thumbnail', {
-      storage: diskStorage({
-        destination: 'uploads',
-        filename: (_req, file, callback) => {
-          const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extname(file.originalname)}`;
-          callback(null, name);
-        },
-      }),
-    }),
+    FileInterceptor('thumbnail', imageUploadOptions),
   )
   async create(
     @CurrentUser() currentUser: { userId: string },
@@ -129,15 +120,7 @@ export class BandsController {
 
   @Patch(':bandId/members/me/profile-image')
   @UseInterceptors(
-    FileInterceptor('profileImage', {
-      storage: diskStorage({
-        destination: 'uploads',
-        filename: (_req, file, callback) => {
-          const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extname(file.originalname)}`;
-          callback(null, name);
-        },
-      }),
-    }),
+    FileInterceptor('profileImage', imageUploadOptions),
   )
   updateMyProfileImage(
     @CurrentUser() user: { userId: string },

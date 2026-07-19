@@ -4,17 +4,22 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { uploadDirectory } from './common/upload';
+import { mkdirSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
   const reflector = app.get(Reflector);
 
-  app.enableCors();
-  app.useStaticAssets('uploads', { prefix: '/uploads' });
+  const corsOrigins = configService.get<string[]>('corsOrigins') ?? [];
+  app.enableCors(corsOrigins.length > 0 ? { origin: corsOrigins } : undefined);
+  mkdirSync(uploadDirectory, { recursive: true });
+  app.useStaticAssets(uploadDirectory, { prefix: '/uploads' });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
     }),
   );

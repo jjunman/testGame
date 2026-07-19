@@ -10,6 +10,18 @@
     "dev:server": "npm --workspace @band/server run start:dev",
     "dev:mobile": "npm --workspace @band/mobile run start",
     "build:server": "npm --workspace @band/server run build",
-    "lint:server": "npm --workspace @band/server run lint"
+    "start:server": "node apps/server/dist/main.js",
+    "lint:server": "npm --workspace @band/server run lint",
+    "lint:mobile": "tsc -p apps/mobile/tsconfig.json --noEmit",
+    "check": "npm run lint:server && npm run lint:mobile && npm run build:server"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "@types/react-dom": "^19.1.9",
+    "react-dom": "19.1.0"
+  },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }

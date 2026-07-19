@@ -1,6 +1,8 @@
 import {
   IsDateString,
   IsNumber,
+  MaxLength,
+  MinLength,
   IsOptional,
   IsString,
   Min,
@@ -30,4 +32,18 @@ export class CreatePracticeAssignmentDto {
 
   @IsDateString()
   dueAt: string;
+}
+
+export class CreatePracticeFeedbackDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  content: string;
+}
+
+export class UpdatePracticeFeedbackDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  content: string;
 }
